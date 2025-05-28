@@ -1,0 +1,90 @@
+from django.db import models
+from django.conf import settings
+
+from jao_backend.embeddings.models import TaggedEmbedding
+from jao_backend.roles.models import Grade
+from jao_backend.vacancies.querysets import VacancyQuerySet
+
+
+class Vacancy(models.Model):
+    class Meta:
+        verbose_name_plural = "Vacancies"
+
+    id = models.IntegerField(
+        primary_key=True, help_text="CS Jobs vacancy ID [5-6 characters]"
+    )
+
+    last_updated = models.DateTimeField(
+        help_text="Last updated date and time."
+    )
+
+    is_deleted = models.BooleanField(default=False, help_text="Vacancy is marked as deleted.")
+    """
+    This ID is synchronised to vacancy_id in the R2D2 database.
+    """
+
+    min_salary = models.DecimalField(
+        max_digits=10, decimal_places=2, help_text="The minimum salary.", null=True
+    )
+    max_salary = models.DecimalField(
+        max_digits=10, decimal_places=2, help_text="The maximum salary.", null=True
+    )
+
+    title = models.TextField(null=True, blank=True, help_text="Job title.")
+    description = models.TextField(null=True, blank=True, help_text="Job description.")
+    summary = models.TextField(null=True, blank=True, help_text="Blerb about teams.")
+
+    objects = VacancyQuerySet.as_manager()
+
+    def __str__(self):
+        return f"{self.id, self.title}"
+
+
+class VacancyGrade(models.Model):
+    """
+    A Vacancy can have many grades.
+    """
+
+    vacancy = models.ForeignKey(
+        Vacancy, on_delete=models.CASCADE, help_text="The vacancy."
+    )
+    grade = models.ForeignKey(
+        Grade, on_delete=models.CASCADE, help_text="The grade of the vacancy."
+    )
+
+    class Meta:
+        unique_together = ("vacancy", "grade")
+        verbose_name_plural = "Vacancy Grades"
+
+    def __str__(self):
+        return f"{self.vacancy.job_title} - {self.grade.name}"
+
+
+class VacancyEmbedding(TaggedEmbedding):
+    """
+    A Vacancy can have many embeddings.
+    """
+
+    vacancy = models.ForeignKey(
+        Vacancy, on_delete=models.CASCADE, help_text="The vacancy."
+    )
+
+    allowed_tags = [
+        settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID,
+    ]
+
+    deprecated_tags = []
+
+    class Meta:
+        unique_together = ("vacancy", "tag", "embedding")
+        verbose_name_plural = "Vacancy Embeddings"
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=["vacancy", "tag", "embedding", "chunk_index"],
+                name="unique_vacancy_embedding_chunk",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.vacancy.job_title} - {self.tag.name}"

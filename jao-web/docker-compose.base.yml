@@ -1,0 +1,9 @@
+services:
+  jao-web:
+    build:
+      context: ..
+      dockerfile: jao-web/Dockerfile
+    image: jao-web-image
+    volumes:
+      - ../models:/app/models
+      - ../recruitmentcopilot:/app/recruitmentcopilot

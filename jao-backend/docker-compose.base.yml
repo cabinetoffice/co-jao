@@ -1,0 +1,29 @@
+services:
+  jao-backend:
+    build:
+      context: ..
+      dockerfile: jao-backend/Dockerfile
+      target: base
+    command: >
+          sh -c "poetry run python src/manage.py collectstatic --noinput &&
+                 poetry run python src/manage.py migrate &&
+                 poetry run hypercorn src/asgi:application --bind 0.0.0.0:8000"
+    image: jao-backend-image
+    volumes:
+      - ../models:/app/models
+      - ../recruitmentcopilot:/app/recruitmentcopilot
+
+  jao-backend-jupyter:
+    # Useful during development
+    build:
+      context: ..
+      dockerfile: jao-backend/Dockerfile
+      target: jupyter
+    ports:
+      - "8899:8899"
+    volumes:
+      - ../jao-backend:/app/jao-backend
+    environment:
+      - ENV=dev
+      - DJANGO_SETTINGS_MODULE=jao_backend.settings.dev
+      - JAO_BACKEND_JUPYTER_TOKEN=${JAO_BACKEND_JUPYTER_TOKEN}

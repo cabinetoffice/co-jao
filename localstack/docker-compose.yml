@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  localstack:
+    container_name: localstack
+    image: localstack/localstack:1.4.0 # Pinned version for stability
+    ports:
+      - "4566:4566" # LocalStack Gateway
+      - "4510-4559:4510-4559" # External services port range
+    environment:
+      - DEBUG=1
+      - HOSTNAME_EXTERNAL=localstack
+      - SERVICES=apigateway,apigatewayv2,cloudformation,cloudwatch,dynamodb,ec2,ecr,ecs,iam,lambda,logs,route53,s3,secretsmanager,ses,sns,sqs,ssm,stepfunctions,sts
+      - DEFAULT_REGION=eu-west-2
+      - DISABLE_CORS_CHECKS=1
+      - LAMBDA_EXECUTOR=local
+      - PERSISTENCE=0
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - USE_SSL=0
+      - SKIP_SSL_CERT_DOWNLOAD=1
+      - DATA_DIR=/tmp/localstack/data
+      - LS_LOG=trace # More verbose logging to debug issues
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "localstack_data:/tmp/localstack/data"
+    networks:
+      - localstack-network
+
+  # A simple container to serve our test app
+  app:
+    container_name: api-backend
+    build:
+      context: ../app
+    ports:
+      - "5000:5000"
+    environment:
+      - LOG_LEVEL=INFO
+      - API_ENV=local
+      - ENABLE_DEBUG=true
+    networks:
+      - localstack-network
+    depends_on:
+      - localstack
+
+networks:
+  localstack-network:
+    driver: bridge
+
+volumes:
+  localstack_data:
+    driver: local
