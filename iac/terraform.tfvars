@@ -1,0 +1,45 @@
+# Override variables to work around resources that already exist
+
+# Resource existence flags
+skip_ecr_creation = false
+aws_account_id    = "860619597616"
+
+# Skip creating resources that already exist
+skip_frontend_role_creation   = false
+skip_backend_role_creation    = false
+skip_cloudwatch_logs_creation = false
+skip_s3_bucket_creation       = true
+skip_param_group_creation     = false
+skip_secret_creation          = true
+skip_policy_creation          = false
+
+# Disable features requiring enhanced permissions
+enable_enhanced_monitoring   = false
+performance_insights_enabled = false
+enable_xray_tracing          = false
+create_cloudwatch_alarms     = false
+enable_api_keys              = false
+enable_detailed_metrics      = false
+
+# Use internal load balancer to avoid public exposure
+internal_lb = false
+
+# Self-manage the initialization
+initialization_bucket = "python-api-dev-initialization"
+init_script           = null
+
+# VPC configuration
+availability_zones   = ["eu-west-2a", "eu-west-2b"]
+vpc_cidr             = "10.0.0.0/16"
+private_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24"]
+public_subnet_cidrs  = ["10.0.101.0/24", "10.0.102.0/24"]
+
+# Reduce resource requirements
+task_cpu      = 256
+task_memory   = 512
+desired_count = 1
+
+# Prevent any deletion protection
+lb_deletion_protection = false
+deletion_protection    = false
+enable_lb_access_logs  = false
