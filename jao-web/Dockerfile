@@ -1,65 +1,62 @@
-# Note: build context is the root of the repository: ..
-#       this is set in docker-compose.base.yml
-FROM python:3.12-slim
+# Use the official Python runtime as a parent image
+FROM python:3.12-slim AS base
 
-ENV POETRY_VERSION=1.8.3
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV POETRY_REQUESTS_TIMEOUT=60
-ENV POETRY_INSTALLER_MAX_WORKERS=4
+# Install Node.js and npm
+RUN apt-get update && \
+    apt-get install -y curl && \
+    curl -sL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-ENV ENV=dev
-ENV HOST=0.0.0.0
+# Create the app directory
+RUN mkdir /app
 
-RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
-    --mount=target=/var/cache/apt,type=cache,sharing=locked \
-    rm -f /etc/apt/apt.conf.d/docker-clean \
-    && apt-get update -y \
-    && apt-get install -y gcc g++ libgdal-dev curl npm \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN useradd --create-home --shell /bin/bash web
-
-RUN mkdir -p /app/jao-web && \
-    chown -R web:web /app
-
-RUN --mount=type=cache,mode=0755,target=/root/.cache/pip \
-    pip install --upgrade pip \
-    && pip install "poetry==$POETRY_VERSION" \
-    && chown -R web:web /app
-
+# Set the working directory inside the container
 WORKDIR /app
 
-USER web
+# Set environment variables to optimize Python
+ENV ENV=dev
+ENV PYTHONPATH="/app/src"
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-COPY --chown=web:web jao-backend-schemas/ /app/jao-backend-schemas
+# Install Poetry
+RUN curl -sSL https://install.python-poetry.org | python -
 
-#RUN mkdir -p /home/web/.cache /home/web/.npm && \
-#    chown -R web:web /home/web/.cache /home/web/.npm
+# Add Poetry to the PATH
+ENV PATH="/root/.local/bin:$PATH"
 
-WORKDIR /app/jao-web
+# Copy the jao-web-schemas directory
+COPY ./jao-web/jao_backend_schemas/ ./jao_backend_schemas/
 
-COPY --chown=web:web jao-web/package*.json /app/jao-web
+# Copy the poetry.lock and pyproject.toml files
+COPY ./jao-web/pyproject.toml ./pyproject.toml
+# COPY poetry.lock ./poetry.lock
 
-RUN --mount=type=cache,uid=1000,gid=1000,mode=0755,target=/home/web/.npm \
-    npm ci
+# Install Python dependencies
+RUN poetry install --no-root --no-cache
 
-COPY --chown=web:web jao-web/ /app/jao-web
+# Copy the package.json and package-lock.json files for npm
+COPY ./jao-web/package.json ./package.json
+# COPY package-lock.json ./package-lock.json
 
-RUN --mount=type=cache,uid=1000,gid=1000,mode=0755,target=/home/web/.npm \
-    npm run build
+# Install npm dependencies
+RUN npm i
 
-RUN --mount=type=cache,mode=0755,target=/home/web/.cache/pip \
-    if [ "$ENV" = "dev" ]; then \
-        poetry install --no-root; \
-    else \
-        poetry install --no-root --no-dev; \
-    fi
+# Copy the rest of the application code
+COPY ./jao-web/src/ ./src/
+COPY ./jao-web/*.py ./
 
-RUN poetry run python src/manage.py collectstatic --noinput
+# Create frontend module directory
+RUN mkdir -p /app/src/frontend
+RUN touch /app/src/frontend/__init__.py
 
-ENV PATH="$PATH:/home/web/.local/bin"
+RUN ls -la /app
+RUN ls -la /app/src
 
+# Expose the Django port
 EXPOSE 8000
 
-CMD ["poetry", "run", "hypercorn", "src/asgi:application", "--bind", "0.0.0.0:8000", "--reload"]
+# Start the application using hypercorn
+CMD ["poetry", "run", "hypercorn", "src.asgi:application", "--bind", "0.0.0.0:8000"]

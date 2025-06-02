@@ -1,79 +1,58 @@
-# Note: build context is the root of the repository: ..
-#       this is set in docker-compose.base.yml
+# Use the official Python runtime as a parent image
 FROM python:3.12-slim AS base
-ENV POETRY_VERSION=1.8.3
+
+# Install Node.js and npm
+RUN apt-get update && \
+    apt-get install -y curl && \
+    curl -sL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create the app directory
+RUN mkdir /app
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Set environment variables to optimize Python
+ENV ENV=dev
+ENV PYTHONPATH="/app/src"
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-ENV POETRY_REQUESTS_TIMEOUT=60
-ENV POETRY_INSTALLER_MAX_WORKERS=4
-ENV ENV=dev
-ENV HOST=0.0.0.0
 
-RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
-    --mount=target=/var/cache/apt,type=cache,sharing=locked \
-    rm -f /etc/apt/apt.conf.d/docker-clean \
-    && apt-get update -y \
-    && apt-get install -y gcc g++ libgdal-dev curl npm \
-    && rm -rf /var/lib/apt/lists/*
+# Install Poetry
+RUN curl -sSL https://install.python-poetry.org | python -
 
-RUN useradd --create-home --shell /bin/bash web
-RUN mkdir -p /app/jao-backend && \
-    chown -R web:web /app
+# Add Poetry to the PATH
+ENV PATH="/root/.local/bin:$PATH"
 
-RUN --mount=type=cache,mode=0755,target=/root/.cache/pip \
-    pip install --upgrade pip \
-    && pip install "poetry==$POETRY_VERSION" \
-    && chown -R web:web /app
+# Copy the jao-backend-schemas directory
+COPY ./jao-backend/jao_backend_schemas/ ./jao_backend_schemas/
 
-WORKDIR /app
-USER web
+# Copy the poetry.lock and pyproject.toml files
+COPY ./jao-backend/pyproject.toml ./pyproject.toml
+# COPY poetry.lock ./poetry.lock
 
-COPY --chown=web:web jao-backend-schemas/ /app/jao-backend-schemas
+# Install Python dependencies
+RUN poetry install --no-root --no-cache
 
-WORKDIR /app/jao-backend
-COPY --chown=web:web jao-backend/package*.json /app/jao-backend
+# Copy the package.json and package-lock.json files for npm
+COPY ./jao-backend/package.json ./package.json
+# COPY package-lock.json ./package-lock.json
 
-RUN --mount=type=cache,uid=1000,gid=1000,mode=0755,target=/home/web/.npm \
-    npm ci
+# Install npm dependencies
+RUN npm i
 
-COPY --chown=web:web jao-backend/ /app/jao-backend
+# Copy the rest of the application code
+COPY ./jao-backend/src/ ./src/
+COPY ./jao-backend/*.py ./
 
-RUN --mount=type=cache,uid=1000,gid=1000,mode=0755,target=/home/web/.npm \
-    npm run build
+RUN ls -la /app
+RUN ls -la /app/src
 
-RUN --mount=type=cache,mode=0755,target=/home/web/.cache/pip \
-    if [ "$ENV" = "dev" ]; then \
-        poetry install --no-root; \
-    else \
-        poetry install --no-root --no-dev; \
-    fi
-
-RUN --mount=type=cache,mode=0755,target=/home/web/.cache/pip \
-    poetry install
-
-RUN poetry run python src/manage.py collectstatic --noinput
-
-ENV PATH="$PATH:/home/web/.local/bin"
+# Expose the Django port
 EXPOSE 8000
 
-ENTRYPOINT ["poetry", "run"]
-CMD ["hypercorn", "src/asgi:application", "--bind", "0.0.0.0:8000", "--reload"]
-
-FROM base AS jupyter
-
-EXPOSE 8888
-ENV DJANGO_ALLOW_ASYNC_UNSAFE=True
-
-USER web
-WORKDIR /app/jao-backend
-
-# Install jupyter extra dependencies
-RUN --mount=type=cache,mode=0755,target=/home/web/.cache/pip \
-    poetry install -E jupyter
-
-# Expose Jupyter port
-EXPOSE 8899
-
-# Set the entrypoint to run Jupyter notebook
-ENTRYPOINT ["poetry", "run"]
-CMD ["src/manage.py", "shell_plus", "--lab"]
+# Start the application using hypercorn
+CMD ["poetry", "run", "hypercorn", "src.asgi:application", "--bind", "0.0.0.0:8000"]

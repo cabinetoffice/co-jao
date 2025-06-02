@@ -124,3 +124,15 @@ variable "existing_log_group_name" {
   type        = string
   default     = ""
 }
+
+variable "enable_enhanced_monitoring" {
+  description = "Whether to enable enhanced monitoring for the API"
+  type        = bool
+  default     = false
+}
+
+variable "enable_xray_tracing" {
+  description = "Whether to enable AWS X-Ray tracing for the API"
+  type        = bool
+  default     = false
+}
