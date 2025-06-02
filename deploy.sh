@@ -33,12 +33,12 @@ VPC_ID_VALIDATED=false
 # Function to validate VPC ID
 validate_vpc_id() {
     local vpc_id="$1"
-    
+
     if [ -z "$vpc_id" ]; then
         echo -e "${YELLOW}No VPC ID provided for validation.${NC}"
         return 1
     fi
-    
+
     echo -e "${YELLOW}Validating VPC ID: ${vpc_id}...${NC}"
     if aws ec2 describe-vpcs --vpc-ids "${vpc_id}" --region "${AWS_REGION}" &>/dev/null; then
         echo -e "${GREEN}VPC ID ${vpc_id} is valid.${NC}"
@@ -218,7 +218,7 @@ if [ "$SKIP_BACKEND" = false ]; then
     cd "${SCRIPT_DIR}"
     echo -e "${BLUE}Using build context: ${SCRIPT_DIR}${NC}"
     echo -e "${BLUE}Using Dockerfile: ${BACKEND_DIR}/Dockerfile${NC}"
-    
+
     # Run build with more verbose output and specific build args
     if ! docker build \
         --build-arg POETRY_VERSION=1.8.3 \
@@ -235,25 +235,24 @@ if [ "$SKIP_BACKEND" = false ]; then
         echo -e "3. Check for network issues that might prevent package downloads"
         echo -e "4. Try running 'docker system prune' to clean up Docker cache"
         echo -e "5. Inspect the error messages carefully for specific package issues"
-        
+
         # Try building just the schemas package to see if it works
-        echo -e "${BLUE}Attempting to build just the schemas package...${NC}"
-        if docker build -t schemas-test -f- . <<EOF
-FROM python:3.12-slim
-ENV POETRY_VERSION=1.8.3
-RUN pip install "poetry==\$POETRY_VERSION"
-WORKDIR /app
-COPY jao-backend-schemas/ /app/
-RUN poetry build
-EOF
-        then
-            echo -e "${GREEN}Schemas package builds successfully in isolation!${NC}"
-            echo -e "${YELLOW}The issue is likely in the backend dependencies or configuration.${NC}"
-        else
-            echo -e "${RED}Schemas package build failed. This is likely the root cause.${NC}"
-            echo -e "${YELLOW}Check the schemas package dependencies and compatibility.${NC}"
-        fi
-        
+#         echo -e "${BLUE}Attempting to build just the schemas package...${NC}"
+#         if docker build -t schemas-test -f- . <<EOF
+# FROM python:3.12-slim
+# ENV POETRY_VERSION=1.8.3
+# RUN pip install "poetry==\$POETRY_VERSION"
+# WORKDIR /app
+# RUN poetry build
+# EOF
+#         then
+#             echo -e "${GREEN}Schemas package builds successfully in isolation!${NC}"
+#             echo -e "${YELLOW}The issue is likely in the backend dependencies or configuration.${NC}"
+#         else
+#             echo -e "${RED}Schemas package build failed. This is likely the root cause.${NC}"
+#             echo -e "${YELLOW}Check the schemas package dependencies and compatibility.${NC}"
+#         fi
+
         # Ask if user wants to continue despite the error
         read -p "Continue with deployment despite backend build failure? (y/n) " -n 1 -r
         echo
@@ -298,7 +297,7 @@ if [ "$SKIP_FRONTEND" = false ]; then
     cd "${SCRIPT_DIR}"
     echo -e "${BLUE}Using build context: ${SCRIPT_DIR}${NC}"
     echo -e "${BLUE}Using Dockerfile: ${FRONTEND_DIR}/Dockerfile${NC}"
-    
+
     # Run build with more verbose output and build args
     if ! docker build \
         --build-arg POETRY_VERSION=1.8.3 \
@@ -315,7 +314,7 @@ if [ "$SKIP_FRONTEND" = false ]; then
         echo -e "3. Check for network issues that might prevent package downloads"
         echo -e "4. Run 'npm cache clean --force' if npm dependencies are failing"
         echo -e "5. Try with a specific Node.js version if compatibility issues occur"
-        
+
         # Ask if user wants to continue despite the error
         read -p "Continue with deployment despite frontend build failure? (y/n) " -n 1 -r
         echo
@@ -373,12 +372,12 @@ EOF
       echo ',
   "existing_backend_log_group": "'"${EXISTING_BACKEND_LOG_GROUP}"'"' >> terraform.tfvars.json
     fi
-    
+
     if [ -n "${EXISTING_FRONTEND_LOG_GROUP}" ]; then
       echo ',
   "existing_frontend_log_group": "'"${EXISTING_FRONTEND_LOG_GROUP}"'"' >> terraform.tfvars.json
     fi
-    
+
     # Close the JSON object
     echo "
 }" >> terraform.tfvars.json
@@ -390,7 +389,7 @@ EOF
         if ! validate_vpc_id "${EXISTING_VPC_ID}"; then
           echo -e "${RED}Error: Invalid VPC ID specified. Please provide a valid VPC ID.${NC}"
           list_available_vpcs
-          
+
           echo -e "${RED}CRITICAL: Using --skip-vpc without a valid VPC ID will fail.${NC}"
           read -p "Disable VPC skipping and create a new VPC instead? (recommended) (y/n) " -n 1 -r
           echo
@@ -414,13 +413,13 @@ EOF
         echo -e "${RED}ERROR: --skip-vpc was specified without a VPC ID.${NC}"
         echo -e "${RED}This configuration will fail. VPC skipping requires a valid VPC ID.${NC}"
         list_available_vpcs
-        
+
         echo -e "${YELLOW}Choose an option:${NC}"
         echo -e "1) Disable VPC skipping (create a new VPC) - recommended"
         echo -e "2) Choose a VPC ID from the list above"
         echo -e "3) Continue anyway (will likely fail)"
         read -p "Enter choice (1-3): " vpc_choice
-        
+
         case $vpc_choice in
           1)
             echo -e "${GREEN}Smart choice! Creating a new VPC instead.${NC}"
@@ -450,19 +449,19 @@ EOF
       fi
     fi
 
-    terraform plan -var-file=skip_existing.tfvars -var-file=master_password.tfvars -out=tfplan
+    terraform plan -var-file=terraform.tfvars -out=tfplan
 
     echo -e "${YELLOW}Applying Terraform changes...${NC}"
     if ! terraform apply tfplan; then
         echo -e "${RED}Terraform apply failed!${NC}"
         echo -e "${YELLOW}If you're seeing 'resource already exists' errors, try running this script with:${NC}"
         echo -e "${BLUE}    $0 --skip-existing --skip-cloudwatch --skip-iam-roles${NC}"
-        
+
         echo -e "${YELLOW}If you're seeing CloudWatch log group errors:${NC}"
         echo -e "${BLUE}    $0 --skip-cloudwatch${NC}"
         echo -e "${YELLOW}Or specify existing log groups:${NC}"
         echo -e "${BLUE}    $0 --skip-cloudwatch --backend-log-group /ecs/python-api-dev --frontend-log-group /ecs/python-api-frontend-dev${NC}"
-        
+
         echo -e "${RED}IMPORTANT: If you're seeing VPC errors:${NC}"
         echo -e "${YELLOW}1. First list your VPCs:${NC}"
         echo -e "${BLUE}    aws ec2 describe-vpcs --region ${AWS_REGION} --query 'Vpcs[*].[VpcId,Tags[?Key==\`Name\`].Value | [0],CidrBlock,IsDefault]' --output table${NC}"
@@ -470,7 +469,7 @@ EOF
         echo -e "${BLUE}    $0 --skip-vpc --existing-vpc-id vpc-xxxxxxxx${NC}"
         echo -e "${RED}WARNING: NEVER use --skip-vpc without --existing-vpc-id${NC}"
         echo -e "${YELLOW}See co/jao-work/co-jao/RESOURCE_ERRORS.md for more details.${NC}"
-        
+
         # Ask if user wants to continue despite the error
         read -p "Continue with deployment despite Terraform errors? (y/n) " -n 1 -r
         echo
@@ -548,10 +547,10 @@ if [ "$SKIP_TERRAFORM" = false ]; then
     # Display test commands
     if [ -n "$API_URL" ]; then
         echo -e "\n${YELLOW}Test commands for API endpoints:${NC}"
-        echo -e "curl \"${API_URL}/health\""
-        echo -e "curl \"${API_URL}/api/hello\""
-        echo -e "curl \"${API_URL}/api/todos\""
-        echo -e "curl -X POST -H \"Content-Type: application/json\" -d '{\"title\":\"Test Todo\"}' \"${API_URL}/api/todos\""
+        echo -e "curl \"${API_URL}health\""
+        echo -e "curl \"${API_URL}api/hello\""
+        echo -e "curl \"${API_URL}api/todos\""
+        echo -e "curl -X POST -H \"Content-Type: application/json\" -d '{\"title\":\"Test Todo\"}' \"${API_URL}api/todos\""
     fi
 
     cd "${SCRIPT_DIR}"

@@ -177,7 +177,6 @@ src/.python-version
 
 iac/.terraform/
 iac/.terraform.lock.hcl
-iac/groundtruth-assets.zip
 iac/terraform.tfstate
 iac/terraform.tfstate.backup
 iac/terraform.tfvars

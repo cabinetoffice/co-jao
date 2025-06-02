@@ -1,587 +1,258 @@
-# Terraform AWS API Gateway with Python ECS Backend
+﻿# Recruitment co-pilot
 
-This project deploys a Python Flask API on AWS ECS with API Gateway integration using Terraform. It has been designed to be highly reusable across multiple projects and environments. It also supports deployment to LocalStack for local development and testing.
+An application that uses LLMs to assist in job description drafting and recruitment.
 
-## Quick Start
+![black](https://github.com/cabinetoffice/RecruitmentCoPilot/actions/workflows/black.yml/badge.svg) ![isort](https://github.com/cabinetoffice/RecruitmentCoPilot/actions/workflows/isort.yml/badge.svg) ![test JAO web](https://github.com/cabinetoffice/RecruitmentCoPilot/actions/workflows/pytest-jao-web.yml/badge.svg) ![test recruitmentcopilot shared module](https://github.com/cabinetoffice/RecruitmentCoPilot/actions/workflows/pytest-recruitmentcopilot.yml/badge.svg)
 
-To deploy this application to AWS:
+## Workflow
 
-1. Deploy everything with a single script:
-   ```bash
-   ./deploy-apigw-app.sh
-   ```
+1. Draft a job description
+2. Check the expected pool of applicants it will return and their skills / experience profile.
+3. Adjust the job description and see how the expected applicant pool changes.
 
-   This script will:
-   - Build and push the Docker image to ECR
-   - Apply the Terraform configuration
-   - Update the ECS service
+## How it works (for the hackathon)
 
-2. Or step-by-step:
+* Prompt gpt3.5 to generate a synthetic pool of applicants from a job description
+      - gpt3.5 is given examples of real applications to learn from
+* Extract key information from the synthetic application using gpt3.5
+      - experience level of candidates
+      - highest level of education, etc  
 
-   a. Build and push the Docker image:
-   ```bash
-   ./deploy-apigw-app.sh --skip-terraform --skip-service-update
-   ```
+## Future state
 
-   b. Apply the Terraform configuration:
-   ```bash
-   ./tf.sh init
-   ./tf.sh apply
-   ```
+* Instead of using gpt for step 1, use a fine-tuned LLM on a real dataset of many 1,000s of real job description: application pairs.
 
-   c. Update the ECS service:
-   ```bash
-   aws ecs update-service --force-new-deployment --service python-api-dev-service --cluster python-api-dev-cluster --region eu-west-2
-   ```
 
-## Architecture
+# Set up 
 
-```
-   +----------------+    +----------------+    +-----------------+
-   |                |    |                |    |                 |
-   |  API Gateway   +--->+   VPC Link     +--->+   Application   |
-   |                |    |                |    |  Load Balancer  |
-   +----------------+    +----------------+    +-------+---------+
-                                                       |
-                                                       v
-                                               +-------+---------+
-                                               |                 |
-                                               |  ECS Service    |
-                                               |                 |
-                                               +-------+---------+
-                                                       |
-                                                       v
-                                               +-------+---------+
-                                               |                 |
-                                               |  ECR Container  |
-                                               |                 |
-                                               +-----------------+
+https://python.langchain.com/docs/integrations/chat/llama2_chat
+https://python.langchain.com/docs/templates/llama2-functions
+https://huggingface.co/blog/llama2#how-to-prompt-llama-2 
+https://python.langchain.com/docs/integrations/llms/llamacpp#grammars
+
+## 1. pyenv
+
+Install here: [https://github.com/pyenv/pyenv#homebrew-on-macos]
+
+Configure by adding the following to your `~/.zshrc` or equivalent (use line nano ~/.zshrc'):
+
+```sh
+# Pyenv environment variables
+export PYENV_ROOT="$HOME/.pyenv"
+export PATH="$PYENV_ROOT/bin:$PATH"
+
+# Pyenv initialization
+eval "$(pyenv init --path)"
+eval "$(pyenv init -)"
 ```
 
-## Prerequisites
+Basic usage:
 
-- AWS CLI configured with appropriate credentials
-- Terraform installed (v1.0+ recommended)
-- Docker installed (for building and pushing container images)
-
-## Project Structure
-
-```
-terraform-api-ecs/
-│
-├── app/                         # Python Flask application
-│   ├── app.py                   # Main application file
-│   ├── requirements.txt         # Python dependencies
-│   └── Dockerfile               # Docker configuration
-│
-├── modules/                     # Terraform modules
-│   ├── vpc/                     # VPC configuration
-│   ├── ecs/                     # ECS cluster and service
-│   └── api_gateway/             # API Gateway configuration
-│
-├── useful-scripts/              # Helper scripts for tasks like ECR management
-│   ├── build-amd64-image.sh     # Build image for x86/amd64 architecture
-│   ├── build-multiplatform-image.sh # Build for multiple architectures
-│   ├── check-ecr-permissions.sh # Check AWS permissions for ECR
-│   ├── fix-ecr-issues.sh        # Comprehensive script for fixing ECR issues
-│   ├── recreate-ecr-repo.sh     # Recreate ECR repository with proper permissions
-│   └── README.md                # Documentation for the scripts
-│
-├── build-python312-image.sh     # Main script to build Python 3.12 image for ECS
-├── main.tf                      # Main Terraform configuration
-├── variables.tf                 # Variable definitions
-└── README.md                    # Project documentation
+```sh
+# Check Python versions
+pyenv install --list
+# Install the Python version defined in this repo
+pyenv install $(cat .python-version)
+# See installed Python versions
+pyenv versions
 ```
 
-## Reusability Features
-
-This project is designed to be highly reusable:
-
-1. **Name Prefixing**: All resources use a consistent naming scheme based on `name_prefix` and `environment` variables.
-2. **Environment-based Configuration**: Different configurations for dev, staging, and prod environments.
-3. **Flexible Tagging**: Common tags are applied to all resources for better organization.
-4. **Modular Design**: Each component (VPC, ECS, API Gateway) is a separate module that can be reused independently.
-
-## How to Use for Multiple Projects
-
-You can use this infrastructure for multiple projects by:
-
-### Option 1: Using Workspace-based Approach
-
-```bash
-# Create workspaces for different projects
-terraform workspace new project1
-terraform workspace new project2
-
-# Select the workspace
-terraform workspace select project1
-
-# Create a tfvars file for each project
-# project1.tfvars
-app_name = "project1"
-environment = "dev"
-...
-
-# Apply with project-specific variables
-terraform apply -var-file=project1.tfvars
+```sh
+# Change to the Python version you just installed
+pyenv shell $(cat .python-version)
 ```
 
-### Option 2: Using Multiple Terraform Directories
+## 2. [pyenv-virtualenvwrapper](https://github.com/pyenv/pyenv-virtualenvwrapper)
 
-```
-infrastructure/
-├── project1/
-│   ├── main.tf          # References the shared modules
-│   ├── variables.tf
-│   └── terraform.tfvars # Project-specific values
-│
-├── project2/
-│   ├── main.tf
-│   ├── variables.tf
-│   └── terraform.tfvars
-│
-└── modules/             # Shared modules
-    ├── vpc/
-    ├── ecs/
-    └── api_gateway/
+```sh
+# Install with homebrew (recommended if you installed pyenv with homebrew)
+brew install pyenv-virtualenvwrapper
 ```
 
-Example of a project-specific main.tf:
+Configure by adding the following to your `~/.zshrc` or equivalent:
 
-```hcl
-module "api_infrastructure" {
-  source = "../modules"
-
-  app_name    = "customer-portal"
-  environment = "prod"
-
-  # Project-specific configuration
-  container_port = 8080
-  desired_count  = 3
-  ...
-}
+```sh
+# pyenv-virtualenvwrapper
+export PYENV_VIRTUALENVWRAPPER_PREFER_PYVENV="true"
+export WORKON_HOME=$HOME/.virtualenvs
+export PROJECT_HOME=$HOME/code  # <- change this to wherever you store your repos
+export VIRTUALENVWRAPPER_PYTHON=$HOME/.pyenv/shims/python
+pyenv virtualenvwrapper_lazy
 ```
 
-## Module Configuration Options
+Test everything is working by opening a new shell (e.g. new Terminal window):
 
-### VPC Module
+```sh
+# Change to the Python version you just installed
+pyenv shell $(cat .python-version)
+# This only needs to be run once after installing a new Python version through pyenv
+# in order to initialise virtualenvwrapper for this Python version
+python -m pip install --upgrade pip
+python -m pip install virtualenvwrapper
+pyenv virtualenvwrapper_lazy
 
-```hcl
-module "vpc" {
-  source = "./modules/vpc"
+# Create test virtualenv (if this doesn't work, try sourcing ~/.zshrc or opening new shell)
+mkvirtualenv venv_test
+which python
+python -V
 
-  name_prefix         = "myapp"
-  environment         = "dev"
-  vpc_cidr            = "10.0.0.0/16"
-  azs                 = ["eu-west-2a", "eu-west-2b"]
-  private_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24"]
-  public_subnet_cidrs  = ["10.0.101.0/24", "10.0.102.0/24"]
-
-  # Cost-saving options for dev environments
-  enable_nat_gateway  = true
-  single_nat_gateway  = true  # Use false for production for higher availability
-
-  tags = {
-    Project = "MyProject"
-    Owner   = "DevOps"
-  }
-}
+# Deactivate & remove test virtualenv
+deactivate
+rmvirtualenv venv_test
 ```
 
-### ECS Module
+## 3. Get the repo & initialise the repo environment
 
-```hcl
-module "ecs" {
-  source = "./modules/ecs"
+⚠️ N.B. You should replace `REPO_GIT_URL` here with your actual URL to your GitHub repo.
 
-  name_prefix          = "myapp"
-  environment          = "dev"
-  ecr_repository_url   = "123456789012.dkr.ecr.eu-west-2.amazonaws.com/myapp"
-  container_port       = 5000
-  vpc_id               = module.vpc.vpc_id
-  private_subnet_ids   = module.vpc.private_subnet_ids
-  cpu                  = 256
-  memory               = 512
-  desired_count        = 2
-  container_name       = "api"
-  health_check_path    = "/health"
-  internal_lb          = true  # Set to false for public-facing load balancers
+```sh
+git clone ${REPO_GIT_URL}
+pyenv shell $(cat .python-version)
 
-  environment_variables = {
-    LOG_LEVEL = "INFO"
-    API_KEY   = "secure-key-reference"
-  }
+# Make a new virtual environment using the Python version & environment name specified in the repo
+mkvirtualenv -p python$(cat .python-version) $(cat .venv)
+python -V  # check this is the correct version of Python
+python -m pip install --upgrade pip
 
-  tags = {
-    Project = "MyProject"
-    Owner   = "DevOps"
-  }
-}
+# resume working on the virtual environment
+workon $(cat .venv)
 ```
 
-### API Gateway Module
+## 4. Install Python requirements into the virtual environment using [Poetry](https://python-poetry.org/docs/)
 
-```hcl
-module "api_gateway" {
-  source = "./modules/api_gateway"
+Install Poetry onto your system by following the instructions here: [https://python-poetry.org/docs/]
 
-  name_prefix           = "myapp"
-  environment           = "dev"
-  vpc_id                = module.vpc.vpc_id
-  vpc_link_subnets      = module.vpc.private_subnet_ids
-  load_balancer_arn     = module.ecs.load_balancer_arn
-  load_balancer_dns_name = module.ecs.load_balancer_dns_name
-  stage_name            = "v1"
+Note that Poetry "lives" outside of project/environment, and if you follow the recommended install
+process it will be installed isolated from the rest of your system.
 
-  # Define your API routes
-  routes = [
-    {
-      route_key = "GET /users"
-      methods   = ["GET"]
-      path      = "/users"
-    },
-    {
-      route_key = "POST /users"
-      methods   = ["POST"]
-      path      = "/users"
-    }
-  ]
+```sh
+# Update Poetry regularly as you would any other system-level tool. Poetry is environment agnostic,
+# it doesn't matter if you run this command inside/outside the virtualenv.
+poetry self update
 
-  cors_allow_origins = ["https://example.com", "https://www.example.com"]
+# This command should be run inside the virtualenv.
+poetry install --sync
 
-  tags = {
-    Project = "MyProject"
-    Owner   = "DevOps"
-  }
-}
+# Export new requirements.txt
+poetry export -f requirements.txt --output requirements.txt --without-hashes
 ```
 
-## API Endpoints
 
-The API includes the following endpoints:
+## 5. Install pre-commit hooks
 
-- `GET /health` - Health check endpoint
-- `GET /api/hello` - Returns a simple greeting message
-- `GET /api/env` - Returns environment variables from the container
-- `POST /api/data` - Accepts JSON data and returns a confirmation response
+Pre commit hooks run after commit to fix up formatting and other issues. Install them with:
 
-The application is built using Python 3.12 and Flask, with the latest compatible versions of dependencies.
-
-### POST Endpoint Details
-
-The `/api/data` endpoint accepts JSON data via POST requests. It will:
-
-1. Validate that the request includes JSON data
-2. Return the data as part of the response with a success message
-3. Return a status code 201 (Created) on success, or 400 if no data was provided
-
-## Deployment Steps
-
-1. **Initialize Terraform**
-
-   ```
-   ./tf.sh init
-   ```
-
-   Or if using the IaC directory directly:
-
-   ```
-   cd iac
-   terraform init
-   ```
-
-2. **Create a variable file for your project**
-
-   Create an `iac/terraform.tfvars` file:
-
-   ```
-   app_name = "myapp"
-   environment = "dev"
-   aws_region = "eu-west-2"
-   container_port = 5000
-   ```
-
-3. **Plan the deployment**
-
-   ```
-   ./tf.sh plan -var-file=terraform.tfvars
-   ```
-
-   Or if using the IaC directory directly:
-
-   ```
-   cd iac
-   terraform plan -var-file=terraform.tfvars
-   ```
-
-4. **Apply the Terraform configuration**
-
-   ```
-   ./tf.sh apply -var-file=terraform.tfvars
-   ```
-
-   Or if using the IaC directory directly:
-
-   ```
-   cd iac
-   terraform apply -var-file=terraform.tfvars
-   ```
-
-5. **Build and Push Docker Image**
-
-   ```bash
-   # Using the deployment script (recommended)
-   ./deploy-apigw-app.sh --skip-terraform
-   
-   # Or manually:
-   
-   # Get ECR repo URL
-   ECR_REPO=$(./tf.sh output -raw ecr_repository_url)
-
-   # Build image for AMD64 platform (important for ECS compatibility)
-   cd app
-   docker build --platform=linux/amd64 -t ${ECR_REPO}:latest .
-
-   # Login to ECR
-   aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin ${ECR_REPO}
-
-   # Push image
-   docker push ${ECR_REPO}:latest
-   ```
-
-6. **Test the API**
-
-   ```
-   # Test GET endpoint
-   curl $(./tf.sh output -raw api_gateway_url)/api/hello
-
-   # Test POST endpoint
-   curl -X POST \
-     -H "Content-Type: application/json" \
-     -d '{"name": "Example", "message": "Hello API"}' \
-     $(./tf.sh output -raw api_gateway_url)/api/data
-   ```
-
-## Testing POST Requests
-
-This project includes example tools for testing the POST endpoint:
-
-### Using HTML Test Page
-
-1. Open `examples/post-request-test.html` in a web browser
-2. Enter your API Gateway URL
-3. Use either the JSON or Form Data tab to customize your request
-4. Click "Send POST Request" to submit the data
-
-### Using Python Script
-
-```bash
-# Install requirements
-pip install requests
-
-# Basic usage
-python examples/post_request_test.py --url https://your-api-gateway-url.execute-api.region.amazonaws.com/dev/
-
-# With custom data
-python examples/post_request_test.py --url https://your-api-gateway-url.execute-api.region.amazonaws.com/dev/ \
-  --data '{"name":"Test User","email":"test@example.com"}'
-
-# With data from file
-python examples/post_request_test.py --url https://your-api-gateway-url.execute-api.region.amazonaws.com/dev/ \
-  --file examples/sample_data.json
+```sh
+pre-commit install
 ```
 
-## LocalStack Deployment
+## 6. Add secrets into .env
 
-You can deploy this project to LocalStack for local development and testing without incurring AWS costs.
+- Run `cp example.env .env` and update the secrets.
 
-### Prerequisites
+## 7. llama-cpp-python
 
-- Docker and Docker Compose
-- LocalStack (via Docker)
-- Terraform
-- AWS CLI (optional, for testing)
-- jq (optional, for formatting JSON output)
+Follow the instructions here: https://abetlen.github.io/llama-cpp-python/macos_install/
 
-### Deployment Steps
-
-1. **Run the LocalStack deployment script**
-
-   ```bash
-   chmod +x localstack-deploy.sh
-   ./localstack-deploy.sh
-   ```
-
-   This script will:
-   - Check for required dependencies
-   - Start LocalStack in a Docker container
-   - Create a LocalStack-specific tfvars file
-   - Apply the Terraform configuration to LocalStack
-   - Start the API container
-   - Test all API endpoints automatically
-   - Display helpful information and commands
-
-2. **Script options**
-
-   The script supports several command line options:
-
-   ```bash
-   # Skip testing endpoints after deployment
-   ./localstack-deploy.sh --skip-test
-
-   # Force a clean start, removing all existing LocalStack data
-   ./localstack-deploy.sh --clean
-
-   # If you encounter permission issues, try running with sudo
-   sudo ./localstack-deploy.sh --clean
-
-   # Show help message
-   ./localstack-deploy.sh --help
-   ```
-
-3. **Manually test the API endpoints**
-
-   ```bash
-   # Test the GET endpoint
-   curl http://localhost:4566/restapis/*/local/_user_request_/api/hello
-
-   # Test the POST endpoint
-   curl -X POST \
-     -H "Content-Type: application/json" \
-     -d '{"name":"Test"}' \
-     http://localhost:4566/restapis/*/local/_user_request_/api/data
-
-   # Test the health endpoint
-   curl http://localhost:4566/restapis/*/local/_user_request_/health
-   ```
-
-   If you know the exact API ID, replace the `*` with your API ID for more reliable requests:
-
-   ```bash
-   # Get the API ID
-   API_ID=$(aws --endpoint-url=http://localhost:4566 apigateway get-rest-apis --query "items[0].id" --output text)
-
-   # Test with specific API ID
-   curl http://localhost:4566/restapis/$API_ID/local/_user_request_/api/hello
-   ```
-
-4. **Stop LocalStack**
-
-   ```bash
-   docker-compose -f docker-compose.localstack.yml down
-   ```
-
-### LocalStack Limitations
-
-- Some AWS services may have limited functionality in LocalStack
-- The free version of LocalStack has limitations compared to the Pro version
-- ECS in LocalStack has simplified functionality compared to real AWS
-- The API Gateway URL format in LocalStack differs from real AWS
-
-### Troubleshooting LocalStack
-
-If you encounter the "Device or resource busy" error when running LocalStack, try these solutions:
-
-1. Run the deployment script with the `--clean` flag:
-   ```
-   ./localstack-deploy.sh --clean
-   ```
-
-2. If that doesn't work, try running with sudo:
-   ```
-   sudo ./localstack-deploy.sh --clean
-   ```
-
-3. Manually clean up LocalStack resources:
-   ```
-   # Stop and remove all LocalStack containers
-   docker ps -a | grep localstack | awk '{print $1}' | xargs -r docker rm -f
-
-   # Remove LocalStack volumes
-   docker volume ls | grep localstack | awk '{print $2}' | xargs -r docker volume rm
-
-   # Remove temporary directories (may require sudo)
-   sudo rm -rf /tmp/localstack*
-   ```
-
-4. Restart Docker if all else fails:
-   ```
-   # On Linux
-   sudo systemctl restart docker
-
-   # On macOS
-   osascript -e 'quit app "Docker"' && open -a Docker
-   ```
-
-## Helper Scripts
-
-The project includes several helper scripts to simplify common tasks:
-
-### Main Scripts
-
-- `deploy-apigw-app.sh` - Deploys the complete application (builds image, applies Terraform, updates ECS)
-- `tf.sh` - Wrapper script for Terraform commands that automatically uses the iac directory
-- `deploy.sh` - Original deployment script (for reference)
-
-### Directory Structure
-
-- `app/` - Contains the Flask application code, Dockerfile, and requirements
-- `iac/` - Contains all Terraform configuration (modules, main.tf, variables.tf)
-- `localstack/` - Configuration for local development using LocalStack
-- `examples/` - Example code and client applications
-
-## Common Issues and Solutions
-
-### Platform Compatibility
-If you encounter the error `image Manifest does not contain descriptor matching platform 'linux/amd64'`, it means you've built your Docker image on a different architecture (e.g., ARM64 on M1/M2 Macs) than what ECS expects (AMD64). Use the `build-python312-image.sh` script to ensure platform compatibility.
-
-### ECR Permission Issues
-If you see `403 Forbidden` errors when pushing to ECR, use the `check-ecr-permissions.sh` script to diagnose permission issues or `recreate-ecr-repo.sh` to set up a new repository with the correct permissions.
-
-## Clean Up
-
-To remove all resources created by this project:
-
-```
-./tf.sh destroy -var-file=terraform.tfvars
+```sh
+pip uninstall llama-cpp-python -y
+CMAKE_ARGS="-DLLAMA_METAL=on" FORCE_CMAKE=1 pip install -U llama-cpp-python --no-cache-dir
+pip install 'llama-cpp-python[server]'
 ```
 
-Or if using the IaC directory directly:
+Download a model file, see the following for advice:
+  - [https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF#provided-files]
+  - download llama-2-7b-chat.Q4_K_M.gguf
+
+
+```sh
+mv ./llama-2-7b-chat.Q4_K_M.gguf ./models/
+```
+
+Run the webserver:
+
+```sh
+# config your gguf model path
+# make sure it is gguf and Q4
+export MODEL=./models/llama-2-7b-chat.Q4_K_M.gguf
+python3 -m llama_cpp.server --model $MODEL  --n_gpu_layers 1
+# Note: If you omit the --n_gpu_layers 1 then CPU will be used
+```
+
+Try the Python API:
+
+```python
+from llama_cpp import Llama
+llm = Llama(model_path="./models/llama-2-7b-chat.Q4_K_M.gguf")
+output = llm("Q: Name the planets in the solar system? A: ", max_tokens=64, stop=["Q:", "\n"], echo=True)
+print(output)
+print(output['choices'][0]['text'])
+```
+
+## Jupyter kernel
+
+```sh
+python -m ipykernel install --user --name recruitmentcopilot --display-name "Python (recruitmentcopilot)"
+```
+
+## Streamlit
+
+```sh
+streamlit run app/home.py
+```
+
+## Docker local
 
 ```
-cd iac
-terraform destroy -var-file=terraform.tfvars
+# only require build initially
+docker-compose build
+docker-compose up -d
+docker-compose down
 ```
 
-## Best Practices for Multi-Environment Setups
+check opensearch by visiting http://localhost:5601/app/login? or running `curl https://localhost:9200 -ku 'admin:admin'`
 
-1. **Environment-specific variables**: Create separate `.tfvars` files for each environment.
-2. **State management**: Use Terraform remote state with state locking.
-3. **CI/CD integration**: Set up pipelines to deploy to different environments.
-4. **Secrets management**: Use AWS Secrets Manager or Parameter Store for sensitive values.
-5. **Least privilege IAM**: Create specific IAM roles for each deployment environment.
-6. **Local development**: Use LocalStack for local development and testing before deploying to AWS.
+## Sagemaker setup
+- Launch a SageMaker Notebook from SageMaker > Notebook > Notebook instances > Create notebook instance
+- Select `ml.g4dn.xlarge` instance type (see [https://aws.amazon.com/sagemaker/pricing/] for pricing)
 
-## Security Considerations
+### Install Python dependencies
 
-- For production, always enable HTTPS on API Gateway
-- Consider adding authentication via Cognito or Lambda authorizers
-- Implement WAF for additional security
-- Use private subnets for ECS tasks
-- Follow the principle of least privilege for IAM roles
-- For POST endpoints, consider:
-  - Input validation to prevent injection attacks
-  - Rate limiting to prevent abuse
-  - Request size limits to prevent denial of service
-  - JSON schema validation for stronger type checking
+Create a new terminal and run the following:
 
-## Development Workflow
+```sh
+# Switch to a bash shell
+bash
 
-Here's a recommended development workflow:
+# Change to the repo root
+cd ~/SageMaker/RecruitmentCoPilot
 
-1. **Local Development**: Deploy to LocalStack for rapid development and testing
-2. **Dev Environment**: Deploy to a dev AWS environment for integration testing
-3. **Staging Environment**: Deploy to a staging environment that mimics production
-4. **Production Environment**: Deploy to production after thorough testing
+# Activate a Python 3.10 environment pre-configured with PyTorch
+conda create -n recruitment-co-pilot python=3.10.13
+conda create -n recruitment-co-pilot python=$(cat .python-version)
+conda activate recruitment-co-pilot
 
-This workflow allows you to catch issues early in the development process and ensures smoother deployments to production.
+# Check Python version
+python --version
+
+# Install the repo's declared dependencies
+pip install poetry
+poetry install
+
+### Add Envs
+
+```sh
+cp .env.template env
+mv env .env
+```
+
+## Jupyter
+```sh
+python -m ipykernel install --user --name recruitment-co-pilot --display-name "Python RCP"
+```
+
+## Streamlit
+
+```sh
+streamlit run app/home.py
+```

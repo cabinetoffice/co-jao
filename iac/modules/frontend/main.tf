@@ -2,10 +2,24 @@
 # This module sets up the frontend container in ECS with load balancer
 
 locals {
-  name_prefix = "${var.name_prefix}-frontend-${var.environment}"
-  container_name = "${var.name_prefix}-frontend"
-  container_port = var.container_port
-  region = data.aws_region.current.name
+  name_prefix                  = "${var.name_prefix}-frontend-${var.environment}"
+  container_name               = "${var.name_prefix}-frontend"
+  container_port               = var.container_port
+  region                       = data.aws_region.current.name
+  frontend_execution_role_arn  = var.skip_iam_role_creation ? var.existing_execution_role_arn : (length(aws_iam_role.frontend_execution) > 0 ? aws_iam_role.frontend_execution[0].arn : "")
+  frontend_task_role_arn       = var.skip_iam_role_creation ? var.existing_task_role_arn : (length(aws_iam_role.frontend_task) > 0 ? aws_iam_role.frontend_task[0].arn : "")
+  frontend_execution_role_name = var.skip_iam_role_creation ? element(split("/", var.existing_execution_role_arn), 1) : (length(aws_iam_role.frontend_execution) > 0 ? aws_iam_role.frontend_execution[0].name : "")
+
+  # Use specified log group name if provided, otherwise use default pattern
+  log_group_name = var.existing_log_group_name != "" ? var.existing_log_group_name : "/ecs/${local.name_prefix}"
+
+  # When skipping creation, use the explicit name, otherwise use the created resource
+  cloudwatch_log_group_name = var.skip_cloudwatch_creation ? local.log_group_name : aws_cloudwatch_log_group.frontend[0].name
+
+  # When skipping creation and using explicit name, use the data source if available
+  cloudwatch_log_group_arn = var.skip_cloudwatch_creation ? (
+    length(data.aws_cloudwatch_log_group.existing_frontend) > 0 ? data.aws_cloudwatch_log_group.existing_frontend[0].arn : ""
+  ) : aws_cloudwatch_log_group.frontend[0].arn
 
   tags = merge(
     var.tags,
@@ -14,6 +28,84 @@ locals {
       Environment = var.environment
     }
   )
+
+  container_definitions = jsonencode(concat(
+    [
+      {
+        name      = local.container_name
+        image     = "${var.ecr_repository_url}:latest"
+        essential = true
+        portMappings = [
+          {
+            containerPort = var.container_port
+            hostPort      = var.container_port
+            protocol      = "tcp"
+          }
+        ]
+        environment = concat(
+          [
+            for key, value in var.environment_variables : {
+              name  = key
+              value = value
+            }
+          ],
+          var.enable_enhanced_monitoring ? [
+            {
+              name  = "ENABLE_METRICS"
+              value = "true"
+            },
+            {
+              name  = "LOG_LEVEL"
+              value = "info"
+            }
+          ] : []
+        )
+        healthCheck = {
+          command     = ["CMD-SHELL", "curl -f http://localhost:${var.container_port}${var.health_check_path} || exit 1"]
+          interval    = 30
+          timeout     = 5
+          retries     = 3
+          startPeriod = 60
+        }
+        logConfiguration = {
+          logDriver = "awslogs"
+          options = {
+            "awslogs-group"         = local.cloudwatch_log_group_name
+            "awslogs-region"        = data.aws_region.current.name
+            "awslogs-stream-prefix" = "xray"
+          }
+        }
+        dependsOn = var.enable_xray_tracing ? [
+          {
+            containerName = "xray-daemon"
+            condition     = "START"
+          }
+        ] : null
+      }
+    ],
+    var.enable_xray_tracing ? [
+      {
+        name      = "xray-daemon"
+        image     = "amazon/aws-xray-daemon:latest"
+        essential = true
+        portMappings = [
+          {
+            containerPort = 2000
+            hostPort      = 2000
+            protocol      = "udp"
+          }
+        ]
+        logConfiguration = {
+          logDriver = "awslogs"
+          options = {
+            "awslogs-group"         = local.cloudwatch_log_group_name
+            "awslogs-region"        = data.aws_region.current.name
+            "awslogs-stream-prefix" = "ecs"
+          }
+        }
+      }
+    ] : []
+  ))
 }
 
 data "aws_region" "current" {}
@@ -25,6 +117,18 @@ resource "aws_ecs_cluster" "frontend" {
   setting {
     name  = "containerInsights"
     value = "enabled"
+  }
+
+  dynamic "configuration" {
+    for_each = var.enable_enhanced_monitoring ? [1] : []
+    content {
+      execute_command_configuration {
+        logging = "OVERRIDE"
+        log_configuration {
+          cloud_watch_log_group_name = local.cloudwatch_log_group_name
+        }
+      }
+    }
   }
 
   tags = local.tags
@@ -43,19 +147,6 @@ resource "aws_cloudwatch_log_group" "frontend" {
 data "aws_cloudwatch_log_group" "existing_frontend" {
   count = var.skip_cloudwatch_creation && var.existing_log_group_name != "" ? 1 : 0
   name  = var.existing_log_group_name != "" ? var.existing_log_group_name : "/ecs/${local.name_prefix}"
-}
-
-locals {
-  # Use specified log group name if provided, otherwise use default pattern
-  log_group_name   = var.existing_log_group_name != "" ? var.existing_log_group_name : "/ecs/${local.name_prefix}"
-  
-  # When skipping creation, use the explicit name, otherwise use the created resource
-  cloudwatch_log_group_name = var.skip_cloudwatch_creation ? local.log_group_name : aws_cloudwatch_log_group.frontend[0].name
-  
-  # When skipping creation and using explicit name, use the data source if available
-  cloudwatch_log_group_arn = var.skip_cloudwatch_creation ? (
-    length(data.aws_cloudwatch_log_group.existing_frontend) > 0 ? data.aws_cloudwatch_log_group.existing_frontend[0].arn : ""
-  ) : aws_cloudwatch_log_group.frontend[0].arn
 }
 
 # Security Group for the Load Balancer
@@ -205,12 +296,6 @@ resource "aws_iam_role" "frontend_task" {
   tags = local.tags
 }
 
-# Locals for role ARNs to use either created or existing roles
-locals {
-  frontend_execution_role_arn = var.skip_iam_role_creation ? var.existing_execution_role_arn : (length(aws_iam_role.frontend_execution) > 0 ? aws_iam_role.frontend_execution[0].arn : "")
-  frontend_task_role_arn = var.skip_iam_role_creation ? var.existing_task_role_arn : (length(aws_iam_role.frontend_task) > 0 ? aws_iam_role.frontend_task[0].arn : "")
-  frontend_execution_role_name = var.skip_iam_role_creation ? element(split("/", var.existing_execution_role_arn), 1) : (length(aws_iam_role.frontend_execution) > 0 ? aws_iam_role.frontend_execution[0].name : "")
-}
 
 # Attach policies to the execution role
 resource "aws_iam_role_policy_attachment" "frontend_execution" {
@@ -231,9 +316,9 @@ resource "aws_ecs_task_definition" "frontend" {
 
   container_definitions = jsonencode([
     {
-      name        = local.container_name
-      image       = var.ecr_repository_url
-      essential   = true
+      name      = local.container_name
+      image     = var.ecr_repository_url
+      essential = true
       environment = [
         for key, value in var.environment_variables : {
           name  = key

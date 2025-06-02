@@ -3,6 +3,21 @@ locals {
   # Resource naming
   name = "${var.name_prefix}-${var.environment}"
 
+  task_execution_role_arn  = var.skip_iam_role_creation ? var.existing_task_execution_role_arn : (length(aws_iam_role.ecs_task_execution_role) > 0 ? aws_iam_role.ecs_task_execution_role[0].arn : "")
+  task_execution_role_name = var.skip_iam_role_creation ? element(split("/", var.existing_task_execution_role_arn), 1) : (length(aws_iam_role.ecs_task_execution_role) > 0 ? aws_iam_role.ecs_task_execution_role[0].name : "")
+
+  # Use specified log group name if provided, otherwise use default pattern
+  log_group_name   = var.existing_log_group_name != "" ? var.existing_log_group_name : "/ecs/${local.name}"
+  log_group_exists = var.skip_cloudwatch_creation
+
+  # When skipping creation, use the explicit name, otherwise use the created resource
+  cloudwatch_log_group_name = var.skip_cloudwatch_creation ? local.log_group_name : aws_cloudwatch_log_group.app[0].name
+
+  # When skipping creation and using explicit name, use the data source if available
+  cloudwatch_log_group_arn = var.skip_cloudwatch_creation ? (
+    length(data.aws_cloudwatch_log_group.existing_app) > 0 ? data.aws_cloudwatch_log_group.existing_app[0].arn : ""
+  ) : aws_cloudwatch_log_group.app[0].arn
+
   # Common tags for all resources
   common_tags = merge(
     var.tags,
@@ -293,11 +308,6 @@ resource "aws_iam_role" "ecs_task_execution_role" {
   )
 }
 
-# Use this to store the actual ARN, either from the created role or the provided existing one
-locals {
-  task_execution_role_arn = var.skip_iam_role_creation ? var.existing_task_execution_role_arn : (length(aws_iam_role.ecs_task_execution_role) > 0 ? aws_iam_role.ecs_task_execution_role[0].arn : "")
-  task_execution_role_name = var.skip_iam_role_creation ? element(split("/", var.existing_task_execution_role_arn), 1) : (length(aws_iam_role.ecs_task_execution_role) > 0 ? aws_iam_role.ecs_task_execution_role[0].name : "")
-}
 
 # Attach the task execution role policy
 resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
@@ -406,20 +416,6 @@ resource "aws_cloudwatch_log_group" "app" {
 data "aws_cloudwatch_log_group" "existing_app" {
   count = var.skip_cloudwatch_creation && var.existing_log_group_name != "" ? 1 : 0
   name  = var.existing_log_group_name != "" ? var.existing_log_group_name : "/ecs/${local.name}"
-}
-
-locals {
-  # Use specified log group name if provided, otherwise use default pattern
-  log_group_name   = var.existing_log_group_name != "" ? var.existing_log_group_name : "/ecs/${local.name}"
-  log_group_exists = var.skip_cloudwatch_creation
-  
-  # When skipping creation, use the explicit name, otherwise use the created resource
-  cloudwatch_log_group_name = var.skip_cloudwatch_creation ? local.log_group_name : aws_cloudwatch_log_group.app[0].name
-  
-  # When skipping creation and using explicit name, use the data source if available
-  cloudwatch_log_group_arn = var.skip_cloudwatch_creation ? (
-    length(data.aws_cloudwatch_log_group.existing_app) > 0 ? data.aws_cloudwatch_log_group.existing_app[0].arn : ""
-  ) : aws_cloudwatch_log_group.app[0].arn
 }
 
 # CloudWatch Log Metric Filters for API monitoring

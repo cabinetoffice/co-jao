@@ -142,12 +142,25 @@ module "ecs" {
     DB_PASSWORD = "dummy-placeholder" # Will be overridden by secrets manager
 
     # Django environment variables
+    ENV                    = "dev" # Required for settings module selection
     DJANGO_SETTINGS_MODULE = "jao_backend.settings.dev"
     DJANGO_SECRET_KEY      = "dummy-placeholder-secret-key" # Will be overridden in production
     DJANGO_DEBUG           = var.environment == "prod" ? "False" : "True"
     API_STAGE_NAME         = var.environment
-    DATABASE_URL           = "dummy-placeholder" # Will be built from DB_* vars in entrypoint
     DJANGO_ALLOWED_HOSTS   = "*"
+
+    # Database URL for Django (required by jao_backend settings)
+    JAO_BACKEND_DATABASE_URL       = "postgresql://${module.vectordb.master_username}:dummy-placeholder@${module.vectordb.cluster_endpoint}:5432/${module.vectordb.database_name}"
+    DATABASE_URL                   = "postgresql://${module.vectordb.master_username}:dummy-placeholder@${module.vectordb.cluster_endpoint}:5432/${module.vectordb.database_name}" # Will be built from DB_* vars in entrypoint
+    JAO_BACKEND_OLEEO_DATABASE_URL = "mssqlms://user.namey:password@co-grid-database.eu-west-2:1433/DART_Dev"
+    # Celery configuration
+    CELERY_BROKER_URL     = "redis://localhost:6379/0" # Update this with your actual Redis endpoint
+    CELERY_RESULT_BACKEND = "redis://localhost:6379/0" # Update this with your actual Redis endpoint
+
+    # LiteLLM integration
+    JAO_BACKEND_LITELLM_API_BASE          = "http://127.0.0.1:11434/api/embed" # Default for dev environment
+    JAO_BACKEND_LITELLM_CUSTOM_PROVIDER   = "ollama"                           # Default for dev environment
+    JAO_EMBEDDER_SUMMARY_RESPONSIBILITIES = "ollama/nomic-embed-text:latest"
 
     # API rate limiting and monitoring config
     ENABLE_RATE_LIMITING = "true"
@@ -322,7 +335,7 @@ module "vectordb" {
   enhanced_monitoring_interval = var.enable_enhanced_monitoring ? (var.environment == "prod" ? 60 : 30) : 0 # Add basic monitoring even in dev
 
   # Initialize the database with the Django todo list schema
-  init_script        = "${path.module}/sql/init_todo_db.sql"
+  init_script        = "${path.module}/sql/init_pgvector.sql"
   init_script_bucket = module.initialization_bucket.bucket_id
   prevent_destroy    = false
 
@@ -383,8 +396,16 @@ module "frontend" {
     BACKEND_API_KEY        = "dummy-placeholder-api-key" # Will be replaced with actual frontend API key
     DJANGO_SETTINGS_MODULE = "frontend.settings"
     PORT                   = "8000"
-    GUNICORN_WORKERS       = "2"
-    GUNICORN_THREADS       = "4"
+    # Required JAO Backend URL for frontend to communicate with backend services
+    JAO_BACKEND_URL = module.api_gateway.api_gateway_url
+    # Add timeout setting for backend requests
+    JAO_BACKEND_TIMEOUT = "15"
+    # Add HTTP/2 setting for backend requests
+    JAO_BACKEND_ENABLE_HTTP2 = "true"
+    # Session configuration
+    SESSION_COOKIE_SECURE = var.environment == "prod" ? "true" : "false"
+    # Set environment for Django settings selection
+    ENV = var.environment
   }
   health_check_path      = "/health"
   internal_lb            = false # Frontend LB is public-facing

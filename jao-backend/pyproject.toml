@@ -2,16 +2,17 @@
 name = "jao_backend"
 version = "0.1.0"
 description = ""
-authors = ["Anthoni Gleeson <anthoni.gleeson@digital.trade.gov.uk>", "Stuart Axon stuart.axon@digital.cabinet-office.gov.uk"]
+authors = [
+    "Anthoni Gleeson <anthoni.gleeson@digital.trade.gov.uk>",
+    "Stuart Axon stuart.axon@digital.cabinet-office.gov.uk",
+]
 readme = "README.md"
 license = "MIT"
 
-packages = [
-    { include = "jao_backend", from = "src" }
-]
+packages = [{ include = "jao_backend", from = "src" }]
 
 [tool.poetry.dependencies]
-jao_backend_schemas = { path = "../jao-backend-schemas", develop = true }
+# jao_backend_schemas = { path = "./jao_backend_schemas", develop = true }
 python = ">=3.12,<4"
 govuk-frontend-django = "0.15.1"
 django = ">=5.0.1,<5.0.15"
@@ -49,7 +50,7 @@ django-percentagefield = "^0.1.7"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.7.0"
-black = {extras = ["jupyter"], version = "^24.3.0"}
+black = { extras = ["jupyter"], version = "^24.3.0" }
 nbstripout = "^0.7.1"
 pytest = "^8.1.1"
 pytest-picked = "^0.5.0"
@@ -71,11 +72,11 @@ hypercorn = "hypercorn.__main__:main"
 profile = "black"
 
 [tool.djlint]
-profile="django"
-indent="4"
-ignore="H021,H006"
-exclude="node_modules,staticfiles,static"
-custom_blocks="gds_accordion,gds_accordion_item,gds_breadcrumbs,gds_checkboxes,gds_checkbox_conditional,gds_cookie_banner,gds_cookie_banner_message,gds_error_summary,gds_error_summary_error_list_item,gds_footer,gds_footer_nav,gds_footer_meta,gds_header,gds_header_nav_item,gds_phase_banner,gds_summary_list,gds_summary_list_row,gds_summary_list_row_key,gds_summary_list_row_value,gds_summary_list_row_actions,gds_summary_list_row_actions_item,gds_summary_list_card,gds_summary_list_card_actions,gds_summary_list_card_actions_item,gds_tabs,gds_tabs_tab"
+profile = "django"
+indent = "4"
+ignore = "H021,H006"
+exclude = "node_modules,staticfiles,static"
+custom_blocks = "gds_accordion,gds_accordion_item,gds_breadcrumbs,gds_checkboxes,gds_checkbox_conditional,gds_cookie_banner,gds_cookie_banner_message,gds_error_summary,gds_error_summary_error_list_item,gds_footer,gds_footer_nav,gds_footer_meta,gds_header,gds_header_nav_item,gds_phase_banner,gds_summary_list,gds_summary_list_row,gds_summary_list_row_key,gds_summary_list_row_value,gds_summary_list_row_actions,gds_summary_list_row_actions_item,gds_summary_list_card,gds_summary_list_card_actions,gds_summary_list_card_actions_item,gds_tabs,gds_tabs_tab"
 
 [build-system]
 requires = ["poetry-core"]
@@ -83,6 +84,4 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "jao_backend.settings.test"
-pythonpath = [
-  "src"
-]
+pythonpath = ["src"]
