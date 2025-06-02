@@ -24,6 +24,16 @@ locals {
       route_key = "GET /health"
       methods   = ["GET"]
       path      = "/health"
+    },
+    {
+      route_key = "POST /lint"
+      methods   = ["POST"]
+      path      = "/lint"
+    },
+    {
+      route_key = "POST /lint-stub"
+      methods   = ["POST"]
+      path      = "/lint-stub"
     }
   ]
 
@@ -34,10 +44,14 @@ locals {
 # Data source for current region
 data "aws_region" "current" {}
 
-# HTTP API Gateway (APIGatewayV2)
-resource "aws_apigatewayv2_api" "main" {
-  name          = "${local.name}-api"
-  protocol_type = "HTTP"
+# REST API Gateway (APIGatewayV1)
+resource "aws_api_gateway_rest_api" "main" {
+  name        = "${local.name}-api"
+  description = "REST API for ${local.name}"
+
+  endpoint_configuration {
+    types = ["REGIONAL"]
+  }
 
   tags = merge(
     local.common_tags,
@@ -48,10 +62,9 @@ resource "aws_apigatewayv2_api" "main" {
 }
 
 # Create VPC Link for API Gateway to communicate with ALB in the VPC
-resource "aws_apigatewayv2_vpc_link" "main" {
-  name               = "${local.name}-vpc-link"
-  security_group_ids = []
-  subnet_ids         = var.vpc_link_subnets
+resource "aws_api_gateway_vpc_link" "main" {
+  name        = "${local.name}-vpc-link"
+  target_arns = [var.load_balancer_arn]
 
   tags = merge(
     local.common_tags,
@@ -61,11 +74,24 @@ resource "aws_apigatewayv2_vpc_link" "main" {
   )
 }
 
+# API Gateway deployment
+resource "aws_api_gateway_deployment" "main" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+
+  depends_on = [
+    aws_api_gateway_integration.routes
+  ]
+  
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
 # API Gateway stage
-resource "aws_apigatewayv2_stage" "main" {
-  api_id      = aws_apigatewayv2_api.main.id
-  name        = var.stage_name
-  auto_deploy = true
+resource "aws_api_gateway_stage" "main" {
+  deployment_id = aws_api_gateway_deployment.main.id
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  stage_name    = var.stage_name
 
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.api_gateway.arn
@@ -74,27 +100,34 @@ resource "aws_apigatewayv2_stage" "main" {
       ip                      = "$context.identity.sourceIp"
       requestTime             = "$context.requestTime"
       httpMethod              = "$context.httpMethod"
-      path                    = "$context.path"
-      routeKey                = "$context.routeKey"
+      resourcePath            = "$context.resourcePath"
       status                  = "$context.status"
       protocol                = "$context.protocol"
       responseLength          = "$context.responseLength"
       integrationErrorMessage = "$context.integrationErrorMessage"
     })
   }
-
-  default_route_settings {
-    detailed_metrics_enabled = var.enable_detailed_metrics
-    throttling_burst_limit   = var.api_throttling_burst_limit
-    throttling_rate_limit    = var.api_throttling_rate_limit
-  }
-
+  
   tags = merge(
     local.common_tags,
     {
       Name = "${local.name}-${var.stage_name}-stage"
     }
   )
+}
+
+# Method settings for the stage
+resource "aws_api_gateway_method_settings" "main" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  stage_name  = aws_api_gateway_stage.main.stage_name
+  method_path = "*/*"
+
+  settings {
+    metrics_enabled        = var.enable_detailed_metrics
+    logging_level          = "INFO"
+    throttling_burst_limit = var.api_throttling_burst_limit
+    throttling_rate_limit  = var.api_throttling_rate_limit
+  }
 }
 
 # CloudWatch log group for API Gateway
@@ -110,24 +143,67 @@ resource "aws_cloudwatch_log_group" "api_gateway" {
   )
 }
 
-# API Gateway integration with ALB
-resource "aws_apigatewayv2_integration" "main" {
-  api_id                 = aws_apigatewayv2_api.main.id
-  integration_type       = "HTTP_PROXY"
-  integration_method     = "ANY"
-  integration_uri        = var.integration_uri
-  connection_type        = "VPC_LINK"
-  connection_id          = aws_apigatewayv2_vpc_link.main.id
-  payload_format_version = "1.0"
-  timeout_milliseconds   = 30000
+# API Resources and Methods
+resource "aws_api_gateway_resource" "proxy" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_rest_api.main.root_resource_id
+  path_part   = "{proxy+}"
 }
 
-# HTTP API Gateway routes
-resource "aws_apigatewayv2_route" "routes" {
-  count     = length(local.routes)
-  api_id    = aws_apigatewayv2_api.main.id
-  route_key = local.routes[count.index].route_key
-  target    = "integrations/${aws_apigatewayv2_integration.main.id}"
+resource "aws_api_gateway_resource" "routes" {
+  count = length(local.routes) - 1 # Subtract 1 for the proxy route we created separately
+
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_rest_api.main.root_resource_id
+  path_part   = element(split("/", replace(local.routes[count.index + 1].path, "/{proxy+}", "")), 1)
+}
+
+# Methods for proxy resource
+resource "aws_api_gateway_method" "proxy" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.proxy.id
+  http_method   = "ANY"
+  authorization = "NONE"
+}
+
+# Methods for other resources
+resource "aws_api_gateway_method" "routes" {
+  count = length(local.routes) - 1 # Subtract 1 for the proxy route we created separately
+
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.routes[count.index].id
+  http_method   = element(local.routes[count.index + 1].methods, 0) # Use first method from methods array
+  authorization = "NONE"
+}
+
+# Integration for proxy resource
+resource "aws_api_gateway_integration" "proxy" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.proxy.id
+  http_method             = aws_api_gateway_method.proxy.http_method
+  integration_http_method = "ANY"
+  type                    = "HTTP_PROXY"
+  uri                     = "http://${var.load_balancer_dns_name}/{proxy}"
+  connection_type         = "VPC_LINK"
+  connection_id           = aws_api_gateway_vpc_link.main.id
+  
+  request_parameters = {
+    "integration.request.path.proxy" = "method.request.path.proxy"
+  }
+}
+
+# Integration for other resources
+resource "aws_api_gateway_integration" "routes" {
+  count = length(local.routes) - 1 # Subtract 1 for the proxy route we created separately
+
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.routes[count.index].id
+  http_method             = aws_api_gateway_method.routes[count.index].http_method
+  integration_http_method = aws_api_gateway_method.routes[count.index].http_method
+  type                    = "HTTP_PROXY"
+  uri                     = "http://${var.load_balancer_dns_name}${local.routes[count.index + 1].path}"
+  connection_type         = "VPC_LINK"
+  connection_id           = aws_api_gateway_vpc_link.main.id
 }
 
 # For API key functionality, we need to use REST API Gateway
@@ -303,7 +379,7 @@ resource "aws_cloudwatch_dashboard" "api_dashboard" {
         height = 6
         properties = {
           metrics = [
-            ["AWS/ApiGateway", "Count", "ApiId", aws_apigatewayv2_api.main.id, "Stage", aws_apigatewayv2_stage.main.name, { "stat" = "Sum" }],
+            ["AWS/ApiGateway", "Count", "ApiName", aws_api_gateway_rest_api.main.name, "Stage", aws_api_gateway_stage.main.stage_name, { "stat" = "Sum" }],
             [".", "4XXError", ".", ".", ".", ".", { "stat" = "Sum" }],
             [".", "5XXError", ".", ".", ".", ".", { "stat" = "Sum" }]
           ]
@@ -322,7 +398,7 @@ resource "aws_cloudwatch_dashboard" "api_dashboard" {
         height = 6
         properties = {
           metrics = [
-            ["AWS/ApiGateway", "Latency", "ApiId", aws_apigatewayv2_api.main.id, "Stage", aws_apigatewayv2_stage.main.name, { "stat" = "Average" }],
+            ["AWS/ApiGateway", "Latency", "ApiName", aws_api_gateway_rest_api.main.name, "Stage", aws_api_gateway_stage.main.stage_name, { "stat" = "Average" }],
             [".", "IntegrationLatency", ".", ".", ".", ".", { "stat" = "Average" }]
           ]
           view    = "timeSeries"
@@ -351,8 +427,8 @@ resource "aws_cloudwatch_metric_alarm" "api_error_rate" {
   alarm_description   = "This alarm monitors the API Gateway 5XX error rate"
 
   dimensions = {
-    ApiId = aws_apigatewayv2_api.main.id
-    Stage = aws_apigatewayv2_stage.main.name
+    ApiName = aws_api_gateway_rest_api.main.name
+    Stage   = aws_api_gateway_stage.main.stage_name
   }
 }
 

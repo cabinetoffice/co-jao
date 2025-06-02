@@ -15,8 +15,9 @@ variable "vpc_id" {
 }
 
 variable "vpc_link_subnets" {
-  description = "Subnet IDs to include in the VPC link"
+  description = "Subnet IDs to include in the VPC link (only used for HTTP APIs, not REST APIs)"
   type        = list(string)
+  default     = []
 }
 
 variable "load_balancer_arn" {
@@ -60,7 +61,7 @@ variable "api_throttling_burst_limit" {
 }
 
 variable "routes" {
-  description = "List of API routes to create"
+  description = "List of API routes to create (path must start with /)"
   type = list(object({
     route_key = string
     methods   = list(string)
@@ -70,7 +71,7 @@ variable "routes" {
 }
 
 variable "integration_uri" {
-  description = "URI of the integration"
+  description = "URI of the integration (Lambda invoke ARN or HTTP URL)"
   type        = string
 }
 
