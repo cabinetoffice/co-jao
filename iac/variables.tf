@@ -8,7 +8,7 @@ variable "aws_region" {
 variable "app_name" {
   description = "Name of the application"
   type        = string
-  default     = "python-api"
+  default     = "jao"
 }
 
 variable "environment" {

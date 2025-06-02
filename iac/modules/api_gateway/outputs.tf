@@ -1,32 +1,32 @@
 # API Gateway module - outputs.tf
 output "api_gateway_id" {
   description = "ID of the API Gateway"
-  value       = aws_apigatewayv2_api.main.id
+  value       = aws_api_gateway_rest_api.main.id
 }
 
 output "api_gateway_arn" {
   description = "ARN of the API Gateway"
-  value       = aws_apigatewayv2_api.main.arn
+  value       = aws_api_gateway_rest_api.main.arn
 }
 
 output "api_gateway_url" {
   description = "URL of the API Gateway"
-  value       = "${aws_apigatewayv2_stage.main.invoke_url}/"
+  value       = "${aws_api_gateway_stage.main.invoke_url}/"
 }
 
 output "vpc_link_id" {
   description = "ID of the VPC Link"
-  value       = aws_apigatewayv2_vpc_link.main.id
+  value       = aws_api_gateway_vpc_link.main.id
 }
 
 output "stage_name" {
   description = "Name of the API Gateway stage"
-  value       = aws_apigatewayv2_stage.main.name
+  value       = aws_api_gateway_stage.main.stage_name
 }
 
 output "stage_url" {
   description = "URL of the API Gateway stage"
-  value       = aws_apigatewayv2_stage.main.invoke_url
+  value       = aws_api_gateway_stage.main.invoke_url
 }
 
 # API Key and Usage Plan outputs
@@ -51,7 +51,10 @@ output "cloudwatch_dashboard_name" {
   value       = var.enable_detailed_metrics && length(aws_cloudwatch_dashboard.api_dashboard) > 0 ? aws_cloudwatch_dashboard.api_dashboard["main"].dashboard_name : null
 }
 
-output "routes" {
-  description = "Map of route keys to their IDs"
-  value       = { for route in aws_apigatewayv2_route.routes : route.route_key => route.id }
+output "resources" {
+  description = "Map of resource paths to their IDs"
+  value       = merge(
+    { "/{proxy+}" = aws_api_gateway_resource.proxy.id },
+    { for i, resource in aws_api_gateway_resource.routes : local.routes[i + 1].path => resource.id }
+  )
 }
