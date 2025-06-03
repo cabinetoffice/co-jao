@@ -240,6 +240,64 @@ resource "aws_lb" "main" {
   )
 }
 
+# Network Load Balancer for API Gateway VPC Link
+resource "aws_lb" "nlb" {
+  name               = "${local.name}-nlb"
+  internal           = var.internal_lb
+  load_balancer_type = "network"
+  subnets            = var.internal_lb ? var.private_subnet_ids : var.public_subnet_ids
+
+  enable_deletion_protection = var.lb_deletion_protection
+
+  # Enable cross-zone load balancing for high availability
+  enable_cross_zone_load_balancing = var.enable_cross_zone_load_balancing
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.name}-nlb"
+    }
+  )
+}
+
+# NLB Target Group for ECS tasks
+resource "aws_lb_target_group" "nlb" {
+  name        = "${local.name}-nlb-tg"
+  port        = var.container_port
+  protocol    = "TCP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    interval            = 30
+    port                = var.container_port
+    protocol            = "TCP"
+    timeout             = 6
+    unhealthy_threshold = 2
+  }
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.name}-nlb-tg"
+    }
+  )
+}
+
+# NLB Listener
+resource "aws_lb_listener" "nlb" {
+  load_balancer_arn = aws_lb.nlb.arn
+  port              = "80"
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.nlb.arn
+  }
+}
+
 # Target group for the ALB
 resource "aws_lb_target_group" "app" {
   name        = "${local.name}-tg"
@@ -576,6 +634,12 @@ resource "aws_ecs_service" "app" {
 
   load_balancer {
     target_group_arn = aws_lb_target_group.app.arn
+    container_name   = local.container_name
+    container_port   = var.container_port
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.nlb.arn
     container_name   = local.container_name
     container_port   = var.container_port
   }

@@ -187,7 +187,7 @@ module "api_gateway" {
   environment            = var.environment
   vpc_id                 = module.vpc.vpc_id
   vpc_link_subnets       = module.vpc.private_subnet_ids
-  load_balancer_arn      = module.ecs.load_balancer_arn
+  load_balancer_arn      = module.ecs.nlb_arn
   integration_uri        = module.ecs.lb_listener_arn
   load_balancer_dns_name = module.ecs.load_balancer_dns_name
   stage_name             = var.environment
@@ -293,6 +293,8 @@ resource "aws_security_group" "db_access" {
   }
 
   tags = local.common_tags
+
+  depends_on = [module.vpc]
 }
 
 # Database Module - Aurora PostgreSQL with pgvector

@@ -52,6 +52,13 @@ resource "aws_api_gateway_rest_api" "main" {
   endpoint_configuration {
     types = ["REGIONAL"]
   }
+  
+  # Binary media types support for file uploads/downloads
+  binary_media_types = [
+    "multipart/form-data",
+    "application/octet-stream",
+    "image/*"
+  ]
 
   tags = merge(
     local.common_tags,
@@ -70,6 +77,7 @@ resource "aws_api_gateway_vpc_link" "main" {
     local.common_tags,
     {
       Name = "${local.name}-vpc-link"
+      Description = "VPC Link connecting API Gateway to JAO ECS cluster"
     }
   )
 }
@@ -79,8 +87,15 @@ resource "aws_api_gateway_deployment" "main" {
   rest_api_id = aws_api_gateway_rest_api.main.id
 
   depends_on = [
-    aws_api_gateway_integration.routes
+    aws_api_gateway_integration.routes,
+    aws_api_gateway_integration.proxy
   ]
+  
+  # Add variables to force redeployment when routes change
+  variables = {
+    # Trigger redeployment when routes or proxy integration changes
+    deployed_at = timestamp()
+  }
   
   lifecycle {
     create_before_destroy = true
@@ -127,6 +142,8 @@ resource "aws_api_gateway_method_settings" "main" {
     logging_level          = "INFO"
     throttling_burst_limit = var.api_throttling_burst_limit
     throttling_rate_limit  = var.api_throttling_rate_limit
+    # Enable detailed logging for troubleshooting
+    data_trace_enabled     = true
   }
 }
 
@@ -164,6 +181,11 @@ resource "aws_api_gateway_method" "proxy" {
   resource_id   = aws_api_gateway_resource.proxy.id
   http_method   = "ANY"
   authorization = "NONE"
+  
+  # Add request parameters to pass all headers, query strings, and path parameters to the integration
+  request_parameters = {
+    "method.request.path.proxy" = true
+  }
 }
 
 # Methods for other resources
@@ -174,6 +196,11 @@ resource "aws_api_gateway_method" "routes" {
   resource_id   = aws_api_gateway_resource.routes[count.index].id
   http_method   = element(local.routes[count.index + 1].methods, 0) # Use first method from methods array
   authorization = "NONE"
+  
+  # Forward query parameters
+  request_parameters = {
+    "method.request.querystring.all" = true
+  }
 }
 
 # Integration for proxy resource
@@ -190,6 +217,9 @@ resource "aws_api_gateway_integration" "proxy" {
   request_parameters = {
     "integration.request.path.proxy" = "method.request.path.proxy"
   }
+  
+  # Add timeout setting for longer operations
+  timeout_milliseconds = 29000
 }
 
 # Integration for other resources
@@ -204,6 +234,9 @@ resource "aws_api_gateway_integration" "routes" {
   uri                     = "http://${var.load_balancer_dns_name}${local.routes[count.index + 1].path}"
   connection_type         = "VPC_LINK"
   connection_id           = aws_api_gateway_vpc_link.main.id
+  
+  # Add timeout setting for longer operations
+  timeout_milliseconds = 29000
 }
 
 # For API key functionality, we need to use REST API Gateway

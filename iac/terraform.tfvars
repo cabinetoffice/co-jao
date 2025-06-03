@@ -1,13 +1,13 @@
 # Override variables to work around resources that already exist
 
 # Resource existence flags
-skip_ecr_creation = false
+skip_ecr_creation = true
 aws_account_id    = "860619597616"
 
 # Skip creating resources that already exist
 skip_frontend_role_creation   = false
 skip_backend_role_creation    = false
-skip_cloudwatch_logs_creation = false
+skip_cloudwatch_logs_creation = true
 skip_s3_bucket_creation       = true
 skip_param_group_creation     = false
 skip_secret_creation          = true
