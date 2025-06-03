@@ -42,7 +42,7 @@ jobs:
           path: ./jao-backend-schemas/dist/*.whl
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: dist/*.whl
           generate_release_notes: true
@@ -51,7 +51,7 @@ jobs:
 
       - name: Upload wheel to GitHub Release
         if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: ./jao-backend-schemas/dist/*.whl
         env:
