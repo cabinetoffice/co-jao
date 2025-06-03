@@ -36,6 +36,7 @@ COPY ./jao-backend/pyproject.toml ./pyproject.toml
 
 # Install Python dependencies
 RUN poetry install --no-root --no-cache
+RUN pip install ../jao-backend-schemas
 
 # Copy the package.json and package-lock.json files for npm
 COPY ./jao-backend/package.json ./package.json

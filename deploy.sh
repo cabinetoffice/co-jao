@@ -13,7 +13,7 @@ echo -e "====================================================================="
 
 # Default values
 AWS_REGION="eu-west-2"
-APP_NAME="python-api"
+APP_NAME="jao"
 ENV="dev"
 IMAGE_TAG="latest"
 SKIP_BACKEND=false
@@ -22,7 +22,7 @@ SKIP_TERRAFORM=false
 SKIP_SERVICE_UPDATE=false
 FORCE_IMPORT=false
 SKIP_VPC=false
-SKIP_CLOUDWATCH=false
+SKIP_CLOUDWATCH=true
 SKIP_IAM_ROLES=false
 EXISTING_VPC_ID=""
 EXISTING_BACKEND_LOG_GROUP=""
@@ -142,7 +142,7 @@ while [[ $# -gt 0 ]]; do
       echo -e "${BLUE}Usage:${NC} $0 [OPTIONS]"
       echo -e "${BLUE}Options:${NC}"
       echo "  --region REGION            AWS region (default: eu-west-2)"
-      echo "  --app-name NAME            Application name (default: python-api)"
+      echo "  --app-name NAME            Application name (default: jao)"
       echo "  --env ENV                  Environment (default: dev)"
       echo "  --tag TAG                  Docker image tag (default: latest)"
       echo "  --skip-backend             Skip building and pushing backend Docker image"
@@ -460,7 +460,7 @@ EOF
         echo -e "${YELLOW}If you're seeing CloudWatch log group errors:${NC}"
         echo -e "${BLUE}    $0 --skip-cloudwatch${NC}"
         echo -e "${YELLOW}Or specify existing log groups:${NC}"
-        echo -e "${BLUE}    $0 --skip-cloudwatch --backend-log-group /ecs/python-api-dev --frontend-log-group /ecs/python-api-frontend-dev${NC}"
+        echo -e "${BLUE}    $0 --skip-cloudwatch --backend-log-group /ecs/jao-dev --frontend-log-group /ecs/jao-frontend-dev${NC}"
 
         echo -e "${RED}IMPORTANT: If you're seeing VPC errors:${NC}"
         echo -e "${YELLOW}1. First list your VPCs:${NC}"
