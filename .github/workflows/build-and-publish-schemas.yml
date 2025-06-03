@@ -2,9 +2,9 @@ name: Build and Publish Wheel
 
 on:
   push:
-    branches: [csj-integration]
+    branches: [feat/csj-integration]
   pull_request:
-    branches: [csj-integration]
+    branches: [feat/csj-integration]
   release:
     types: [published]
 
