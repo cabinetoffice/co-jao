@@ -3,6 +3,8 @@ name: Build and Publish Wheel
 on:
   push:
     branches: [feat/csj-integration]
+    tags:
+      - "v*"
   pull_request:
     branches: [feat/csj-integration]
   release:
@@ -38,3 +40,19 @@ jobs:
         with:
           name: python-wheel
           path: ./jao-backend-schemas/dist/*.whl
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/*.whl
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload wheel to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./jao-backend-schemas/dist/*.whl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
