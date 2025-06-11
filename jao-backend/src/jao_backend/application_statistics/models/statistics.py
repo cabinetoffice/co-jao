@@ -1,16 +1,17 @@
 from django.db import models
 
-#from django_percentagefield.db.models import PercentageField
-
 from jao_backend.application_statistics.models import AgeGroup
 from jao_backend.application_statistics.models import Disability
-from jao_backend.application_statistics.models import Gender
-from jao_backend.application_statistics.models import Ethnicity
 from jao_backend.application_statistics.models import EthnicGroup
+from jao_backend.application_statistics.models import Ethnicity
+from jao_backend.application_statistics.models import Gender
 from jao_backend.roles.models import Grade
 from jao_backend.roles.models import RoleType
-
 from jao_backend.vacancies.models import Vacancy
+
+# from django_percentagefield.db.models import PercentageField
+
+
 
 
 # class ProtectedCharacteristic(models.Model):
@@ -163,7 +164,12 @@ from jao_backend.vacancies.models import Vacancy
 #         return f"Statistics for {self.vacancy}"
 #
 
+
 class ApplicationStatistic(models.Model):
+    """
+    Abstract base class for all aggregated application statistics.
+    """
+
     vacancy = models.OneToOneField(
         Vacancy,
         on_delete=models.CASCADE,
@@ -181,6 +187,7 @@ class ApplicationStatistic(models.Model):
     class Meta:
         abstract = True
 
+
 class ProtectedCharacteristicStatistic(ApplicationStatistic):
     """Abstract base class for all protected characteristic mixins"""
 
@@ -191,6 +198,10 @@ class ProtectedCharacteristicStatistic(ApplicationStatistic):
 
 
 class AgeGroupStatistic(ProtectedCharacteristicStatistic):
+    """
+    Aggregated age groups of applicants for a vacancy.
+    """
+
     age_group = models.ForeignKey(
         AgeGroup,
         on_delete=models.CASCADE,
@@ -207,6 +218,8 @@ class AgeGroupStatistic(ProtectedCharacteristicStatistic):
 
 
 class DisabilityStatistic(ProtectedCharacteristicStatistic):
+    """Aggregated disability statistics for applicants to a vacancy."""
+
     disability = models.ForeignKey(
         Disability,
         on_delete=models.CASCADE,
@@ -221,7 +234,10 @@ class DisabilityStatistic(ProtectedCharacteristicStatistic):
             )
         ]
 
+
 class EthnicityStatistic(ProtectedCharacteristicStatistic):
+    """Aggregated ethnicity statistics for applicants to a vacancy."""
+
     ethnicity = models.ForeignKey(
         Ethnicity,
         on_delete=models.CASCADE,
@@ -238,6 +254,8 @@ class EthnicityStatistic(ProtectedCharacteristicStatistic):
 
 
 class EthnicGroupStatistic(ProtectedCharacteristicStatistic):
+    """Aggregated ethnic group statistics for applicants to a vacancy."""
+
     ethnic_group = models.ForeignKey(
         EthnicGroup,
         on_delete=models.CASCADE,
@@ -252,7 +270,10 @@ class EthnicGroupStatistic(ProtectedCharacteristicStatistic):
             )
         ]
 
+
 class GenderStatistic(ProtectedCharacteristicStatistic):
+    """Aggregated gender statistics for applicants to a vacancy."""
+
     gender = models.ForeignKey(
         Gender,
         on_delete=models.CASCADE,
@@ -266,7 +287,11 @@ class GenderStatistic(ProtectedCharacteristicStatistic):
                 name="unique_vacancy_gender",
             )
         ]
+
+
 class JobGradeStatistic(ProtectedCharacteristicStatistic):
+    """Aggregated job grade statistics for applicants to a vacancy."""
+
     job_grade = models.ForeignKey(
         Grade,
         on_delete=models.CASCADE,
@@ -281,7 +306,10 @@ class JobGradeStatistic(ProtectedCharacteristicStatistic):
             )
         ]
 
+
 class RoleTypeStatistic(ProtectedCharacteristicStatistic):
+    """Aggregated role type statistics for applicants to a vacancy."""
+
     role_type = models.ForeignKey(
         RoleType,
         on_delete=models.CASCADE,

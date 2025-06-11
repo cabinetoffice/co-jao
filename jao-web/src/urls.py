@@ -1,12 +1,17 @@
 from django.conf import settings
 from django.contrib import admin
+from django.http import HttpResponse
 from django.urls import include
 from django.urls import path
+
+def health_check(request):
+    return HttpResponse("OK", content_type="text/plain")
 
 urlpatterns = [
     path("", include("jao_web.home.urls")),
     path("job_advert_optimiser/", include("jao_web.job_advert_optimiser.urls")),
     path("django-admin/", admin.site.urls),
+    path("health", health_check, name="health_check"),
 ]
 
 

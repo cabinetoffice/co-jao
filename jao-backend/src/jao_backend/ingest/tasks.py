@@ -22,7 +22,7 @@ def ingest():
 
     if not settings.JAO_BACKEND_ENABLE_OLEEO:
         logger.error("Oleeo ingest is disabled")
-        raise ImproperlyConfigured("Oleeo ingest is not disabled")
+        raise ImproperlyConfigured("Oleeo ingest is not enabled")
 
     ingester = OleeoIngest()
     ingester.update()

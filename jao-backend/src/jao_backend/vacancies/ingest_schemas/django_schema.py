@@ -15,5 +15,5 @@ class VacancySchema(ModelSchema):
             "title",
             "description",
             "summary",
-        ]
+        ],
     )

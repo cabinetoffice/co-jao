@@ -1,15 +1,31 @@
 from functools import lru_cache
-from typing import Type, Union, Tuple, Iterable, Dict, Any, Generator, Self, List, Optional
+from typing import Any
+from typing import Dict
+from typing import Generator
+from typing import Iterable
+from typing import List
+from typing import Optional
+from typing import Self
+from typing import Tuple
+from typing import Type
+from typing import Union
 
-from django.utils import timezone
 from django.db import models
-from django.db.models import QuerySet, Q
+from django.db.models import Q
+from django.db.models import QuerySet
+from django.utils import timezone
 from djantic import ModelSchema
 
-from jao_backend.common.querysets import SqlServerIsValidDecimal, SqlServerIsValidDecimalOrNull
-from jao_backend.oleeo.ingest_schemas.oleeo_schema_registry import get_oleeo_schema_for_model
+from jao_backend.common.querysets import SqlServerIsValidDecimal
+from jao_backend.common.querysets import SqlServerIsValidDecimalOrNull
+from jao_backend.oleeo.ingest_schemas.oleeo_schema_registry import (
+    get_oleeo_schema_for_model,
+)
 
-def sliding_window_range(source_start, source_end, max_batch_size, extra, progress_bar=None):
+
+def sliding_window_range(
+    source_start, source_end, max_batch_size, extra, progress_bar=None
+):
     """
     Sliding window.
 
@@ -26,6 +42,7 @@ def sliding_window_range(source_start, source_end, max_batch_size, extra, progre
         batch_end = batch_start + max_batch_size + extra
 
         yield batch_start, batch_end
+
 
 #
 # class JaoAppsQuerySet(models.QuerySet):
@@ -77,7 +94,7 @@ class UpstreamModelQuerySet(models.QuerySet):
         Allow the user to use 'pk' as a shortcut for the primary key field name.
         """
         pk_name = model._meta.pk.name  # noqa
-        return [pk_name if k == 'pk' else k for k in keys]
+        return [pk_name if k == "pk" else k for k in keys]
 
     @lru_cache(maxsize=1)
     def _get_destination_model(self):
@@ -112,7 +129,9 @@ class UpstreamModelQuerySet(models.QuerySet):
             for source_item in self.values()
         )
 
-    def as_destination_values_list(self, *args, flat=False) -> Generator[Union[Tuple, Any], None, None]:
+    def as_destination_values_list(
+        self, *args, flat=False
+    ) -> Generator[Union[Tuple, Any], None, None]:
         """\
         Equivalent to .values_list: query the List model and transform the results to the destination model
         using `.as_destination_values().`
@@ -156,9 +175,7 @@ class UpstreamModelQuerySet(models.QuerySet):
         """
         destination_model = self._get_destination_model()
         destination_values = self.as_destination_values()
-        return (
-            destination_model(**value) for value in destination_values
-        )
+        return (destination_model(**value) for value in destination_values)
 
     def as_destination_query(self, strict=True) -> QuerySet[models.Model]:
         """\
@@ -176,7 +193,9 @@ class UpstreamModelQuerySet(models.QuerySet):
         destination_count = destination_qs.count()
 
         if strict and (source_count != destination_count):
-            raise ValueError(f"{source_count} != {destination_count}, lists are not synchronized.")
+            raise ValueError(
+                f"{source_count} != {destination_count}, lists are not synchronized."
+            )
 
         return destination_qs
 
@@ -204,7 +223,8 @@ class UpstreamModelQuerySet(models.QuerySet):
         common_pks = set(source_data.keys()) & set(destination_data.keys())
 
         pks_to_update = [
-            source_pk for source_pk in common_pks
+            source_pk
+            for source_pk in common_pks
             if source_data[source_pk] != destination_data[source_pk]
         ]
 
@@ -213,7 +233,9 @@ class UpstreamModelQuerySet(models.QuerySet):
     # There is no pending_delete as it would have to return records that exist in the
     # destination model but not in this queryset.
 
-    def destination_pending_create(self, max_batch_size: Optional[int] = None) -> Generator[models.Model, None, None]:
+    def destination_pending_create(
+        self, max_batch_size: Optional[int] = None
+    ) -> Generator[models.Model, None, None]:
         """
         :param max_batch_size: The maximum number of records to return.
         :return: Generator of Instances in the destination model matching this queryset that are pending creation.
@@ -223,7 +245,9 @@ class UpstreamModelQuerySet(models.QuerySet):
             pending = pending[:max_batch_size]
         return pending.as_destination_instances()
 
-    def destination_pending_update(self, max_batch_size: Optional[int] = None) -> QuerySet[models.Model]:
+    def destination_pending_update(
+        self, max_batch_size: Optional[int] = None
+    ) -> QuerySet[models.Model]:
         """
         :return: Instances in the destination model matching this queryset that are pending an update.
         """
@@ -232,100 +256,90 @@ class UpstreamModelQuerySet(models.QuerySet):
             pending = pending[:max_batch_size]
         return pending.as_destination_query()
 
-    def destination_pending_delete(self, max_batch_size: Optional[int] = None) -> QuerySet[models.Model]:
+    def destination_pending_delete(
+        self, start_pk=None, end_pk=None
+    ) -> QuerySet[models.Model]:
         """
-        :return: Instances in the destination model matching this queryset that are pending an delete.
+        :return: Instances in the destination model matching this queryset that are pending delete.
+
+        Users can implement batching by providing start_pk and end_pk.
         """
         destination_model = self._get_destination_model()
         qs = self
-        if max_batch_size:
-            qs = qs[:max_batch_size]
-        source_pks = [*qs.values_list("pk", flat=True)]
-        destination_pending = destination_model.objects.exclude(pk__in=source_pks)
+        filter_args = []
+
+        if start_pk is not None and end_pk is not None:
+            filter_args = [Q(pk__gte=start_pk) & Q(pk__lte=end_pk)]
+
+        source_pks = [*qs.filter(*filter_args).values_list("pk", flat=True)]
+
+        destination_pending = destination_model.objects.filter(*filter_args).exclude(
+            pk__in=source_pks
+        )
+
         return destination_pending
 
-    def bulk_create_pending(self, max_batch_size: Optional[int] = None) -> List[models.Model]:
+    def create_pending(
+        self, max_batch_size: Optional[int] = None
+    ) -> List[models.Model]:
         """
         Bulk create records that exist in this queryset but not in the destination model.
         """
         destination_model = self._get_destination_model()
-        destination_instances = self.destination_pending_create(max_batch_size=max_batch_size)
+        destination_instances = self.destination_pending_create(
+            max_batch_size=max_batch_size
+        )
 
-        return destination_model.objects.bulk_create(destination_instances,
-                                                     batch_size=max_batch_size)
+        return destination_model.objects.bulk_create(
+            destination_instances, batch_size=max_batch_size
+        )
 
-    def bulk_update_pending(self, max_batch_size: Optional[int] = None) -> List[models.Model]:
+    def update_pending(
+        self, max_batch_size: Optional[int] = None
+    ) -> List[models.Model]:
         """
         Bulk create records that exist in this queryset but not in the destination model.
         """
         destination_model = self._get_destination_model()
         destination_fields = [
-            field.name for field in destination_model._meta.fields    # noqa
-            if field.name != 'id'
+            field.name
+            for field in destination_model._meta.fields  # noqa
+            if field.name != "id"
         ]
 
-        destination_instances = self.destination_pending_update(max_batch_size=max_batch_size)
-        return destination_model.objects.bulk_update(destination_instances,
-                                                     destination_fields,
-                                                     batch_size=max_batch_size)
-
-    def bulk_delete_pending(self) -> List[models.Model]:
-        """
-        bulk_delete_pending is not wanted since it's unsafe as FK relations aren't followed, .delete is sufficient.
-
-        This is added mostly to stop a future dev adding it as it's missing.
-        """
-        raise NotImplementedError(
-            "bulk_delete_pending is not implemented in JAO. "
-            "Use bulk_mark_delete_pending() or delete_pending() instead."
+        destination_instances = self.destination_pending_update(
+            max_batch_size=max_batch_size
+        )
+        return destination_model.objects.bulk_update(
+            destination_instances, destination_fields, batch_size=max_batch_size
         )
 
-    # batch based bulk updates...
-
-    def batch_mark_delete_pending(self, max_batch_size=10000, progress_bar=None):
+    def bulk_update_pending(self, max_batch_size=10000, progress_bar=None):
         """
         Batch create pending records.
 
         This is intended for larger, non-list tables such as Vacancies.
         """
-        dest_start = self.first().pk
-        dest_end = self.last().pk
+        source_start = self.first().pk
+        source_end = self.last().pk
 
-        if dest_end == self.last():
+        if source_end == self.last():
             return
 
-        for batch_start, batch_end in sliding_window_range(dest_start, dest_end, max_batch_size, 0,
-                                                           progress_bar=progress_bar):
-            deleted = self.filter(pk__gte=batch_start, pk__lte=batch_end).mark_delete_pending(
-                max_batch_size=max_batch_size)
-            yield deleted
-
-    def batch_bulk_update_pending(self, max_batch_size=10000, progress_bar=None):
-        """
-        Batch create pending records.
-
-        This is intended for larger, non-list tables such as Vacancies.
-        """
-        dest_model = self.model.get_destination_model()
-        dest_start = self.first().pk
-        dest_end = self.last().pk
-
-        if dest_end == self.last():
-            return
-
-        for batch_start, batch_end in sliding_window_range(dest_start, dest_end, max_batch_size, 0,
-                                                           progress_bar=progress_bar):
-            updated = self.filter(pk__gte=batch_start, pk__lte=batch_end) \
-                .bulk_update_pending(max_batch_size=max_batch_size)
+        for batch_start, batch_end in sliding_window_range(
+            source_start, source_end, max_batch_size, 0, progress_bar=progress_bar
+        ):
+            updated = self.filter(
+                pk__gte=batch_start, pk__lte=batch_end
+            ).update_pending(max_batch_size=max_batch_size)
             yield updated
 
-    def batch_bulk_create_pending(self, max_batch_size=10000, append=True, progress_bar=None):
+    def bulk_create_pending(self, max_batch_size=10000, append=True, progress_bar=None):
         """
         Batch create pending records.
 
         This is intended for larger, non-list tables such as Vacancies.
         """
-
         if append:
             dest_model = self.model.get_destination_model()
             source_start = getattr(dest_model.objects.order_by("pk").last(), "pk", 0)
@@ -339,26 +353,29 @@ class UpstreamModelQuerySet(models.QuerySet):
 
         # IDs are not contiguous query more from the source model than the max_batch_size
         extra = 50 + (max_batch_size // 10)
-        for source_start, source_end in sliding_window_range(source_start, source_end, max_batch_size, extra,
-                                                             progress_bar=progress_bar):
-            created = self.filter(pk__gte=source_start, pk__lte=source_end) \
-                .bulk_create_pending(max_batch_size=max_batch_size)
+        for source_start, source_end in sliding_window_range(
+            source_start, source_end, max_batch_size, extra, progress_bar=progress_bar
+        ):
+            created = self.filter(
+                pk__gte=source_start, pk__lte=source_end
+            ).create_pending(max_batch_size=max_batch_size)
             yield created
-    # End batch based bulk updates...
 
-    def delete_pending(self, max_batch_size: Optional[int] = None) -> int:
+    def delete_pending(self) -> int:
         """
         Delete records that exist in the destination model but not in this queryset.
         """
-        destination_instances = self.destination_pending_delete(max_batch_size=max_batch_size)
+        destination_instances = self.destination_pending_delete()
         return destination_instances.delete()
 
-    def mark_delete_pending(self, max_batch_size: Optional[int] = None) -> int:
+    def mark_delete_pending(self) -> int:
         """
         Mark models for deletion in the destination model.
         """
-        destination_instances = self.destination_pending_delete(max_batch_size=max_batch_size)
-        return destination_instances.update(is_deleted=True, last_updated=timezone.now())
+        destination_instances = self.destination_pending_delete()
+        return destination_instances.update(
+            is_deleted=True, last_updated=timezone.now()
+        )
 
 
 class VacanciesQuerySet(UpstreamModelQuerySet):
@@ -366,8 +383,8 @@ class VacanciesQuerySet(UpstreamModelQuerySet):
         """
         Filter known bad records:
 
-        salary_minimum:  Must be consist of digits and an optional decimal point
-        salary_maximum_optional:  Can be null or digits and an optional decimal point
+        salary_minimum: string of digits, compatible with decimal.Decimal
+        salary_maximum_optional:  None or string of digits, compatible with decimal.Decimal
 
         Bad data found in the system:
 
@@ -377,9 +394,8 @@ class VacanciesQuerySet(UpstreamModelQuerySet):
         very large numbers.
         """
         return self.annotate(
-            salary_minimum_is_valid=SqlServerIsValidDecimal('salary_minimum'),
-            salary_maximum_optional_is_valid=SqlServerIsValidDecimalOrNull('salary_maximum_optional')
-        ).filter(
-            salary_minimum_is_valid=True,
-            salary_maximum_optional_is_valid=True
-        )
+            salary_minimum_is_valid=SqlServerIsValidDecimal("salary_minimum"),
+            salary_maximum_optional_is_valid=SqlServerIsValidDecimalOrNull(
+                "salary_maximum_optional"
+            ),
+        ).filter(salary_minimum_is_valid=True, salary_maximum_optional_is_valid=True)

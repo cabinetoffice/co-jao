@@ -1,4 +1,6 @@
 from django.db import models
+
+
 class VacancyQuerySet(models.QuerySet):
 
     def annotate_responsibilities(self):
@@ -10,8 +12,6 @@ class VacancyQuerySet(models.QuerySet):
         """
         return self.annotate(
             responsibilities=(
-                    models.F("summary") +
-                    models.Value('\n') +
-                    models.F("description")
+                models.F("summary") + models.Value("\n") + models.F("description")
             )
         )

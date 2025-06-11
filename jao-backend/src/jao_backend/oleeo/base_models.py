@@ -1,10 +1,12 @@
 from functools import lru_cache
-from typing import Union, Type
+from typing import Type
+from typing import Union
 
 from django.apps import apps
 from django.db import models
 
-from jao_backend.oleeo.querysets import UpstreamModelQuerySet, VacanciesQuerySet
+from jao_backend.oleeo.querysets import UpstreamModelQuerySet
+from jao_backend.oleeo.querysets import VacanciesQuerySet
 
 
 class UpstreamModelBase(models.Model):
@@ -34,6 +36,7 @@ class UpstreamModelBase(models.Model):
 
     See: bulk_create_pending(), bulk_update_pending() and bulk_delete_pending() in ListModelQuerySet.
     """
+
     class Meta:
         abstract = True
 
@@ -55,12 +58,12 @@ class UpstreamModelBase(models.Model):
 
         if model_path is None:
             raise ValueError(
-                f"{cls.__name__}.destination_model must have a destination_model set in the format: "
-                "app_name.model_name"
+                f"{cls.__name__}.destination_model must have a destination_model set in"
+                " the format: app_name.model_name"
             )
 
         # Parse the string into app_label and model_name using rsplit
-        app_label, model_name = model_path.rsplit('.', 1)  # Not comma, but period
+        app_label, model_name = model_path.rsplit(".", 1)  # Not comma, but period
 
         # Get the model class
         try:

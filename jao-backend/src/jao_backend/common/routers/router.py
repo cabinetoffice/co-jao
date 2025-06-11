@@ -24,17 +24,17 @@ class OleeoRouter:
         """
         Route read operations to the appropriate database.
         """
-        if model._meta.app_label == 'oleeo':
-            return 'oleeo'
-        return 'default'
+        if model._meta.app_label == "oleeo":
+            return "oleeo"
+        return "default"
 
     def db_for_write(self, model, **hints):
         """
         Route write operations to the appropriate database.
         """
-        if model._meta.app_label == 'oleeo':
-            return 'oleeo'
-        return 'default'
+        if model._meta.app_label == "oleeo":
+            return "oleeo"
+        return "default"
 
     def allow_relation(self, obj1, obj2, **hints):
         """
@@ -46,10 +46,10 @@ class OleeoRouter:
             return True
 
         # For models in different apps, check if they're in the same database
-        if obj1._meta.app_label == 'oleeo' and obj2._meta.app_label == 'oleeo':
+        if obj1._meta.app_label == "oleeo" and obj2._meta.app_label == "oleeo":
             return True
 
-        if obj1._meta.app_label != 'oleeo' and obj2._meta.app_label != 'oleeo':
+        if obj1._meta.app_label != "oleeo" and obj2._meta.app_label != "oleeo":
             return True
 
         # Disallow relations between models in different databases
@@ -61,11 +61,11 @@ class OleeoRouter:
         never on the unmanaged 'oleeo' database.
         """
         # Prevent any migrations on the oleeo database
-        if db == 'oleeo':
+        if db == "oleeo":
             return False
 
         # Only run migrations for non-oleeo apps on the default database
-        if app_label == 'oleeo':
+        if app_label == "oleeo":
             return False
 
-        return db == 'default'
+        return db == "default"

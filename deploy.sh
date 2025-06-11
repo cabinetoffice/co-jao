@@ -236,23 +236,6 @@ if [ "$SKIP_BACKEND" = false ]; then
         echo -e "4. Try running 'docker system prune' to clean up Docker cache"
         echo -e "5. Inspect the error messages carefully for specific package issues"
 
-        # Try building just the schemas package to see if it works
-#         echo -e "${BLUE}Attempting to build just the schemas package...${NC}"
-#         if docker build -t schemas-test -f- . <<EOF
-# FROM python:3.12-slim
-# ENV POETRY_VERSION=1.8.3
-# RUN pip install "poetry==\$POETRY_VERSION"
-# WORKDIR /app
-# RUN poetry build
-# EOF
-#         then
-#             echo -e "${GREEN}Schemas package builds successfully in isolation!${NC}"
-#             echo -e "${YELLOW}The issue is likely in the backend dependencies or configuration.${NC}"
-#         else
-#             echo -e "${RED}Schemas package build failed. This is likely the root cause.${NC}"
-#             echo -e "${YELLOW}Check the schemas package dependencies and compatibility.${NC}"
-#         fi
-
         # Ask if user wants to continue despite the error
         read -p "Continue with deployment despite backend build failure? (y/n) " -n 1 -r
         echo
@@ -340,7 +323,14 @@ fi
 if [ "$SKIP_TERRAFORM" = false ]; then
     echo -e "\n${GREEN}Running Terraform...${NC}"
     cd "${IAC_DIR}"
-    terraform init
+
+    # Initialize Terraform with local state
+    echo -e "${BLUE}Initializing Terraform with local state...${NC}"
+    if ! terraform init -reconfigure; then
+        echo -e "${RED}Failed to initialize Terraform!${NC}"
+        echo -e "${YELLOW}Check your AWS credentials and configuration.${NC}"
+        exit 1
+    fi
 
     echo -e "${YELLOW}Planning Terraform changes...${NC}"
 
@@ -360,6 +350,7 @@ if [ "$SKIP_TERRAFORM" = false ]; then
 {
   "skip_ecr_creation": ${SKIP_ECR_CREATION},
   "aws_account_id": "${AWS_ACCOUNT_ID}",
+  "image_tag": "${IMAGE_TAG}",
   "skip_vpc_creation": ${SKIP_VPC},
   "skip_vpc_validation": true,
   "skip_cloudwatch_creation": ${SKIP_CLOUDWATCH},
@@ -549,8 +540,6 @@ if [ "$SKIP_TERRAFORM" = false ]; then
         echo -e "\n${YELLOW}Test commands for API endpoints:${NC}"
         echo -e "curl \"${API_URL}health\""
         echo -e "curl \"${API_URL}api/hello\""
-        echo -e "curl \"${API_URL}api/todos\""
-        echo -e "curl -X POST -H \"Content-Type: application/json\" -d '{\"title\":\"Test Todo\"}' \"${API_URL}api/todos\""
     fi
 
     cd "${SCRIPT_DIR}"
@@ -560,7 +549,6 @@ if [ "$SKIP_TERRAFORM" = false ]; then
     echo -e "The API is secured with API keys. You can view and manage API keys in the AWS Console."
     echo -e "Usage plans have been created for different consumer types (frontend, partners, public)."
     echo -e "To use the API, add the 'x-api-key' header to your requests with the appropriate API key."
-    echo -e "Example: curl -H \"x-api-key: YOUR_API_KEY\" \"${API_URL}/api/todos\""
 fi
 
 # Final steps and validation

@@ -30,5 +30,12 @@ DEFAULT_TEST_OLEEO_DATABASE_NAME = "postgresql:///jao-backend-oleeo"
 
 DATABASES = {
     "default": dj_database_url.config(env="JAO_TEST_BACKEND_DATABASE_URL", default=DEFAULT_TEST_DATABASE_NAME),
-    "oleeo": dj_database_url.config(env="JAO_TEST_OLEEO_DATABASE_URL", default=DEFAULT_TEST_OLEEO_DATABASE_NAME),
 }
+
+if JAO_BACKEND_ENABLE_OLEEO:
+    DATABASES["oleeo"] = dj_database_url.config(
+        env="JAO_TEST_BACKEND_OLEEO_DATABASE_URL",
+        default="sqlite://:memory:"
+    )
+    # Keep the router configuration from common.py
+    DATABASE_ROUTERS = ['jao_backend.common.routers.router.OleeoRouter']

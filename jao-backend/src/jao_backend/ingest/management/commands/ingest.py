@@ -1,5 +1,3 @@
-import pathlib
-
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils.log import logging
@@ -27,8 +25,9 @@ class Command(BaseCommand):
         This means we won't need as large instances when running on AWS, and
         is usefully locally when we run LLMs that use a lot of memory.
         """
-        ##existing_vacancy_count = Vacancy.objects.count()
-        ##existing_application_statistics_count = ApplicationStatistic.objects.count()
+        if not settings.JAO_BACKEND_ENABLE_OLEEO:
+            logger.error("OLEEO ingest is disabled")
+            raise ValueError("OLEEO ingest is not enabled")
 
         if options["local"]:
             # This option is for validating the ingester, and running locally.
@@ -45,15 +44,3 @@ class Command(BaseCommand):
             ingest_result = ingest_task.delay()
             self.stdout.write("Ingest task started...")
             ingest_result.get()
-
-        # new_vacancies = Vacancy.objects.count() - existing_vacancy_count
-        # new_application_statistics = (
-        #     ApplicationStatistic.objects.count() - existing_application_statistics_count
-        # )
-        #
-        # self.stdout.write(
-        #     self.style.SUCCESS(
-        #         f"Ingested {new_vacancies} new vacancies and"
-        #         f" {new_application_statistics} new application statistics."
-        #     )
-        # )
