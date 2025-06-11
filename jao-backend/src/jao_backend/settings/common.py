@@ -30,7 +30,7 @@ PROJECT_DIR = BASE_DIR.parent
 
 JAO_BACKEND_ENABLE_HTTP2 = True
 JAO_BACKEND_TIMEOUT = os.getenv("JAO_BACKEND_TIMEOUT", 15)
-""
+
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
@@ -57,12 +57,9 @@ INSTALLED_APPS = [
     "jao_backend.vacancies",
     "jao_backend.application_statistics",
     "jao_backend.embeddings",
-    "jao_backend.ingest"
+    "jao_backend.ingest",
+    "jao_backend.oleeo",
 ]
-
-if JAO_BACKEND_ENABLE_OLEEO := is_truthy(os.getenv("JAO_BACKEND_ENABLE_OLEEO", "false")):
-    INSTALLED_APPS.append("jao_backend.oleeo")
-
 
 LITELLM_API_BASE = os.environ.get("JAO_BACKEND_LITELLM_API_BASE")
 LITELLM_CUSTOM_PROVIDER = os.environ.get("JAO_BACKEND_LITELLM_CUSTOM_PROVIDER")
@@ -139,6 +136,7 @@ DATABASES = {
     "default": dj_database_url.config(env="JAO_BACKEND_DATABASE_URL"),
 }
 
+JAO_BACKEND_ENABLE_OLEEO = is_truthy(os.environ.get("JAO_BACKEND_ENABLE_OLEEO", "false"))
 if JAO_BACKEND_ENABLE_OLEEO:
     DATABASES["oleeo"] = dj_database_url.config(env="JAO_BACKEND_OLEEO_DATABASE_URL")
     DATABASE_ROUTERS = ['jao_backend.common.routers.router.OleeoRouter']

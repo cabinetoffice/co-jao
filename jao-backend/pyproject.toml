@@ -12,9 +12,8 @@ license = "MIT"
 packages = [{ include = "jao_backend", from = "src" }]
 
 [tool.poetry.dependencies]
-# jao_backend_schemas = { path = "../jao-backend-schemas", develop = true }
-jao-backend-schemas = "https://github.com/cabinetoffice/co-jao/actions/runs/15420759573/artifacts/3251035110"
-python = ">=3.12,<4"
+jao-backend-schemas = { url = "https://github.com/cabinetoffice/co-jao/releases/download/v0.0.2/jao_backend_schemas-0.1.0-py3-none-any.whl" }
+python = ">=3.12,<=3.13"
 govuk-frontend-django = "0.15.1"
 django = ">=5.0.1,<5.0.15"
 python-dotenv = "^1.0.1"
@@ -46,6 +45,7 @@ psycopg2-binary = "^2.9.10"
 pytest-unordered = "^0.6.1"
 faker = "^37.1.0"
 factory-boy = "^3.3.3"
+nest-asyncio = "^1.6.0"
 mssql-django = "^1.5"
 django-percentagefield = "^0.1.7"
 
@@ -57,6 +57,7 @@ pytest = "^8.1.1"
 pytest-picked = "^0.5.0"
 django-debug-toolbar = "4.2"
 jupyter = "^1.1.1"
+pytest-env = "^1.1.5"
 
 
 [tool.poetry.group.jupyter.dependencies]
@@ -85,4 +86,5 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "jao_backend.settings.test"
+env = ["ENV=test"]
 pythonpath = ["src"]

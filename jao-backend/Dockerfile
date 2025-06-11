@@ -9,6 +9,14 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Manual ODBC library setup
+RUN apt-get update && apt-get install -y \
+    unixodbc \
+    unixodbc-dev \
+    gcc \
+    g++ \
+    && ldconfig
+
 # Create the app directory
 RUN mkdir /app
 
@@ -27,20 +35,16 @@ RUN curl -sSL https://install.python-poetry.org | python -
 # Add Poetry to the PATH
 ENV PATH="/root/.local/bin:$PATH"
 
-# Copy the jao-backend-schemas directory
-COPY ./jao-backend/jao_backend_schemas/ ./jao_backend_schemas/
-
 # Copy the poetry.lock and pyproject.toml files
 COPY ./jao-backend/pyproject.toml ./pyproject.toml
-# COPY poetry.lock ./poetry.lock
+# COPY ./jao-backend/poetry.lock ./poetry.lock
 
 # Install Python dependencies
 RUN poetry install --no-root --no-cache
-RUN pip install ../jao-backend-schemas
 
 # Copy the package.json and package-lock.json files for npm
 COPY ./jao-backend/package.json ./package.json
-# COPY package-lock.json ./package-lock.json
+# COPY ./jao-backend/package-lock.json ./package-lock.json
 
 # Install npm dependencies
 RUN npm i
@@ -48,6 +52,14 @@ RUN npm i
 # Copy the rest of the application code
 COPY ./jao-backend/src/ ./src/
 COPY ./jao-backend/*.py ./
+COPY ./jao-backend/webpack.config.js ./webpack.config.js
+
+# Build frontend assets with backendpack
+RUN npm run build
+
+# Create frontend module directory
+RUN mkdir -p /app/src/frontend
+RUN touch /app/src/frontend/__init__.py
 
 RUN ls -la /app
 RUN ls -la /app/src

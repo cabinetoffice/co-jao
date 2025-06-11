@@ -18,12 +18,70 @@ An application that uses LLMs to assist in job description drafting and recruitm
       - experience level of candidates
       - highest level of education, etc  
 
-## Future state
+# Future state
 
 * Instead of using gpt for step 1, use a fine-tuned LLM on a real dataset of many 1,000s of real job description: application pairs.
 
+# Deployment
 
-# Set up 
+## Infrastructure Deployment
+
+This project uses Terraform for infrastructure deployment with an S3 backend for state management. The deployment script automatically handles the backend setup.
+
+### Prerequisites
+
+- AWS CLI configured with appropriate credentials
+- Docker installed and running
+- Terraform installed
+
+### Quick Deployment
+
+```bash
+./deploy.sh
+```
+
+The deployment script will:
+1. Check if the Terraform backend infrastructure exists (S3 bucket and DynamoDB table)
+2. If not present, create the backend infrastructure first
+3. Initialize Terraform with the S3 backend
+4. Build and push Docker images to ECR
+5. Deploy the infrastructure using Terraform
+6. Update ECS services with new images
+
+### Backend Configuration
+
+The Terraform state is stored in:
+- **S3 Bucket**: `jao-tf-state`
+- **State Key**: `jao/dev/terraform.tfstate`
+- **DynamoDB Table**: `jao-terraform-locks` (for state locking)
+- **Region**: `eu-west-2`
+
+The deployment script automatically handles the chicken-and-egg problem of creating the backend infrastructure before using it.
+
+### Deployment Options
+
+```bash
+# Skip building specific components
+./deploy.sh --skip-backend           # Skip backend Docker build
+./deploy.sh --skip-frontend          # Skip frontend Docker build
+./deploy.sh --skip-terraform         # Skip Terraform deployment
+
+# Skip creating existing resources
+./deploy.sh --skip-existing          # Skip all commonly conflicting resources
+./deploy.sh --skip-vpc --existing-vpc-id vpc-xxxxxxxx  # Use existing VPC
+./deploy.sh --skip-cloudwatch        # Skip CloudWatch log groups
+
+# Force clean deployment
+./deploy.sh --force-import           # Force import of existing ECR repositories
+```
+
+### Troubleshooting
+
+- If you encounter "resource already exists" errors, use `--skip-existing`
+- For VPC conflicts, use `--skip-vpc --existing-vpc-id vpc-xxxxxxxx`
+- For CloudWatch log group conflicts, use `--skip-cloudwatch`
+
+# Set up
 
 https://python.langchain.com/docs/integrations/chat/llama2_chat
 https://python.langchain.com/docs/templates/llama2-functions

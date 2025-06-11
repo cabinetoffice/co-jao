@@ -18,7 +18,9 @@ def test_vacancy_embedding_save_embeddings():
     EmbeddingService.sync_embedding_tags.cache_clear()
     EmbeddingService.sync_embedding_tags()
 
-    tag = EmbeddingTag.objects.order_by("-version").get(name="job-title-responsibilities")
+    tag = EmbeddingTag.objects.order_by("-version").get(
+        name="job-title-responsibilities"
+    )
     vacancy = VacancyFactory.create()
     assert vacancy.vacancyembedding_set.exists() is False
 
@@ -26,10 +28,10 @@ def test_vacancy_embedding_save_embeddings():
     fake_embeddings = [np.random.rand(EmbeddingTiny.dimensions)]
 
     saved_embeddings = VacancyEmbedding.save_embeddings(
-        tag=tag,
-        chunks=fake_embeddings,
-        vacancy=vacancy
+        tag=tag, chunks=fake_embeddings, vacancy=vacancy
     )
 
-    assert 0 < len(saved_embeddings) == len(fake_embeddings), "Failed to save embeddings"
+    assert (
+        0 < len(saved_embeddings) == len(fake_embeddings)
+    ), "Failed to save embeddings"
     assert list(vacancy.vacancyembedding_set.all()) == saved_embeddings

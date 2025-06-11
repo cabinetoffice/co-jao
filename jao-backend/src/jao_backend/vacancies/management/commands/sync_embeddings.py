@@ -48,11 +48,8 @@ class Command(BaseCommand):
             service.create_for_vacancy(vacancy)
 
     def _get_vacancies_to_sync(self) -> QuerySet:
-        vacancies = Vacancy.objects \
-            .filter(vacancyembedding__isnull=True) \
-            .order_by('id')
+        vacancies = Vacancy.objects.filter(vacancyembedding__isnull=True).order_by("id")
 
         # TODO: currently create_at isn't a field on vacancy, so we can't limit by date§
         count = vacancies.count()
-        return vacancies[max(count-self.MAX_EMBEDDINGS, 0):]
-
+        return vacancies[max(count - self.MAX_EMBEDDINGS, 0) :]

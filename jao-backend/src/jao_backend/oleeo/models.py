@@ -150,6 +150,7 @@ class Vacancies(UpstreamModelBase):
         db_table = "Vacancies"
         app_label = "oleeo"
 
+
 class Dandi(UpstreamModelBase):
     application = models.OneToOneField(
         Applications,
@@ -240,6 +241,7 @@ class ListAgeGroup(UpstreamModelBase):
         managed = False  # Created from a view. Don't remove.
         db_table = "List_AgeGroup"
 
+
 # TODO: These models are not yet ingested:
 class ListApplicantType(UpstreamModelBase):
     applicant_type_id = models.AutoField(primary_key=True)
@@ -247,7 +249,7 @@ class ListApplicantType(UpstreamModelBase):
     row_last_updated = models.DateTimeField()
 
     # TODO: destination_model
-    
+
     class Meta:
         managed = False  # Created from a view. Don't remove.
         db_table = "List_ApplicantType"
@@ -264,7 +266,7 @@ class ListApplicationStatus(UpstreamModelBase):
     status_group_detailed_desc = models.TextField(blank=True, null=True)
 
     # TODO: destination_model
-    
+
     class Meta:
         managed = False  # Created from a view. Don't remove.
         db_table = "List_ApplicationStatus"
@@ -304,7 +306,10 @@ class ListDepartment(UpstreamModelBase):
     class Meta:
         managed = False  # Created from a view. Don't remove.
         db_table = "List_Department"
+
+
 # /End TODO
+
 
 class ListDisability(UpstreamModelBase):
     disability_id = models.AutoField(primary_key=True)
@@ -366,6 +371,7 @@ class ListJobGrade(UpstreamModelBase):
         managed = False  # Created from a view. Don't remove.
         db_table = "List_JobGrade"
 
+
 class ListTypeOfRole(UpstreamModelBase):
     type_of_role_id = models.AutoField(primary_key=True)
     type_of_role_desc = models.TextField()
@@ -377,7 +383,9 @@ class ListTypeOfRole(UpstreamModelBase):
         managed = False  # Created from a view. Don't remove.
         db_table = "List_TypeOfRole"
 
+
 # TODO: Location ingest is not in this part of the code
+
 
 class ListLocationType(UpstreamModelBase):
     location_type_id = models.AutoField(primary_key=True)
@@ -425,7 +433,10 @@ class ListRegion(UpstreamModelBase):
     class Meta:
         managed = False  # Created from a view. Don't remove.
         db_table = "List_Region"
+
+
 # /END TODO
+
 
 class ListReligion(UpstreamModelBase):
     religion_id = models.AutoField(primary_key=True)

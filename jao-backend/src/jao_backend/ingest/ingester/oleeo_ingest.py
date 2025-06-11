@@ -1,3 +1,8 @@
+import logging
+
+from django.db import transaction
+from django.conf import settings
+
 from jao_backend.oleeo.models import ListAgeGroup
 from jao_backend.oleeo.models import ListApplicantType
 from jao_backend.oleeo.models import ListApplicationStatus
@@ -21,7 +26,7 @@ from jao_backend.oleeo.models import ListVacancyPostcode
 from jao_backend.oleeo.models import ListVacancyStatus
 from jao_backend.oleeo.models import Vacancies
 
-from django.db import transaction
+logger = logging.getLogger(__name__)
 
 LIST_MODELS = [
     ListAgeGroup,
@@ -51,20 +56,21 @@ DATA_MODELS = [
     Vacancies,
 ]
 
+
 class OleeoIngest:
     """
     Ingest OLEEO data stored in the R2D2 database.
 
     Prerequisites:
 
-    INSTALLED_APPS must "oleeo"
+    INSTALLED_APPS must include "oleeo"
     """
 
     @transaction.atomic
     def synchronise_lists(self):
         for list_model in LIST_MODELS:
-            created = list_model.objects.bulk_create_pending()
-            updated = list_model.objects.bulk_update_pending()
+            created = list_model.objects.create_pending()
+            updated = list_model.objects.update_pending()
             deleted = list_model.objects.mark_delete_pending()
             yield list_model, (created, updated, deleted)
 
@@ -72,16 +78,34 @@ class OleeoIngest:
     def synchronise_large_models(self):
         for data_model in DATA_MODELS:
             qs = data_model.objects.exclude_known_bad()
-            created = qs.bulk_create_pending()
-            updated = qs.bulk_update_pending()
-            deleted = qs.mark_delete_pending()
-            yield data_model, (created, updated, deleted)
+            total_created = 0
+            for created in qs.bulk_create_pending():
+                total_created += len(created)
+
+            for total_updated in qs.bulk_update_pending():
+                pass
+
+            qs.mark_delete_pending()
+
+            yield data_model, (total_created, total_updated)
+
+    @transaction.atomic
+    def synchronise_aggregated_statistics(self):
+        """
+        Synchronise the statistics models with the OLEEO data.
+        """
+        # TODO:  Aggregation queries are currently too slow so this is not implemented yet.
+        logging.info("Synchronising aggregated statistics is not implemented yet.")
 
     @transaction.atomic
     def update(self):
+        if not settings.JAO_BACKEND_ENABLE_OLEEO:
+            raise ValueError("OLEEO ingest is not enabled")
+
         for model, (created, updated, deleted) in self.synchronise_lists():
-            print("synced ", model.__name__)
+            logging.info("synced %s", model.__name__)
 
-        for model, (created, updated, deleted) in self.synchronise_large_models():
-            print("synced ", model.__name__)
+        for model, (created, updated) in self.synchronise_large_models():
+            logging.info("synced %s", model.__name__)
 
+        self.synchronise_aggregated_statistics()

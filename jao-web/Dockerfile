@@ -27,19 +27,16 @@ RUN curl -sSL https://install.python-poetry.org | python -
 # Add Poetry to the PATH
 ENV PATH="/root/.local/bin:$PATH"
 
-# Copy the jao-web-schemas directory
-COPY ./jao-web/jao_backend_schemas/ ./jao_backend_schemas/
-
 # Copy the poetry.lock and pyproject.toml files
 COPY ./jao-web/pyproject.toml ./pyproject.toml
-# COPY poetry.lock ./poetry.lock
+# COPY ./jao-web/poetry.lock ./poetry.lock
 
 # Install Python dependencies
 RUN poetry install --no-root --no-cache
 
 # Copy the package.json and package-lock.json files for npm
 COPY ./jao-web/package.json ./package.json
-# COPY package-lock.json ./package-lock.json
+# COPY ./jao-web/package-lock.json ./package-lock.json
 
 # Install npm dependencies
 RUN npm i
@@ -47,6 +44,10 @@ RUN npm i
 # Copy the rest of the application code
 COPY ./jao-web/src/ ./src/
 COPY ./jao-web/*.py ./
+COPY ./jao-web/webpack.config.js ./webpack.config.js
+
+# Build frontend assets with webpack
+RUN npm run build
 
 # Create frontend module directory
 RUN mkdir -p /app/src/frontend

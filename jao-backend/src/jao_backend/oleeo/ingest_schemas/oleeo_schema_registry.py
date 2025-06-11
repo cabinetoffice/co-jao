@@ -25,9 +25,8 @@ def register_oleeo_mapping(model_schema):
     """
     # Get the base class (assuming it's the first one in __mro__ after the class itself)
     for base_class in model_schema.__mro__:
-        if hasattr(base_class, 'model_config') and "model" in base_class.model_config:
+        if hasattr(base_class, "model_config") and "model" in base_class.model_config:
             destination_model = base_class.model_config["model"]
-            print(f"Registering {model_schema} for {destination_model}")
             OLEEO_MODEL_SCHEMAS[fully_qualified_name(destination_model)] = model_schema
             break
     else:

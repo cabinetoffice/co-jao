@@ -1,12 +1,16 @@
-from django.db.models import Func
 from django.db.models import BooleanField
+from django.db.models import Func
 
 
 class SqlServerIsValidDecimal(Func):
     """
-    Custom function to check if a field can be parsed as a decimal with specified precision.
-    Used in annotations to validate decimal string fields.
+    Check if a field can be parsed as a decimal with specified precision.
+
+    Allows filtering of fields that can be parsed as decimal numbers in versions
+    of SQLServer that don't have regex support, which could be used for this
+    in Django otherwise.
     """
+
     output_field = BooleanField()
 
     def __init__(self, expression, max_digits=10, decimal_places=2, **kwargs):
@@ -16,9 +20,6 @@ class SqlServerIsValidDecimal(Func):
 
     def as_sql(self, compiler, connection):
         expression_sql, params = compiler.compile(self.source_expressions[0])
-
-        # Calculate the maximum absolute value based on precision
-        max_value = 10 ** (self.max_digits - self.decimal_places)
 
         sql = (
             f"CASE WHEN TRY_CONVERT(DECIMAL({self.max_digits},{self.decimal_places}), "
@@ -35,8 +36,6 @@ class SqlServerIsValidDecimalOrNull(SqlServerIsValidDecimal):
 
     def as_sql(self, compiler, connection):
         expression_sql, params = compiler.compile(self.source_expressions[0])
-
-        max_value = 10 ** (self.max_digits - self.decimal_places)
 
         sql = (
             f"CASE WHEN {expression_sql} IS NULL THEN 1 "

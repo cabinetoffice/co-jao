@@ -14,11 +14,11 @@ class Vacancy(models.Model):
         primary_key=True, help_text="CS Jobs vacancy ID [5-6 characters]"
     )
 
-    last_updated = models.DateTimeField(
-        help_text="Last updated date and time."
-    )
+    last_updated = models.DateTimeField(help_text="Last updated date and time.")
 
-    is_deleted = models.BooleanField(default=False, help_text="Vacancy is marked as deleted.")
+    is_deleted = models.BooleanField(
+        default=False, help_text="Vacancy is marked as deleted."
+    )
     """
     This ID is synchronised to vacancy_id in the R2D2 database.
     """

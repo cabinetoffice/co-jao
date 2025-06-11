@@ -2,13 +2,18 @@ from django.conf import settings
 from django.contrib import admin
 from django.urls import include
 from django.urls import path
+from django.http import HttpResponse
 
+
+def health_check(request):
+    return HttpResponse("OK", content_type="text/plain")
 
 urlpatterns = [
     path("", include("jao_backend.home.urls")),
     path("api/v1/", include("jao_backend.api.urls")),
     path("ingest/", include("jao_backend.ingest.urls")),
     path("django-admin/", admin.site.urls),
+    path("health", health_check, name="health_check"),
 ]
 
 
