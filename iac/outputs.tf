@@ -8,12 +8,12 @@ output "api_gateway_url" {
 
 output "backend_ecr_repository_url" {
   description = "Backend ECR Repository URL"
-  value       = var.skip_ecr_creation ? "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.app_name}-${var.environment}" : aws_ecr_repository.app[0].repository_url
+  value       = aws_ecr_repository.app.repository_url
 }
 
 output "frontend_ecr_repository_url" {
   description = "Frontend ECR Repository URL"
-  value       = var.skip_ecr_creation ? "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.app_name}-frontend-${var.environment}" : aws_ecr_repository.frontend[0].repository_url
+  value       = aws_ecr_repository.frontend.repository_url
 }
 
 output "backend_load_balancer_dns" {

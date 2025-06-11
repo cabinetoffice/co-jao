@@ -1,17 +1,22 @@
 # Override variables to work around resources that already exist
 
-# Resource existence flags
-skip_ecr_creation = true
+# Resource existence flags - COMMENTED OUT FOR SIMPLIFICATION
+# skip_ecr_creation = true
 aws_account_id    = "860619597616"
 
-# Skip creating resources that already exist
-skip_frontend_role_creation   = false
-skip_backend_role_creation    = false
-skip_cloudwatch_logs_creation = true
-skip_s3_bucket_creation       = true
-skip_param_group_creation     = false
-skip_secret_creation          = true
-skip_policy_creation          = false
+# Skip creating resources that already exist - COMMENTED OUT FOR SIMPLIFICATION
+# skip_iam_role_creation        = false
+# skip_vpc_creation             = false
+# skip_cloudwatch_creation      = false
+# skip_s3_bucket_creation       = false
+# skip_param_group_creation     = false
+# skip_secret_creation          = true
+# skip_policy_creation          = false
+
+# Existing IAM role ARNs - COMMENTED OUT FOR SIMPLIFICATION
+# existing_task_execution_role_arn = "arn:aws:iam::860619597616:role/ipa-scout-preprod-backend-ecs-task-role"
+# existing_frontend_execution_role_arn = "arn:aws:iam::860619597616:role/ipa-scout-preprod-frontend-ecs-task-role"
+# existing_frontend_task_role_arn = "arn:aws:iam::860619597616:role/ipa-scout-preprod-frontend-ecs-task-role"
 
 # Disable features requiring enhanced permissions
 enable_enhanced_monitoring   = false
@@ -25,7 +30,7 @@ enable_detailed_metrics      = false
 internal_lb = false
 
 # Self-manage the initialization
-initialization_bucket = "python-api-dev-initialization"
+initialization_bucket = "jao-dev-initialization"
 init_script           = null
 
 # VPC configuration

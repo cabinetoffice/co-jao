@@ -13,24 +13,76 @@ provider "aws" {
   region = var.aws_region
 }
 
+locals {
+  common_tags = {
+    Project     = var.app_name
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+
+  # Environment-specific configurations
+  env_config = {
+    prod = {
+      force_destroy_buckets       = false
+      single_nat_gateway         = false
+      s3_lifecycle_days          = 365
+      log_retention_days         = 90
+      db_min_capacity           = 1.0
+      db_max_capacity           = 8.0
+      db_backup_retention       = 30
+      db_skip_final_snapshot    = false
+      db_deletion_protection    = true
+      api_rate_limit            = 200
+      api_burst_limit           = 300
+      max_requests_per_min      = "1000"
+      enable_xray_tracing       = true
+      django_debug              = "False"
+      session_cookie_secure     = "true"
+      monitoring_interval       = 60
+    }
+    dev = {
+      force_destroy_buckets       = true
+      single_nat_gateway         = true
+      s3_lifecycle_days          = 90
+      log_retention_days         = 30
+      db_min_capacity           = 0.5
+      db_max_capacity           = 2.0
+      db_backup_retention       = 7
+      db_skip_final_snapshot    = true
+      db_deletion_protection    = false
+      api_rate_limit            = 500
+      api_burst_limit           = 1000
+      max_requests_per_min      = "2000"
+      enable_xray_tracing       = false
+      django_debug              = "True"
+      session_cookie_secure     = "false"
+      monitoring_interval       = 30
+    }
+  }
+
+  # Current environment config
+  current_env = local.env_config[var.environment == "prod" ? "prod" : "dev"]
+
+  # ECR repository URLs
+  backend_ecr_url = "${aws_ecr_repository.app.repository_url}:${var.image_tag}"
+  frontend_ecr_url = "${aws_ecr_repository.frontend.repository_url}:${var.image_tag}"
+}
+
 # Create S3 bucket for initialization scripts
 module "initialization_bucket" {
   source      = "./modules/s3_bucket"
-  bucket_name = var.initialization_bucket != "" ? var.initialization_bucket : "${var.app_name}-${var.environment}-initialization"
+  bucket_name = coalesce(var.initialization_bucket, "${var.app_name}-${var.environment}-initialization")
 
   enable_versioning = true
   enable_encryption = true
-  force_destroy     = var.environment != "prod"
-
-  # Skip creation if the bucket already exists and is imported
-  create_bucket = !var.skip_s3_bucket_creation
+  force_destroy     = local.current_env.force_destroy_buckets
 
   lifecycle_rules = [
     {
       id     = "expire-old-scripts"
       status = "Enabled"
       expiration = {
-        days = var.environment == "prod" ? 365 : 90
+        days = local.current_env.s3_lifecycle_days
       }
     }
   ]
@@ -40,7 +92,6 @@ module "initialization_bucket" {
 
 # ECR Repository for Backend API Docker image
 resource "aws_ecr_repository" "app" {
-  count                = var.skip_ecr_creation ? 0 : 1
   name                 = "${var.app_name}-${var.environment}"
   image_tag_mutability = "MUTABLE"
 
@@ -51,16 +102,8 @@ resource "aws_ecr_repository" "app" {
   tags = local.common_tags
 }
 
-# This import block is only needed when the repository already exists
-# and you're importing it into Terraform state for the first time
-# import {
-#   to = aws_ecr_repository.app
-#   id = "${var.app_name}-${var.environment}"
-# }
-
 # ECR Repository for Frontend Docker image
 resource "aws_ecr_repository" "frontend" {
-  count                = var.skip_ecr_creation ? 0 : 1
   name                 = "${var.app_name}-frontend-${var.environment}"
   image_tag_mutability = "MUTABLE"
 
@@ -71,21 +114,6 @@ resource "aws_ecr_repository" "frontend" {
   tags = local.common_tags
 }
 
-# This import block is only needed when the repository already exists
-# and you're importing it into Terraform state for the first time
-# import {
-#   to = aws_ecr_repository.frontend
-#   id = "${var.app_name}-frontend-${var.environment}"
-# }
-
-# Define common tags for all resources
-locals {
-  common_tags = {
-    Project     = var.app_name
-    Environment = var.environment
-    ManagedBy   = "terraform"
-  }
-}
 
 # VPC configuration
 module "vpc" {
@@ -99,11 +127,9 @@ module "vpc" {
   public_subnet_cidrs  = var.public_subnet_cidrs
 
   enable_nat_gateway = true
-  single_nat_gateway = var.environment == "dev" ? true : false
+  single_nat_gateway = local.current_env.single_nat_gateway
 
-  # Skip VPC creation if it already exists
-  skip_vpc_creation = var.skip_vpc_creation
-  existing_vpc_id   = var.existing_vpc_id
+
 
   tags = local.common_tags
 }
@@ -114,7 +140,7 @@ module "ecs" {
 
   name_prefix        = var.app_name
   environment        = var.environment
-  ecr_repository_url = var.skip_ecr_creation ? "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.app_name}-${var.environment}" : aws_ecr_repository.app[0].repository_url
+  ecr_repository_url = local.backend_ecr_url
   container_port     = var.container_port
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnet_ids
@@ -124,14 +150,6 @@ module "ecs" {
   desired_count      = var.desired_count
   container_name     = var.app_name
 
-  # Skip resource creation if resources already exist
-  skip_cloudwatch_creation         = var.skip_cloudwatch_creation
-  skip_iam_role_creation           = var.skip_iam_role_creation
-  existing_task_execution_role_arn = var.existing_task_execution_role_arn
-
-  # Use existing log group if specified
-  existing_log_group_name = var.existing_backend_log_group
-
   # Environment variables for the API service
   environment_variables = merge(var.environment_variables, {
     # Database environment variables
@@ -139,20 +157,21 @@ module "ecs" {
     DB_PORT     = "5432"
     DB_NAME     = module.vectordb.database_name
     DB_USER     = module.vectordb.master_username
-    DB_PASSWORD = "dummy-placeholder" # Will be overridden by secrets manager
+    DB_PASSWORD = "secrettpassword" # Matches hardcoded password in Aurora module
 
     # Django environment variables
     ENV                    = "dev" # Required for settings module selection
     DJANGO_SETTINGS_MODULE = "jao_backend.settings.dev"
     DJANGO_SECRET_KEY      = "dummy-placeholder-secret-key" # Will be overridden in production
-    DJANGO_DEBUG           = var.environment == "prod" ? "False" : "True"
+    DJANGO_DEBUG           = local.current_env.django_debug
     API_STAGE_NAME         = var.environment
     DJANGO_ALLOWED_HOSTS   = "*"
 
     # Database URL for Django (required by jao_backend settings)
-    JAO_BACKEND_DATABASE_URL       = "postgresql://${module.vectordb.master_username}:dummy-placeholder@${module.vectordb.cluster_endpoint}:5432/${module.vectordb.database_name}"
-    DATABASE_URL                   = "postgresql://${module.vectordb.master_username}:dummy-placeholder@${module.vectordb.cluster_endpoint}:5432/${module.vectordb.database_name}" # Will be built from DB_* vars in entrypoint
+    JAO_BACKEND_DATABASE_URL       = "postgresql://${module.vectordb.master_username}:secrettpassword@${module.vectordb.cluster_endpoint}:5432/${module.vectordb.database_name}"
+    DATABASE_URL                   = "postgresql://${module.vectordb.master_username}:secrettpassword@${module.vectordb.cluster_endpoint}:5432/${module.vectordb.database_name}" # Will be built from DB_* vars in entrypoint
     JAO_BACKEND_OLEEO_DATABASE_URL = "mssqlms://user.namey:password@co-grid-database.eu-west-2:1433/DART_Dev"
+    JAO_BACKEND_ENABLE_OLEEO       = "true"
     # Celery configuration
     CELERY_BROKER_URL     = "redis://localhost:6379/0" # Update this with your actual Redis endpoint
     CELERY_RESULT_BACKEND = "redis://localhost:6379/0" # Update this with your actual Redis endpoint
@@ -164,16 +183,16 @@ module "ecs" {
 
     # API rate limiting and monitoring config
     ENABLE_RATE_LIMITING = "true"
-    MAX_REQUESTS_PER_MIN = var.environment == "prod" ? "1000" : "2000"
+    MAX_REQUESTS_PER_MIN = local.current_env.max_requests_per_min
     ENABLE_API_METRICS   = "true"
   })
   health_check_path      = "/health"
-  internal_lb            = var.environment != "prod"
-  logs_retention_in_days = var.environment == "prod" ? 90 : 30
+  internal_lb            = true
+  logs_retention_in_days = local.current_env.log_retention_days
 
   # Enable enhanced monitoring and tracing for the API backend
   enable_enhanced_monitoring = true
-  enable_xray_tracing        = var.environment == "prod" ? true : false
+  enable_xray_tracing        = local.current_env.enable_xray_tracing
   enable_circuit_breaker     = true
 
   tags = local.common_tags
@@ -186,20 +205,18 @@ module "api_gateway" {
   name_prefix            = var.app_name
   environment            = var.environment
   vpc_id                 = module.vpc.vpc_id
-  vpc_link_subnets       = module.vpc.private_subnet_ids
-  load_balancer_arn      = module.ecs.nlb_arn
-  integration_uri        = module.ecs.lb_listener_arn
+  load_balancer_arn      = module.ecs.load_balancer_arn
   load_balancer_dns_name = module.ecs.load_balancer_dns_name
   stage_name             = var.environment
-  logs_retention_in_days = var.environment == "prod" ? 90 : 30
+  logs_retention_in_days = local.current_env.log_retention_days
 
   # CloudWatch logs are always created by this module
 
   # Enhanced API features for third-party consumers
   enable_api_keys            = true
   enable_detailed_metrics    = true
-  api_throttling_rate_limit  = var.environment == "prod" ? 200 : 500
-  api_throttling_burst_limit = var.environment == "prod" ? 300 : 1000
+  api_throttling_rate_limit  = local.current_env.api_rate_limit
+  api_throttling_burst_limit = local.current_env.api_burst_limit
 
   # API keys for third-party consumers
   api_keys = [
@@ -219,50 +236,6 @@ module "api_gateway" {
       enabled     = true
     }
   ]
-
-  # Usage plans with different throttling settings
-  # usage_plans = [
-  #   {
-  #     name        = "frontend-plan"
-  #     description = "Usage plan for internal frontend"
-  #     quota = {
-  #       limit  = 1000000
-  #       period = "MONTH"
-  #     }
-  #     throttle = {
-  #       rate_limit  = 100
-  #       burst_limit = 200
-  #     }
-  #     api_key_names = ["internal-frontend"]
-  #   },
-  #   {
-  #     name        = "partner-plan"
-  #     description = "Usage plan for partner API consumers"
-  #     quota = {
-  #       limit  = 500000
-  #       period = "MONTH"
-  #     }
-  #     throttle = {
-  #       rate_limit  = 50
-  #       burst_limit = 50
-  #     }
-  #     api_key_names = ["partner-api-consumer"]
-  #   }
-  # ]
-
-  # Route-specific throttling for critical endpoints
-  # route_specific_throttling = {
-  #   "GET /api/todos" = {
-  #     rate_limit  = 30
-  #     burst_limit = 60
-  #   },
-  #   "POST /api/todos" = {
-  #     rate_limit  = 15
-  #     burst_limit = 30
-  #   }s
-  # }
-
-  # Define API routes
   routes = [
     {
       route_key = "ANY /{proxy+}"
@@ -279,23 +252,48 @@ module "api_gateway" {
   tags = local.common_tags
 }
 
-# Security group for database access
-resource "aws_security_group" "db_access" {
-  name        = "${var.app_name}-${var.environment}-db-access"
-  description = "Security group for database access"
-  vpc_id      = module.vpc.vpc_id
+# Frontend Module
+module "frontend" {
+  source = "./modules/frontend"
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+  name_prefix        = var.app_name
+  environment        = var.environment
+  ecr_repository_url = local.frontend_ecr_url
+  container_port     = 8000
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+  public_subnet_ids  = module.vpc.public_subnet_ids
+  cpu                = var.task_cpu
+  memory             = var.task_memory
+  desired_count      = var.desired_count
+
+  # Environment variables for the frontend service
+  environment_variables = {
+    DJANGO_SECRET_KEY = "dummy-placeholder-secret-key"
+    DJANGO_DEBUG      = local.current_env.django_debug
+    BACKEND_API_KEY        = "dummy-placeholder-api-key"
+    DJANGO_SETTINGS_MODULE = "jao_web.settings.dev"
+    PORT                   = "8000"
+    JAO_BACKEND_URL = module.api_gateway.api_gateway_url
+    JAO_BACKEND_TIMEOUT = "15"
+    JAO_BACKEND_ENABLE_HTTP2 = "true"
+    SESSION_COOKIE_SECURE = local.current_env.session_cookie_secure
+    ENV = var.environment
+    DJANGO_ALLOWED_HOSTS = "*"
+    DB_HOST = module.vectordb.cluster_endpoint
+    DB_PORT = "5432"
+    DB_NAME = module.vectordb.database_name
+    DB_USER = module.vectordb.master_username
+    DB_PASSWORD = "secrettpassword"
+    DATABASE_URL = "postgresql://${module.vectordb.master_username}:secrettpassword@${module.vectordb.cluster_endpoint}:5432/${module.vectordb.database_name}"
   }
+  health_check_path      = "/health"
+  internal_lb            = false # Frontend LB is public-facing
+  logs_retention_in_days = local.current_env.log_retention_days
 
   tags = local.common_tags
-
-  depends_on = [module.vpc]
 }
+
 
 # Database Module - Aurora PostgreSQL with pgvector
 module "vectordb" {
@@ -323,18 +321,18 @@ module "vectordb" {
   use_serverless = false
   instance_count = 1
   # Enhanced capacity for API workloads with high throughput
-  min_capacity = var.environment == "prod" ? 1.0 : 0.5 # Higher baseline for production
-  max_capacity = var.environment == "prod" ? 8.0 : 2.0 # Higher ceiling for production
+  min_capacity = local.current_env.db_min_capacity
+  max_capacity = local.current_env.db_max_capacity
 
   # Development settings
   apply_immediately       = true
-  skip_final_snapshot     = var.environment != "prod"
-  deletion_protection     = var.environment == "prod"
-  backup_retention_period = var.environment == "prod" ? 30 : 7 # Increased retention for production
+  skip_final_snapshot     = local.current_env.db_skip_final_snapshot
+  deletion_protection     = local.current_env.db_deletion_protection
+  backup_retention_period = local.current_env.db_backup_retention
 
   # Enhanced Monitoring for API database
   performance_insights_enabled = var.performance_insights_enabled != null ? var.performance_insights_enabled : true
-  enhanced_monitoring_interval = var.enable_enhanced_monitoring ? (var.environment == "prod" ? 60 : 30) : 0 # Add basic monitoring even in dev
+  enhanced_monitoring_interval = var.enable_enhanced_monitoring ? local.current_env.monitoring_interval : 0
 
   # Initialize the database with the Django todo list schema
   init_script        = "${path.module}/sql/init_pgvector.sql"
@@ -365,61 +363,45 @@ module "vectordb" {
   tags = local.common_tags
 }
 
-# Frontend Module
-module "frontend" {
-  source = "./modules/frontend"
+# Security group for database access
+resource "aws_security_group" "db_access" {
+  name        = "${var.app_name}-${var.environment}-db-access"
+  description = "Security group for database access"
+  vpc_id      = module.vpc.vpc_id
 
-  name_prefix        = var.app_name
-  environment        = var.environment
-  ecr_repository_url = var.skip_ecr_creation ? "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.app_name}-frontend-${var.environment}" : aws_ecr_repository.frontend[0].repository_url
-  container_port     = 8000
-  vpc_id             = module.vpc.vpc_id
-  private_subnet_ids = module.vpc.private_subnet_ids
-  public_subnet_ids  = module.vpc.public_subnet_ids
-  cpu                = var.task_cpu
-  memory             = var.task_memory
-  desired_count      = var.desired_count
-
-  # Skip resource creation if resources already exist
-  skip_cloudwatch_creation    = var.skip_cloudwatch_creation
-  skip_iam_role_creation      = var.skip_iam_role_creation
-  existing_execution_role_arn = var.existing_frontend_execution_role_arn
-  existing_task_role_arn      = var.existing_frontend_task_role_arn
-
-  # Use existing log group if specified
-  existing_log_group_name = var.existing_frontend_log_group
-
-  # Environment variables for the frontend service
-  environment_variables = {
-    DJANGO_SECRET_KEY = "dummy-placeholder-secret-key" # Will be overridden in production
-    DJANGO_DEBUG      = var.environment == "prod" ? "False" : "True"
-    # Connect to backend via API Gateway with API key for better monitoring and control
-    BACKEND_URL            = module.api_gateway.api_gateway_url
-    BACKEND_API_KEY        = "dummy-placeholder-api-key" # Will be replaced with actual frontend API key
-    DJANGO_SETTINGS_MODULE = "frontend.settings"
-    PORT                   = "8000"
-    # Required JAO Backend URL for frontend to communicate with backend services
-    JAO_BACKEND_URL = module.api_gateway.api_gateway_url
-    # Add timeout setting for backend requests
-    JAO_BACKEND_TIMEOUT = "15"
-    # Add HTTP/2 setting for backend requests
-    JAO_BACKEND_ENABLE_HTTP2 = "true"
-    # Session configuration
-    SESSION_COOKIE_SECURE = var.environment == "prod" ? "true" : "false"
-    # Set environment for Django settings selection
-    ENV = var.environment
+  # Database access (PostgreSQL)
+  egress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = [module.vpc.vpc_cidr_block]
+    description = "PostgreSQL database access"
   }
-  health_check_path      = "/health"
-  internal_lb            = false # Frontend LB is public-facing
-  logs_retention_in_days = var.environment == "prod" ? 90 : 30
+
+  # DNS resolution
+  egress {
+    from_port   = 53
+    to_port     = 53
+    protocol    = "udp"
+    cidr_blocks = [module.vpc.vpc_cidr_block]
+    description = "DNS resolution"
+  }
+
+  # HTTPS for AWS services (RDS monitoring, CloudWatch, etc.)
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTPS for AWS services"
+  }
 
   tags = local.common_tags
+
+  depends_on = [module.vpc]
 }
 
-# Outputs are defined in outputs.tf
 
-# Add ECS security group to DB access security group after ECS is created
-# This breaks the circular dependency while still allowing ECS tasks to access the database
 resource "aws_security_group_rule" "allow_ecs_to_db" {
   type                     = "ingress"
   from_port                = 5432

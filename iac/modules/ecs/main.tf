@@ -1,22 +1,19 @@
-# ECS module - main.tf
 locals {
-  # Resource naming
   name = "${var.name_prefix}-${var.environment}"
 
-  task_execution_role_arn  = var.skip_iam_role_creation ? var.existing_task_execution_role_arn : (length(aws_iam_role.ecs_task_execution_role) > 0 ? aws_iam_role.ecs_task_execution_role[0].arn : "")
-  task_execution_role_name = var.skip_iam_role_creation ? element(split("/", var.existing_task_execution_role_arn), 1) : (length(aws_iam_role.ecs_task_execution_role) > 0 ? aws_iam_role.ecs_task_execution_role[0].name : "")
+  # IAM configuration
+  task_execution_role_arn  = aws_iam_role.ecs_task_execution_role.arn
+  task_execution_role_name = aws_iam_role.ecs_task_execution_role.name
 
-  # Use specified log group name if provided, otherwise use default pattern
-  log_group_name   = var.existing_log_group_name != "" ? var.existing_log_group_name : "/ecs/${local.name}"
-  log_group_exists = var.skip_cloudwatch_creation
+  # CloudWatch configuration
+  log_group_name = "/ecs/${local.name}"
+  cloudwatch_log_group_name = aws_cloudwatch_log_group.app.name
+  cloudwatch_log_group_arn = aws_cloudwatch_log_group.app.arn
 
-  # When skipping creation, use the explicit name, otherwise use the created resource
-  cloudwatch_log_group_name = var.skip_cloudwatch_creation ? local.log_group_name : aws_cloudwatch_log_group.app[0].name
-
-  # When skipping creation and using explicit name, use the data source if available
-  cloudwatch_log_group_arn = var.skip_cloudwatch_creation ? (
-    length(data.aws_cloudwatch_log_group.existing_app) > 0 ? data.aws_cloudwatch_log_group.existing_app[0].arn : ""
-  ) : aws_cloudwatch_log_group.app[0].arn
+  # Feature flags
+  enable_monitoring = var.enable_enhanced_monitoring
+  enable_xray = var.enable_xray_tracing
+  enable_discovery = var.enable_service_discovery
 
   # Common tags for all resources
   common_tags = merge(
@@ -33,7 +30,7 @@ locals {
     [
       {
         name      = local.container_name
-        image     = "${var.ecr_repository_url}:latest"
+        image     = var.ecr_repository_url
         essential = true
         portMappings = [
           {
@@ -49,7 +46,7 @@ locals {
               value = value
             }
           ],
-          var.enable_enhanced_monitoring ? [
+          local.enable_monitoring ? [
             {
               name  = "ENABLE_METRICS"
               value = "true"
@@ -75,7 +72,7 @@ locals {
             "awslogs-stream-prefix" = "xray"
           }
         }
-        dependsOn = var.enable_xray_tracing ? [
+        dependsOn = local.enable_xray ? [
           {
             containerName = "xray-daemon"
             condition     = "START"
@@ -83,7 +80,7 @@ locals {
         ] : null
       }
     ],
-    var.enable_xray_tracing ? [
+    local.enable_xray ? [
       {
         name      = "xray-daemon"
         image     = "amazon/aws-xray-daemon:latest"
@@ -119,7 +116,7 @@ resource "aws_ecs_cluster" "main" {
 
   # Enable CloudWatch Container Insights for enhanced monitoring
   dynamic "configuration" {
-    for_each = var.enable_enhanced_monitoring ? [1] : []
+    for_each = local.enable_monitoring ? [1] : []
     content {
       execute_command_configuration {
         logging = "OVERRIDE"
@@ -132,7 +129,7 @@ resource "aws_ecs_cluster" "main" {
 
   # Service discovery configuration for microservices communication
   dynamic "service_connect_defaults" {
-    for_each = var.enable_service_discovery ? [1] : []
+    for_each = local.enable_discovery ? [1] : []
     content {
       namespace = var.service_discovery_namespace
     }
@@ -146,52 +143,46 @@ resource "aws_ecs_cluster" "main" {
   )
 }
 
-# Security group for the ALB
-resource "aws_security_group" "alb" {
-  name        = "${local.name}-alb-sg"
-  description = "Controls access to the ALB"
-  vpc_id      = var.vpc_id
 
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = merge(
-    local.common_tags,
-    {
-      Name = "${local.name}-alb-sg"
-    }
-  )
+# Data source to get VPC CIDR
+data "aws_vpc" "main" {
+  id = var.vpc_id
 }
 
 # Security group for ECS tasks
 resource "aws_security_group" "ecs_tasks" {
   name        = "${local.name}-ecs-tasks-sg"
-  description = "Allow inbound access from the ALB only"
+  description = "Allow inbound access from the NLB"
   vpc_id      = var.vpc_id
 
   ingress {
-    from_port       = var.container_port
-    to_port         = var.container_port
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
+    from_port   = var.container_port
+    to_port     = var.container_port
+    protocol    = "tcp"
+    cidr_blocks = [data.aws_vpc.main.cidr_block]
+  }
+
+  egress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = [data.aws_vpc.main.cidr_block]
+  }
+
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [data.aws_vpc.main.cidr_block]
+  }
+
+  egress {
+    from_port   = 53
+    to_port     = 53
+    protocol    = "udp"
+    cidr_blocks = [data.aws_vpc.main.cidr_block]
+    description = "DNS resolution"
   }
 
   egress {
@@ -199,6 +190,7 @@ resource "aws_security_group" "ecs_tasks" {
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+    description = "All outbound traffic"
   }
 
   tags = merge(
@@ -209,39 +201,8 @@ resource "aws_security_group" "ecs_tasks" {
   )
 }
 
-# Application Load Balancer
+# Network Load Balancer
 resource "aws_lb" "main" {
-  name               = "${local.name}-alb"
-  internal           = var.internal_lb
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb.id]
-  subnets            = var.internal_lb ? var.private_subnet_ids : var.public_subnet_ids
-
-  enable_deletion_protection = var.lb_deletion_protection
-
-  # Enable access logs for troubleshooting and analysis
-  dynamic "access_logs" {
-    for_each = var.enable_lb_access_logs ? [1] : []
-    content {
-      bucket  = var.lb_access_logs_bucket
-      prefix  = "${local.name}-alb-logs"
-      enabled = true
-    }
-  }
-
-  # Enable cross-zone load balancing for high availability
-  enable_cross_zone_load_balancing = var.enable_cross_zone_load_balancing
-
-  tags = merge(
-    local.common_tags,
-    {
-      Name = "${local.name}-alb"
-    }
-  )
-}
-
-# Network Load Balancer for API Gateway VPC Link
-resource "aws_lb" "nlb" {
   name               = "${local.name}-nlb"
   internal           = var.internal_lb
   load_balancer_type = "network"
@@ -260,60 +221,24 @@ resource "aws_lb" "nlb" {
   )
 }
 
-# NLB Target Group for ECS tasks
-resource "aws_lb_target_group" "nlb" {
-  name        = "${local.name}-nlb-tg"
+# Network Load Balancer for API Gateway VPC Link
+
+
+# Target group for the NLB
+resource "aws_lb_target_group" "app" {
+  name        = "${local.name}-tg"
   port        = var.container_port
   protocol    = "TCP"
   vpc_id      = var.vpc_id
   target_type = "ip"
 
   health_check {
-    enabled             = true
-    healthy_threshold   = 2
-    interval            = 30
     port                = var.container_port
     protocol            = "TCP"
-    timeout             = 6
-    unhealthy_threshold = 2
-  }
-
-  tags = merge(
-    local.common_tags,
-    {
-      Name = "${local.name}-nlb-tg"
-    }
-  )
-}
-
-# NLB Listener
-resource "aws_lb_listener" "nlb" {
-  load_balancer_arn = aws_lb.nlb.arn
-  port              = "80"
-  protocol          = "TCP"
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.nlb.arn
-  }
-}
-
-# Target group for the ALB
-resource "aws_lb_target_group" "app" {
-  name        = "${local.name}-tg"
-  port        = var.container_port
-  protocol    = "HTTP"
-  vpc_id      = var.vpc_id
-  target_type = "ip"
-
-  health_check {
-    path                = var.health_check_path
-    protocol            = "HTTP"
-    matcher             = "200"
     interval            = 30
-    timeout             = 5
-    healthy_threshold   = 3
-    unhealthy_threshold = 3
+    timeout             = 6
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
   }
 
   lifecycle {
@@ -328,11 +253,11 @@ resource "aws_lb_target_group" "app" {
   )
 }
 
-# ALB listener
+# NLB Listener
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
-  port              = 80
-  protocol          = "HTTP"
+  port              = "80"
+  protocol          = "TCP"
 
   default_action {
     type             = "forward"
@@ -342,7 +267,6 @@ resource "aws_lb_listener" "http" {
 
 # ECS task execution role
 resource "aws_iam_role" "ecs_task_execution_role" {
-  count = var.skip_iam_role_creation ? 0 : 1
   name  = "${local.name}-ecs-task-execution-role"
 
   assume_role_policy = jsonencode({
@@ -366,11 +290,9 @@ resource "aws_iam_role" "ecs_task_execution_role" {
   )
 }
 
-
 # Attach the task execution role policy
 resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
-  count      = var.skip_iam_role_creation ? 0 : 1
-  role       = aws_iam_role.ecs_task_execution_role[0].name
+  role       = aws_iam_role.ecs_task_execution_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
@@ -411,17 +333,13 @@ resource "aws_iam_policy" "ecr_access_policy" {
   )
 }
 
-# Attach ECR access policy to task execution role
-# ECS Task Role
 resource "aws_iam_role_policy_attachment" "ecr_access_policy_attachment" {
-  count      = var.skip_iam_role_creation ? 0 : 1
-  role       = aws_iam_role.ecs_task_execution_role[0].name
+  role       = aws_iam_role.ecs_task_execution_role.name
   policy_arn = aws_iam_policy.ecr_access_policy.arn
 }
 
-# X-Ray policies for tracing API calls
 resource "aws_iam_policy" "xray_access_policy" {
-  count = var.enable_xray_tracing ? 1 : 0
+  count = local.enable_xray ? 1 : 0
 
   name        = "${local.name}-xray-access-policy"
   description = "Policy for X-Ray tracing access"
@@ -447,18 +365,16 @@ resource "aws_iam_policy" "xray_access_policy" {
 }
 
 resource "aws_iam_role_policy_attachment" "xray_access_policy_attachment" {
-  count = var.enable_xray_tracing && !var.skip_iam_role_creation ? 1 : 0
+  count = local.enable_xray ? 1 : 0
 
-  role       = aws_iam_role.ecs_task_execution_role[0].name
+  role       = aws_iam_role.ecs_task_execution_role.name
   policy_arn = aws_iam_policy.xray_access_policy[0].arn
 }
 
-# Data source for current region
 data "aws_region" "current" {}
 
 # CloudWatch log group
 resource "aws_cloudwatch_log_group" "app" {
-  count             = var.skip_cloudwatch_creation ? 0 : 1
   name              = local.log_group_name
   retention_in_days = var.logs_retention_in_days
 
@@ -470,15 +386,9 @@ resource "aws_cloudwatch_log_group" "app" {
   )
 }
 
-# Data source to read existing CloudWatch log group if skipping creation
-data "aws_cloudwatch_log_group" "existing_app" {
-  count = var.skip_cloudwatch_creation && var.existing_log_group_name != "" ? 1 : 0
-  name  = var.existing_log_group_name != "" ? var.existing_log_group_name : "/ecs/${local.name}"
-}
-
 # CloudWatch Log Metric Filters for API monitoring
 resource "aws_cloudwatch_log_metric_filter" "api_errors" {
-  count = var.enable_enhanced_monitoring && (!var.skip_cloudwatch_creation || var.existing_log_group_name != "") ? 1 : 0
+  count = local.enable_monitoring ? 1 : 0
 
   name           = "${local.name}-api-errors"
   pattern        = "{$.level = \"error\" || $.level = \"ERROR\"}"
@@ -493,7 +403,7 @@ resource "aws_cloudwatch_log_metric_filter" "api_errors" {
 }
 
 resource "aws_cloudwatch_log_metric_filter" "api_latency" {
-  count = var.enable_enhanced_monitoring && (!var.skip_cloudwatch_creation || var.existing_log_group_name != "") ? 1 : 0
+  count = local.enable_monitoring ? 1 : 0
 
   name           = "${local.name}-api-latency"
   pattern        = "{$.responseTime > 0}"
@@ -509,7 +419,7 @@ resource "aws_cloudwatch_log_metric_filter" "api_latency" {
 
 # CloudWatch Dashboard for API monitoring
 resource "aws_cloudwatch_dashboard" "api_monitoring" {
-  count = var.enable_enhanced_monitoring ? 1 : 0
+  count = local.enable_monitoring ? 1 : 0
 
   dashboard_name = "${local.name}-api-monitoring"
   dashboard_body = jsonencode({
@@ -597,7 +507,7 @@ resource "aws_ecs_task_definition" "app" {
 
   # Enable AWS X-Ray tracing for API monitoring
   dynamic "proxy_configuration" {
-    for_each = var.enable_xray_tracing ? [1] : []
+    for_each = local.enable_xray ? [1] : []
     content {
       type           = "APPMESH"
       container_name = "envoy"
@@ -638,12 +548,6 @@ resource "aws_ecs_service" "app" {
     container_port   = var.container_port
   }
 
-  load_balancer {
-    target_group_arn = aws_lb_target_group.nlb.arn
-    container_name   = local.container_name
-    container_port   = var.container_port
-  }
-
   deployment_controller {
     type = "ECS"
   }
@@ -664,10 +568,6 @@ resource "aws_ecs_service" "app" {
   depends_on = [
     aws_lb_listener.http
   ]
-
-  lifecycle {
-    ignore_changes = [task_definition, desired_count]
-  }
 
   tags = merge(
     local.common_tags,

@@ -1,4 +1,3 @@
-# Frontend ECS Module
 # This module sets up the frontend container in ECS with load balancer
 
 locals {
@@ -6,20 +5,14 @@ locals {
   container_name               = "${var.name_prefix}-frontend"
   container_port               = var.container_port
   region                       = data.aws_region.current.name
-  frontend_execution_role_arn  = var.skip_iam_role_creation ? var.existing_execution_role_arn : (length(aws_iam_role.frontend_execution) > 0 ? aws_iam_role.frontend_execution[0].arn : "")
-  frontend_task_role_arn       = var.skip_iam_role_creation ? var.existing_task_role_arn : (length(aws_iam_role.frontend_task) > 0 ? aws_iam_role.frontend_task[0].arn : "")
-  frontend_execution_role_name = var.skip_iam_role_creation ? element(split("/", var.existing_execution_role_arn), 1) : (length(aws_iam_role.frontend_execution) > 0 ? aws_iam_role.frontend_execution[0].name : "")
+  frontend_execution_role_arn  = aws_iam_role.frontend_execution.arn
+  frontend_task_role_arn       = aws_iam_role.frontend_task.arn
+  frontend_execution_role_name = aws_iam_role.frontend_execution.name
 
-  # Use specified log group name if provided, otherwise use default pattern
-  log_group_name = var.existing_log_group_name != "" ? var.existing_log_group_name : "/ecs/${local.name_prefix}"
-
-  # When skipping creation, use the explicit name, otherwise use the created resource
-  cloudwatch_log_group_name = var.skip_cloudwatch_creation ? local.log_group_name : aws_cloudwatch_log_group.frontend[0].name
-
-  # When skipping creation and using explicit name, use the data source if available
-  cloudwatch_log_group_arn = var.skip_cloudwatch_creation ? (
-    length(data.aws_cloudwatch_log_group.existing_frontend) > 0 ? data.aws_cloudwatch_log_group.existing_frontend[0].arn : ""
-  ) : aws_cloudwatch_log_group.frontend[0].arn
+  # CloudWatch log group configuration
+  log_group_name = "/ecs/${local.name_prefix}"
+  cloudwatch_log_group_name = aws_cloudwatch_log_group.frontend.name
+  cloudwatch_log_group_arn = aws_cloudwatch_log_group.frontend.arn
 
   tags = merge(
     var.tags,
@@ -33,7 +26,7 @@ locals {
     [
       {
         name      = local.container_name
-        image     = "${var.ecr_repository_url}:latest"
+        image     = var.ecr_repository_url
         essential = true
         portMappings = [
           {
@@ -136,18 +129,13 @@ resource "aws_ecs_cluster" "frontend" {
 
 # CloudWatch Log Group for frontend
 resource "aws_cloudwatch_log_group" "frontend" {
-  count             = var.skip_cloudwatch_creation ? 0 : 1
   name              = local.log_group_name
   retention_in_days = var.logs_retention_in_days
 
   tags = local.tags
 }
 
-# Data source to read existing CloudWatch log group if skipping creation
-data "aws_cloudwatch_log_group" "existing_frontend" {
-  count = var.skip_cloudwatch_creation && var.existing_log_group_name != "" ? 1 : 0
-  name  = var.existing_log_group_name != "" ? var.existing_log_group_name : "/ecs/${local.name_prefix}"
-}
+
 
 # Security Group for the Load Balancer
 resource "aws_security_group" "frontend_lb" {
@@ -256,7 +244,6 @@ resource "aws_lb_listener" "frontend_http" {
 
 # ECS Task Execution Role
 resource "aws_iam_role" "frontend_execution" {
-  count = var.skip_iam_role_creation ? 0 : 1
   name  = "${local.name_prefix}-execution-role"
 
   assume_role_policy = jsonencode({
@@ -277,7 +264,6 @@ resource "aws_iam_role" "frontend_execution" {
 
 # ECS Task Role
 resource "aws_iam_role" "frontend_task" {
-  count = var.skip_iam_role_creation ? 0 : 1
   name  = "${local.name_prefix}-task-role"
 
   assume_role_policy = jsonencode({
@@ -299,8 +285,7 @@ resource "aws_iam_role" "frontend_task" {
 
 # Attach policies to the execution role
 resource "aws_iam_role_policy_attachment" "frontend_execution" {
-  count      = var.skip_iam_role_creation ? 0 : 1
-  role       = aws_iam_role.frontend_execution[0].name
+  role       = aws_iam_role.frontend_execution.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
@@ -370,10 +355,6 @@ resource "aws_ecs_service" "frontend" {
   deployment_circuit_breaker {
     enable   = true
     rollback = true
-  }
-
-  lifecycle {
-    ignore_changes = [desired_count]
   }
 
   tags = local.tags

@@ -70,10 +70,7 @@ variable "routes" {
   default = []
 }
 
-variable "integration_uri" {
-  description = "URI of the integration (Lambda invoke ARN or HTTP URL)"
-  type        = string
-}
+# integration_uri variable removed - no longer needed for direct ALB connection
 
 # Enhanced API management for third-party consumers
 variable "enable_api_keys" {
