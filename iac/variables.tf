@@ -44,7 +44,7 @@ variable "public_subnet_cidrs" {
 variable "container_port" {
   description = "Port exposed by the docker container"
   type        = number
-  default     = 5000
+  default     = 8000
 }
 
 variable "task_cpu" {
@@ -79,11 +79,7 @@ variable "initialization_bucket" {
   default     = ""
 }
 
-variable "skip_ecr_creation" {
-  description = "Whether to skip creating ECR repositories (useful when repositories already exist)"
-  type        = bool
-  default     = false
-}
+# skip_ecr_creation variable removed for simplification
 
 variable "performance_insights_enabled" {
   description = "Whether to enable Performance Insights for the database"
@@ -157,47 +153,7 @@ variable "aws_account_id" {
   default     = ""
 }
 
-variable "skip_frontend_role_creation" {
-  description = "Whether to skip creating IAM roles for the frontend service"
-  type        = bool
-  default     = false
-}
-
-variable "skip_backend_role_creation" {
-  description = "Whether to skip creating IAM roles for the backend service"
-  type        = bool
-  default     = false
-}
-
-variable "skip_cloudwatch_logs_creation" {
-  description = "Whether to skip creating CloudWatch log groups"
-  type        = bool
-  default     = false
-}
-
-variable "skip_s3_bucket_creation" {
-  description = "Whether to skip creating the S3 bucket"
-  type        = bool
-  default     = true
-}
-
-variable "skip_param_group_creation" {
-  description = "Whether to skip creating the RDS parameter group"
-  type        = bool
-  default     = false
-}
-
-variable "skip_secret_creation" {
-  description = "Whether to skip creating the Secrets Manager secret"
-  type        = bool
-  default     = false
-}
-
-variable "skip_policy_creation" {
-  description = "Whether to skip creating IAM policies"
-  type        = bool
-  default     = false
-}
+# skip_* variables removed for simplification
 
 # Enhanced API support variables
 variable "enable_api_monitoring" {
@@ -249,56 +205,12 @@ variable "lb_access_logs_bucket" {
 }
 
 # Skip resource creation variables
-variable "skip_vpc_creation" {
-  description = "Whether to skip creating the VPC (useful when VPC already exists)"
-  type        = bool
-  default     = false
-}
+# skip_* and existing_* variables removed for simplification
 
-variable "existing_vpc_id" {
-  description = "ID of existing VPC to use if skip_vpc_creation is true"
+variable "image_tag" {
+  description = "Docker image tag to use for ECS containers"
   type        = string
-  default     = ""
+  default     = "latest"
 }
 
-variable "skip_cloudwatch_creation" {
-  description = "Whether to skip creating CloudWatch log groups"
-  type        = bool
-  default     = false
-}
-
-variable "existing_backend_log_group" {
-  description = "Name of existing backend CloudWatch log group to use if skip_cloudwatch_creation is true"
-  type        = string
-  default     = ""
-}
-
-variable "existing_frontend_log_group" {
-  description = "Name of existing frontend CloudWatch log group to use if skip_cloudwatch_creation is true"
-  type        = string
-  default     = ""
-}
-
-variable "skip_iam_role_creation" {
-  description = "Whether to skip creating IAM roles"
-  type        = bool
-  default     = false
-}
-
-variable "existing_task_execution_role_arn" {
-  description = "ARN of existing task execution role to use for ECS if skip_iam_role_creation is true"
-  type        = string
-  default     = ""
-}
-
-variable "existing_frontend_execution_role_arn" {
-  description = "ARN of existing execution role to use for frontend if skip_iam_role_creation is true"
-  type        = string
-  default     = ""
-}
-
-variable "existing_frontend_task_role_arn" {
-  description = "ARN of existing task role to use for frontend if skip_iam_role_creation is true"
-  type        = string
-  default     = ""
-}
+# skip_vpc_validation variable removed for simplification

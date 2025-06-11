@@ -73,7 +73,7 @@ variable "environment_variables" {
 variable "health_check_path" {
   description = "Path for the frontend health check"
   type        = string
-  default     = "/health/"
+  default     = "/health"
 }
 
 variable "internal_lb" {
@@ -95,35 +95,7 @@ variable "tags" {
 }
 
 # Skip resource creation variables
-variable "skip_cloudwatch_creation" {
-  description = "Skip creation of CloudWatch log groups if they already exist"
-  type        = bool
-  default     = false
-}
 
-variable "skip_iam_role_creation" {
-  description = "Skip creation of IAM roles if they already exist"
-  type        = bool
-  default     = false
-}
-
-variable "existing_execution_role_arn" {
-  description = "ARN of existing execution role to use if skip_iam_role_creation is true"
-  type        = string
-  default     = ""
-}
-
-variable "existing_task_role_arn" {
-  description = "ARN of existing task role to use if skip_iam_role_creation is true"
-  type        = string
-  default     = ""
-}
-
-variable "existing_log_group_name" {
-  description = "Name of existing CloudWatch log group to use if skip_cloudwatch_creation is true"
-  type        = string
-  default     = ""
-}
 
 variable "enable_enhanced_monitoring" {
   description = "Whether to enable enhanced monitoring for the API"

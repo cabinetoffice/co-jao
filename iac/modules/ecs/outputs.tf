@@ -44,20 +44,7 @@ output "lb_listener_arn" {
   description = "The ARN of the load balancer listener"
 }
 
-output "nlb_arn" {
-  description = "ARN of the Network Load Balancer"
-  value       = aws_lb.nlb.arn
-}
 
-output "nlb_dns_name" {
-  description = "DNS name of the Network Load Balancer"
-  value       = aws_lb.nlb.dns_name
-}
-
-output "nlb_listener_arn" {
-  description = "ARN of the NLB listener"
-  value       = aws_lb_listener.nlb.arn
-}
 
 
 # Enhanced API monitoring outputs

@@ -15,7 +15,7 @@ output "api_gateway_url" {
 }
 
 output "vpc_link_id" {
-  description = "ID of the VPC Link"
+  description = "ID of the VPC Link for NLB connection"
   value       = aws_api_gateway_vpc_link.main.id
 }
 
@@ -32,7 +32,7 @@ output "stage_url" {
 # API Key and Usage Plan outputs
 output "api_keys" {
   description = "Map of API key names to their IDs"
-  value       = var.enable_api_keys ? { for i, key in aws_api_gateway_api_key.api_keys : var.api_keys[i].name => key.id } : {}
+  value       = local.create_api_keys ? { for i, key in aws_api_gateway_api_key.api_keys : var.api_keys[i].name => key.id } : {}
   sensitive   = true
 }
 
@@ -43,12 +43,12 @@ output "api_keys" {
 
 output "api_keys_api_url" {
   description = "URL of the API Keys validation API if enabled"
-  value       = var.enable_api_keys && length(aws_api_gateway_stage.api_keys_api) > 0 ? "${aws_api_gateway_stage.api_keys_api[0].invoke_url}/validate" : null
+  value       = local.create_api_keys && length(aws_api_gateway_stage.api_keys_api) > 0 ? "${aws_api_gateway_stage.api_keys_api[0].invoke_url}/validate" : null
 }
 
 output "cloudwatch_dashboard_name" {
   description = "Name of the CloudWatch dashboard for API metrics"
-  value       = var.enable_detailed_metrics && length(aws_cloudwatch_dashboard.api_dashboard) > 0 ? aws_cloudwatch_dashboard.api_dashboard["main"].dashboard_name : null
+  value       = local.create_detailed_metrics && length(aws_cloudwatch_dashboard.api_dashboard) > 0 ? aws_cloudwatch_dashboard.api_dashboard["main"].dashboard_name : null
 }
 
 output "resources" {

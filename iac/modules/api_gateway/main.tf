@@ -1,9 +1,6 @@
-# API Gateway module - main.tf
 locals {
-  # Resource naming
   name = "${var.name_prefix}-${var.environment}"
 
-  # Common tags for all resources
   common_tags = merge(
     var.tags,
     {
@@ -13,7 +10,6 @@ locals {
     }
   )
 
-  # Default routes if none are provided
   default_routes = [
     {
       route_key = "ANY /{proxy+}"
@@ -37,14 +33,20 @@ locals {
     }
   ]
 
-  # Use provided routes or defaults
-  routes = length(var.routes) > 0 ? var.routes : local.default_routes
+  # Simplified route selection
+  routes = coalesce(var.routes, local.default_routes)
+  
+  # Feature flags
+  create_api_keys = var.enable_api_keys
+  create_detailed_metrics = var.enable_detailed_metrics
+  
+  # Count calculations for resources
+  api_keys_count = local.create_api_keys ? length(var.api_keys) : 0
+  routes_count = length(local.routes) - 1  # Subtract proxy route
 }
 
-# Data source for current region
 data "aws_region" "current" {}
 
-# REST API Gateway (APIGatewayV1)
 resource "aws_api_gateway_rest_api" "main" {
   name        = "${local.name}-api"
   description = "REST API for ${local.name}"
@@ -52,8 +54,7 @@ resource "aws_api_gateway_rest_api" "main" {
   endpoint_configuration {
     types = ["REGIONAL"]
   }
-  
-  # Binary media types support for file uploads/downloads
+
   binary_media_types = [
     "multipart/form-data",
     "application/octet-stream",
@@ -68,7 +69,7 @@ resource "aws_api_gateway_rest_api" "main" {
   )
 }
 
-# Create VPC Link for API Gateway to communicate with ALB in the VPC
+# VPC Link for connecting to NLB
 resource "aws_api_gateway_vpc_link" "main" {
   name        = "${local.name}-vpc-link"
   target_arns = [var.load_balancer_arn]
@@ -77,12 +78,11 @@ resource "aws_api_gateway_vpc_link" "main" {
     local.common_tags,
     {
       Name = "${local.name}-vpc-link"
-      Description = "VPC Link connecting API Gateway to JAO ECS cluster"
+      Description = "VPC Link connecting API Gateway to NLB"
     }
   )
 }
 
-# API Gateway deployment
 resource "aws_api_gateway_deployment" "main" {
   rest_api_id = aws_api_gateway_rest_api.main.id
 
@@ -90,19 +90,16 @@ resource "aws_api_gateway_deployment" "main" {
     aws_api_gateway_integration.routes,
     aws_api_gateway_integration.proxy
   ]
-  
-  # Add variables to force redeployment when routes change
+
   variables = {
-    # Trigger redeployment when routes or proxy integration changes
     deployed_at = timestamp()
   }
-  
+
   lifecycle {
     create_before_destroy = true
   }
 }
 
-# API Gateway stage
 resource "aws_api_gateway_stage" "main" {
   deployment_id = aws_api_gateway_deployment.main.id
   rest_api_id   = aws_api_gateway_rest_api.main.id
@@ -122,7 +119,7 @@ resource "aws_api_gateway_stage" "main" {
       integrationErrorMessage = "$context.integrationErrorMessage"
     })
   }
-  
+
   tags = merge(
     local.common_tags,
     {
@@ -131,7 +128,6 @@ resource "aws_api_gateway_stage" "main" {
   )
 }
 
-# Method settings for the stage
 resource "aws_api_gateway_method_settings" "main" {
   rest_api_id = aws_api_gateway_rest_api.main.id
   stage_name  = aws_api_gateway_stage.main.stage_name
@@ -168,7 +164,7 @@ resource "aws_api_gateway_resource" "proxy" {
 }
 
 resource "aws_api_gateway_resource" "routes" {
-  count = length(local.routes) - 1 # Subtract 1 for the proxy route we created separately
+  count = local.routes_count
 
   rest_api_id = aws_api_gateway_rest_api.main.id
   parent_id   = aws_api_gateway_rest_api.main.root_resource_id
@@ -181,7 +177,7 @@ resource "aws_api_gateway_method" "proxy" {
   resource_id   = aws_api_gateway_resource.proxy.id
   http_method   = "ANY"
   authorization = "NONE"
-  
+
   # Add request parameters to pass all headers, query strings, and path parameters to the integration
   request_parameters = {
     "method.request.path.proxy" = true
@@ -190,13 +186,13 @@ resource "aws_api_gateway_method" "proxy" {
 
 # Methods for other resources
 resource "aws_api_gateway_method" "routes" {
-  count = length(local.routes) - 1 # Subtract 1 for the proxy route we created separately
+  count = local.routes_count
 
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.routes[count.index].id
   http_method   = element(local.routes[count.index + 1].methods, 0) # Use first method from methods array
   authorization = "NONE"
-  
+
   # Forward query parameters
   request_parameters = {
     "method.request.querystring.all" = true
@@ -213,18 +209,18 @@ resource "aws_api_gateway_integration" "proxy" {
   uri                     = "http://${var.load_balancer_dns_name}/{proxy}"
   connection_type         = "VPC_LINK"
   connection_id           = aws_api_gateway_vpc_link.main.id
-  
+
   request_parameters = {
     "integration.request.path.proxy" = "method.request.path.proxy"
   }
-  
+
   # Add timeout setting for longer operations
   timeout_milliseconds = 29000
 }
 
 # Integration for other resources
 resource "aws_api_gateway_integration" "routes" {
-  count = length(local.routes) - 1 # Subtract 1 for the proxy route we created separately
+  count = local.routes_count
 
   rest_api_id             = aws_api_gateway_rest_api.main.id
   resource_id             = aws_api_gateway_resource.routes[count.index].id
@@ -234,7 +230,7 @@ resource "aws_api_gateway_integration" "routes" {
   uri                     = "http://${var.load_balancer_dns_name}${local.routes[count.index + 1].path}"
   connection_type         = "VPC_LINK"
   connection_id           = aws_api_gateway_vpc_link.main.id
-  
+
   # Add timeout setting for longer operations
   timeout_milliseconds = 29000
 }
@@ -242,7 +238,7 @@ resource "aws_api_gateway_integration" "routes" {
 # For API key functionality, we need to use REST API Gateway
 # REST API Gateway (APIGatewayV1) for API key management
 resource "aws_api_gateway_rest_api" "api_keys_api" {
-  count = var.enable_api_keys ? 1 : 0
+  count = local.create_api_keys ? 1 : 0
 
   name        = "${local.name}-keys-api"
   description = "REST API for API key management"
@@ -256,7 +252,7 @@ resource "aws_api_gateway_rest_api" "api_keys_api" {
 
 # API resource for validation
 resource "aws_api_gateway_resource" "validate" {
-  count = var.enable_api_keys ? 1 : 0
+  count = local.create_api_keys ? 1 : 0
 
   rest_api_id = aws_api_gateway_rest_api.api_keys_api[0].id
   parent_id   = aws_api_gateway_rest_api.api_keys_api[0].root_resource_id
@@ -265,7 +261,7 @@ resource "aws_api_gateway_resource" "validate" {
 
 # Method for validation
 resource "aws_api_gateway_method" "validate" {
-  count = var.enable_api_keys ? 1 : 0
+  count = local.create_api_keys ? 1 : 0
 
   rest_api_id      = aws_api_gateway_rest_api.api_keys_api[0].id
   resource_id      = aws_api_gateway_resource.validate[0].id
@@ -276,7 +272,7 @@ resource "aws_api_gateway_method" "validate" {
 
 # Integration for validation
 resource "aws_api_gateway_integration" "validate" {
-  count = var.enable_api_keys ? 1 : 0
+  count = local.create_api_keys ? 1 : 0
 
   rest_api_id = aws_api_gateway_rest_api.api_keys_api[0].id
   resource_id = aws_api_gateway_resource.validate[0].id
@@ -290,7 +286,7 @@ resource "aws_api_gateway_integration" "validate" {
 
 # Method response
 resource "aws_api_gateway_method_response" "validate" {
-  count = var.enable_api_keys ? 1 : 0
+  count = local.create_api_keys ? 1 : 0
 
   rest_api_id = aws_api_gateway_rest_api.api_keys_api[0].id
   resource_id = aws_api_gateway_resource.validate[0].id
@@ -304,7 +300,7 @@ resource "aws_api_gateway_method_response" "validate" {
 
 # Integration response
 resource "aws_api_gateway_integration_response" "validate" {
-  count = var.enable_api_keys ? 1 : 0
+  count = local.create_api_keys ? 1 : 0
 
   rest_api_id = aws_api_gateway_rest_api.api_keys_api[0].id
   resource_id = aws_api_gateway_resource.validate[0].id
@@ -321,7 +317,7 @@ resource "aws_api_gateway_integration_response" "validate" {
 
 # REST API Deployment
 resource "aws_api_gateway_deployment" "api_keys_api" {
-  count = var.enable_api_keys ? 1 : 0
+  count = local.create_api_keys ? 1 : 0
 
   depends_on = [
     aws_api_gateway_integration.validate
@@ -336,7 +332,7 @@ resource "aws_api_gateway_deployment" "api_keys_api" {
 
 # REST API Stage
 resource "aws_api_gateway_stage" "api_keys_api" {
-  count = var.enable_api_keys ? 1 : 0
+  count = local.create_api_keys ? 1 : 0
 
   deployment_id = aws_api_gateway_deployment.api_keys_api[0].id
   rest_api_id   = aws_api_gateway_rest_api.api_keys_api[0].id
@@ -345,12 +341,15 @@ resource "aws_api_gateway_stage" "api_keys_api" {
 
 # API Keys
 resource "aws_api_gateway_api_key" "api_keys" {
-  count = var.enable_api_keys ? length(var.api_keys) : 0
+  count = local.api_keys_count
 
   name        = "${local.name}-${var.api_keys[count.index].name}"
   description = var.api_keys[count.index].description
   enabled     = var.api_keys[count.index].enabled
 }
+
+
+
 
 # Usage Plans
 # resource "aws_api_gateway_usage_plan" "usage_plans" {
@@ -398,7 +397,7 @@ resource "aws_api_gateway_api_key" "api_keys" {
 
 # CloudWatch Dashboard for API metrics
 resource "aws_cloudwatch_dashboard" "api_dashboard" {
-  for_each = var.enable_detailed_metrics ? { "main" = true } : {}
+  for_each = local.create_detailed_metrics ? { "main" = true } : {}
 
   dashboard_name = "${local.name}-api-dashboard"
 
@@ -447,7 +446,7 @@ resource "aws_cloudwatch_dashboard" "api_dashboard" {
 
 # CloudWatch Alarm for API errors
 resource "aws_cloudwatch_metric_alarm" "api_error_rate" {
-  count = var.enable_detailed_metrics ? 1 : 0
+  count = local.create_detailed_metrics ? 1 : 0
 
   alarm_name          = "${local.name}-api-error-rate"
   comparison_operator = "GreaterThanThreshold"
@@ -467,7 +466,7 @@ resource "aws_cloudwatch_metric_alarm" "api_error_rate" {
 
 # Message about API key usage with HTTP APIs
 resource "null_resource" "api_key_usage_note" {
-  count = var.enable_api_keys ? 1 : 0
+  count = local.create_api_keys ? 1 : 0
 
   provisioner "local-exec" {
     command = "echo 'Note: To use the API with API keys, include the x-api-key header in your requests. You can verify key validity at ${aws_api_gateway_stage.api_keys_api[0].invoke_url}/validate'"

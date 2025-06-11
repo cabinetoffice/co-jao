@@ -47,17 +47,7 @@ variable "private_subnet_tags" {
   default     = {}
 }
 
-variable "skip_vpc_creation" {
-  description = "Skip creation of VPC if it already exists"
-  type        = bool
-  default     = false
-}
 
-variable "existing_vpc_id" {
-  description = "ID of existing VPC to use if skip_vpc_creation is true"
-  type        = string
-  default     = ""
-}
 
 variable "public_subnet_tags" {
   description = "Additional tags for the public subnets"

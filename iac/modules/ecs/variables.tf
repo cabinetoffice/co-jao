@@ -198,27 +198,3 @@ variable "enhanced_metrics_collection_interval" {
   default     = 60
 }
 
-variable "existing_log_group_name" {
-  description = "Name of existing CloudWatch log group to use if skip_cloudwatch_creation is true"
-  type        = string
-  default     = ""
-}
-
-# Skip resource creation variables
-variable "skip_cloudwatch_creation" {
-  description = "Skip creation of CloudWatch log groups if they already exist"
-  type        = bool
-  default     = false
-}
-
-variable "skip_iam_role_creation" {
-  description = "Skip creation of IAM roles if they already exist"
-  type        = bool
-  default     = false
-}
-
-variable "existing_task_execution_role_arn" {
-  description = "ARN of existing task execution role to use if skip_iam_role_creation is true"
-  type        = string
-  default     = ""
-}
