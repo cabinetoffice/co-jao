@@ -29,6 +29,12 @@ enable_detailed_metrics      = false
 # Use internal load balancer to avoid public exposure
 internal_lb = false
 
+# VPC Endpoints Configuration - Resolve ECR Docker endpoint conflict
+create_ecr_dkr_endpoint = false  # Existing endpoint already present
+create_ecr_api_endpoint = true   # Create missing ECR API endpoint
+create_s3_endpoint = true        # Create S3 Gateway endpoint for ECR layers
+create_logs_endpoint = true      # Create CloudWatch Logs endpoint
+
 # Self-manage the initialization
 initialization_bucket = "jao-dev-initialization"
 init_script           = null

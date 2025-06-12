@@ -35,14 +35,14 @@ locals {
 
   # Simplified route selection
   routes = coalesce(var.routes, local.default_routes)
-  
+
   # Feature flags
-  create_api_keys = var.enable_api_keys
+  create_api_keys         = var.enable_api_keys
   create_detailed_metrics = var.enable_detailed_metrics
-  
+
   # Count calculations for resources
   api_keys_count = local.create_api_keys ? length(var.api_keys) : 0
-  routes_count = length(local.routes) - 1  # Subtract proxy route
+  routes_count   = length(local.routes) - 1 # Subtract proxy route
 }
 
 data "aws_region" "current" {}
@@ -77,7 +77,7 @@ resource "aws_api_gateway_vpc_link" "main" {
   tags = merge(
     local.common_tags,
     {
-      Name = "${local.name}-vpc-link"
+      Name        = "${local.name}-vpc-link"
       Description = "VPC Link connecting API Gateway to NLB"
     }
   )
@@ -139,7 +139,7 @@ resource "aws_api_gateway_method_settings" "main" {
     throttling_burst_limit = var.api_throttling_burst_limit
     throttling_rate_limit  = var.api_throttling_rate_limit
     # Enable detailed logging for troubleshooting
-    data_trace_enabled     = true
+    data_trace_enabled = true
   }
 }
 

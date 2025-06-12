@@ -6,14 +6,15 @@ locals {
   task_execution_role_name = aws_iam_role.ecs_task_execution_role.name
 
   # CloudWatch configuration
-  log_group_name = "/ecs/${local.name}"
+  log_group_name            = "/ecs/${local.name}"
   cloudwatch_log_group_name = aws_cloudwatch_log_group.app.name
-  cloudwatch_log_group_arn = aws_cloudwatch_log_group.app.arn
+  cloudwatch_log_group_arn  = aws_cloudwatch_log_group.app.arn
 
   # Feature flags
   enable_monitoring = var.enable_enhanced_monitoring
-  enable_xray = var.enable_xray_tracing
-  enable_discovery = var.enable_service_discovery
+  enable_xray       = var.enable_xray_tracing
+  enable_discovery  = var.enable_service_discovery
+  enable_celery     = var.enable_celery_services
 
   # Common tags for all resources
   common_tags = merge(
@@ -26,12 +27,35 @@ locals {
   )
 
   container_name = var.container_name != "" ? var.container_name : var.name_prefix
-  container_definitions = jsonencode(concat(
+
+
+  base_environment = concat(
+    [
+      for key, value in var.environment_variables : {
+        name  = key
+        value = value
+      }
+    ],
+    local.enable_monitoring ? [
+      {
+        name  = "ENABLE_METRICS"
+        value = "true"
+      },
+      {
+        name  = "LOG_LEVEL"
+        value = "debug"
+      }
+    ] : []
+  )
+
+  # Web API container definitions
+  api_container_definitions = jsonencode(concat(
     [
       {
         name      = local.container_name
         image     = var.ecr_repository_url
         essential = true
+        command   = var.api_command
         portMappings = [
           {
             containerPort = var.container_port
@@ -39,37 +63,20 @@ locals {
             protocol      = "tcp"
           }
         ]
-        environment = concat(
-          [
-            for key, value in var.environment_variables : {
-              name  = key
-              value = value
-            }
-          ],
-          local.enable_monitoring ? [
-            {
-              name  = "ENABLE_METRICS"
-              value = "true"
-            },
-            {
-              name  = "LOG_LEVEL"
-              value = "debug"
-            }
-          ] : []
-        )
+        environment = local.base_environment
         healthCheck = {
-          command     = ["CMD-SHELL", "curl -f http://localhost:${var.container_port}${var.health_check_path} || exit 1"]
+          command     = ["CMD-SHELL", "curl -f http://localhost:${var.container_port}${var.health_check_path} || python -c \"import urllib.request; urllib.request.urlopen('http://localhost:${var.container_port}${var.health_check_path}')\" || exit 1"]
           interval    = 30
-          timeout     = 5
+          timeout     = 10
           retries     = 3
-          startPeriod = 60
+          startPeriod = 120
         }
         logConfiguration = {
           logDriver = "awslogs"
           options = {
             "awslogs-group"         = local.cloudwatch_log_group_name
             "awslogs-region"        = data.aws_region.current.name
-            "awslogs-stream-prefix" = "xray"
+            "awslogs-stream-prefix" = "web"
           }
         }
         dependsOn = local.enable_xray ? [
@@ -97,12 +104,72 @@ locals {
           options = {
             "awslogs-group"         = local.cloudwatch_log_group_name
             "awslogs-region"        = data.aws_region.current.name
-            "awslogs-stream-prefix" = "ecs"
+            "awslogs-stream-prefix" = "xray"
           }
         }
       }
     ] : []
   ))
+
+  # Celery Worker container definitions
+  worker_container_definitions = jsonencode([
+    {
+      name      = "celery-worker"
+      image     = var.ecr_repository_url
+      essential = true
+      command   = var.celery_worker_command
+      environment = concat(
+        local.base_environment,
+        [
+          {
+            name  = "CELERY_WORKER_CONCURRENCY"
+            value = tostring(var.celery_worker_concurrency)
+          }
+        ]
+      )
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = local.cloudwatch_log_group_name
+          "awslogs-region"        = data.aws_region.current.name
+          "awslogs-stream-prefix" = "worker"
+        }
+      }
+      healthCheck = {
+        command     = var.celery_worker_health_check
+        interval    = 60
+        timeout     = 30
+        retries     = 3
+        startPeriod = 120
+      }
+    }
+  ])
+
+  # Celery Beat container definitions
+  beat_container_definitions = jsonencode([
+    {
+      name        = "celery-beat"
+      image       = var.ecr_repository_url
+      essential   = true
+      command     = var.celery_beat_command
+      environment = local.base_environment
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = local.cloudwatch_log_group_name
+          "awslogs-region"        = data.aws_region.current.name
+          "awslogs-stream-prefix" = "beat"
+        }
+      }
+      healthCheck = {
+        command     = var.celery_beat_health_check
+        interval    = 60
+        timeout     = 30
+        retries     = 3
+        startPeriod = 120
+      }
+    }
+  ])
 }
 
 # ECS cluster for service discovery
@@ -143,8 +210,6 @@ resource "aws_ecs_cluster" "main" {
   )
 }
 
-
-
 # Data source to get VPC CIDR
 data "aws_vpc" "main" {
   id = var.vpc_id
@@ -163,18 +228,39 @@ resource "aws_security_group" "ecs_tasks" {
     cidr_blocks = [data.aws_vpc.main.cidr_block]
   }
 
+  # HTTP for health checks and external APIs
   egress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = [data.aws_vpc.main.cidr_block]
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # HTTPS for VPC endpoints and external APIs
   egress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = [data.aws_vpc.main.cidr_block]
+    description = "HTTPS to VPC endpoints"
+  }
+
+  # HTTPS for external APIs (if needed)
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTPS to external APIs"
+  }
+
+  # DNS resolution
+  egress {
+    from_port   = 53
+    to_port     = 53
+    protocol    = "tcp"
+    cidr_blocks = [data.aws_vpc.main.cidr_block]
+    description = "DNS TCP to VPC"
   }
 
   egress {
@@ -182,15 +268,16 @@ resource "aws_security_group" "ecs_tasks" {
     to_port     = 53
     protocol    = "udp"
     cidr_blocks = [data.aws_vpc.main.cidr_block]
-    description = "DNS resolution"
+    description = "DNS UDP to VPC"
   }
 
+  # Database access (PostgreSQL)
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "All outbound traffic"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = [data.aws_vpc.main.cidr_block]
+    description = "PostgreSQL database access"
   }
 
   tags = merge(
@@ -267,7 +354,7 @@ resource "aws_lb_listener" "http" {
 
 # ECS task execution role
 resource "aws_iam_role" "ecs_task_execution_role" {
-  name  = "${local.name}-ecs-task-execution-role"
+  name = "${local.name}-ecs-task-execution-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -417,93 +504,15 @@ resource "aws_cloudwatch_log_metric_filter" "api_latency" {
   }
 }
 
-# CloudWatch Dashboard for API monitoring
-resource "aws_cloudwatch_dashboard" "api_monitoring" {
-  count = local.enable_monitoring ? 1 : 0
-
-  dashboard_name = "${local.name}-api-monitoring"
-  dashboard_body = jsonencode({
-    widgets = [
-      {
-        type   = "metric"
-        x      = 0
-        y      = 0
-        width  = 12
-        height = 6
-        properties = {
-          metrics = [
-            ["AWS/ECS", "CPUUtilization", "ServiceName", aws_ecs_service.app.name, "ClusterName", aws_ecs_cluster.main.name, { "stat" = "Average" }],
-            [".", "MemoryUtilization", ".", ".", ".", ".", { "stat" = "Average" }]
-          ]
-          period  = 300
-          region  = data.aws_region.current.name
-          title   = "ECS Service CPU and Memory"
-          view    = "timeSeries"
-          stacked = false
-        }
-      },
-      {
-        type   = "metric"
-        x      = 12
-        y      = 0
-        width  = 12
-        height = 6
-        properties = {
-          metrics = [
-            ["API/Errors", "${local.name}-APIErrors", { "stat" = "Sum" }]
-          ]
-          period  = 300
-          region  = data.aws_region.current.name
-          title   = "API Errors"
-          view    = "timeSeries"
-          stacked = false
-        }
-      },
-      {
-        type   = "metric"
-        x      = 0
-        y      = 6
-        width  = 12
-        height = 6
-        properties = {
-          metrics = [
-            ["API/Performance", "${local.name}-APILatency", { "stat" = "Average" }],
-            ["...", { "stat" = "p90" }],
-            ["...", { "stat" = "p99" }]
-          ]
-          period  = 300
-          region  = data.aws_region.current.name
-          title   = "API Latency"
-          view    = "timeSeries"
-          stacked = false
-        }
-      },
-      {
-        type   = "log"
-        x      = 12
-        y      = 6
-        width  = 12
-        height = 6
-        properties = {
-          query  = "SOURCE '${local.cloudwatch_log_group_name}' | fields @timestamp, @message | filter level='error' OR level='ERROR' | sort @timestamp desc | limit 20"
-          region = data.aws_region.current.name
-          title  = "Recent API Errors"
-          view   = "table"
-        }
-      }
-    ]
-  })
-}
-
-# Task definition
-resource "aws_ecs_task_definition" "app" {
-  family                   = "${local.name}-task"
+# Task definitions
+resource "aws_ecs_task_definition" "api" {
+  family                   = "${local.name}-api-task"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = var.cpu
-  memory                   = var.memory
+  cpu                      = var.api_cpu
+  memory                   = var.api_memory
   execution_role_arn       = local.task_execution_role_arn
-  container_definitions    = local.container_definitions
+  container_definitions    = local.api_container_definitions
 
   # Enable AWS X-Ray tracing for API monitoring
   dynamic "proxy_configuration" {
@@ -523,16 +532,56 @@ resource "aws_ecs_task_definition" "app" {
   tags = merge(
     local.common_tags,
     {
-      Name = "${local.name}-task-definition"
+      Name = "${local.name}-web-task-definition"
+    }
+  )
+}
+
+# Celery Worker Task Definition
+resource "aws_ecs_task_definition" "worker" {
+  count = local.enable_celery ? 1 : 0
+
+  family                   = "${local.name}-worker-task"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = var.worker_cpu
+  memory                   = var.worker_memory
+  execution_role_arn       = local.task_execution_role_arn
+  container_definitions    = local.worker_container_definitions
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.name}-worker-task-definition"
+    }
+  )
+}
+
+# Celery Beat Task Definition
+resource "aws_ecs_task_definition" "beat" {
+  count = local.enable_celery ? 1 : 0
+
+  family                   = "${local.name}-beat-task"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = var.beat_cpu
+  memory                   = var.beat_memory
+  execution_role_arn       = local.task_execution_role_arn
+  container_definitions    = local.beat_container_definitions
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.name}-beat-task-definition"
     }
   )
 }
 
 # ECS service
-resource "aws_ecs_service" "app" {
-  name            = "${local.name}-service"
+resource "aws_ecs_service" "api" {
+  name            = "${local.name}-api-service"
   cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.app.arn
+  task_definition = aws_ecs_task_definition.api.arn
   desired_count   = var.desired_count
   launch_type     = "FARGATE"
 
@@ -572,7 +621,200 @@ resource "aws_ecs_service" "app" {
   tags = merge(
     local.common_tags,
     {
-      Name = "${local.name}-service"
+      Name = "${local.name}-api-service"
     }
   )
+}
+
+resource "aws_ecs_service" "worker" {
+  count = local.enable_celery ? 1 : 0
+
+  name            = "${local.name}-worker-service"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.worker[0].arn
+  desired_count   = var.worker_desired_count
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    security_groups  = concat([aws_security_group.ecs_tasks.id], var.additional_security_group_ids)
+    subnets          = var.private_subnet_ids
+    assign_public_ip = false
+  }
+
+  deployment_controller {
+    type = "ECS"
+  }
+
+  deployment_maximum_percent         = var.deployment_maximum_percent
+  deployment_minimum_healthy_percent = var.deployment_minimum_healthy_percent
+
+  enable_ecs_managed_tags = true
+  propagate_tags          = "SERVICE"
+
+  deployment_circuit_breaker {
+    enable   = var.enable_circuit_breaker
+    rollback = var.enable_circuit_breaker
+  }
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.name}-worker-service"
+    }
+  )
+}
+
+resource "aws_ecs_service" "beat" {
+  count = local.enable_celery ? 1 : 0
+
+  name            = "${local.name}-beat-service"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.beat[0].arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    security_groups  = [aws_security_group.ecs_tasks.id]
+    subnets          = var.private_subnet_ids
+    assign_public_ip = false
+  }
+
+  deployment_controller {
+    type = "ECS"
+  }
+
+  deployment_maximum_percent         = 100
+  deployment_minimum_healthy_percent = 0
+
+  enable_ecs_managed_tags = true
+  propagate_tags          = "SERVICE"
+
+  deployment_circuit_breaker {
+    enable   = var.enable_circuit_breaker
+    rollback = var.enable_circuit_breaker
+  }
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.name}-beat-service"
+    }
+  )
+}
+
+resource "aws_appautoscaling_target" "worker" {
+  count = local.enable_celery && var.enable_worker_autoscaling ? 1 : 0
+
+  max_capacity       = var.worker_max_capacity
+  min_capacity       = var.worker_min_capacity
+  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.worker[0].name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+
+resource "aws_appautoscaling_policy" "worker_cpu_scaling" {
+  count = local.enable_celery && var.enable_worker_autoscaling ? 1 : 0
+
+  name               = "${local.name}-worker-cpu-scaling"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.worker[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.worker[0].scalable_dimension
+  service_namespace  = aws_appautoscaling_target.worker[0].service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+    target_value       = var.worker_cpu_target_value
+    scale_in_cooldown  = 300
+    scale_out_cooldown = 300
+  }
+}
+
+
+resource "aws_cloudwatch_dashboard" "api_monitoring" {
+  count = local.enable_monitoring ? 1 : 0
+
+  dashboard_name = "${local.name}-monitoring"
+  dashboard_body = jsonencode({
+    widgets = concat([
+      {
+        type   = "metric"
+        x      = 0
+        y      = 0
+        height = 6
+        properties = {
+          metrics = [
+            ["AWS/ECS", "CPUUtilization", "ServiceName", aws_ecs_service.api.name, "ClusterName", aws_ecs_cluster.main.name, { "stat" = "Average" }],
+            [".", "MemoryUtilization", ".", ".", ".", ".", { "stat" = "Average" }]
+          ]
+          period  = 300
+          region  = data.aws_region.current.name
+          title   = "Web Service - CPU and Memory"
+          view    = "timeSeries"
+          stacked = false
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 0
+        width  = 12
+        height = 6
+        properties = {
+          metrics = concat(
+            [
+              ["API/Errors", "${local.name}-APIErrors", { "stat" = "Sum" }]
+            ],
+            local.enable_celery ? [
+              ["Celery/Errors", "${local.name}-CeleryErrors", { "stat" = "Sum" }]
+            ] : []
+          )
+          period  = 300
+          region  = data.aws_region.current.name
+          title   = "Error Counts"
+          view    = "timeSeries"
+          stacked = false
+        }
+      }
+      ],
+      (local.enable_celery ? [
+        {
+          type   = "metric"
+          x      = 0
+          y      = 6
+          width  = 12
+          height = 6
+          properties = {
+            metrics = [
+              ["AWS/ECS", "CPUUtilization", "ServiceName", aws_ecs_service.worker[0].name, "ClusterName", aws_ecs_cluster.main.name, { "stat" = "Average" }],
+              [".", "MemoryUtilization", ".", ".", ".", ".", { "stat" = "Average" }]
+            ],
+            period  = 300,
+            region  = data.aws_region.current.name,
+            title   = "Worker Service - CPU and Memory",
+            view    = "timeSeries",
+            stacked = false
+          }
+        },
+        {
+          type   = "metric"
+          x      = 12
+          y      = 6
+          width  = 12
+          height = 6
+          properties = {
+            metrics = [
+              ["AWS/ECS", "RunningTaskCount", "ServiceName", aws_ecs_service.beat[0].name, "ClusterName", aws_ecs_cluster.main.name, { "stat" = "Average" }],
+              [".", ".", "ServiceName", "${local.name}-beat-service", ".", ".", { "stat" = "Average" }]
+            ],
+            period  = 300,
+            region  = data.aws_region.current.name,
+            title   = "Celery Services - Running Tasks",
+            view    = "timeSeries",
+            stacked = false
+          }
+        }
+    ] : []))
+  })
 }

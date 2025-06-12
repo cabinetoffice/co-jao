@@ -35,6 +35,7 @@ variable "public_subnet_ids" {
   default     = null
 }
 
+
 variable "cpu" {
   description = "CPU units for the ECS task"
   type        = number
@@ -198,3 +199,125 @@ variable "enhanced_metrics_collection_interval" {
   default     = 60
 }
 
+# Api Service Configuration
+variable "api_command" {
+  description = "Command to run for web service"
+  type        = list(string)
+  default     = ["poetry", "run", "hypercorn", "src.asgi:application", "--bind", "0.0.0.0:8000"]
+}
+
+variable "api_cpu" {
+  description = "CPU units for web service (1024 = 1 vCPU)"
+  type        = number
+  default     = 512
+}
+
+variable "api_memory" {
+  description = "Memory in MB for web service"
+  type        = number
+  default     = 1024
+}
+
+variable "api_desired_count" {
+  description = "Number of web service instances"
+  type        = number
+  default     = 2
+}
+
+# Celery Configuration
+variable "enable_celery_services" {
+  description = "Enable Celery worker and beat services"
+  type        = bool
+  default     = true
+}
+
+# Celery Worker Configuration
+variable "celery_worker_command" {
+  description = "Command to run Celery worker"
+  type        = list(string)
+  default     = ["poetry", "run", "celery", "-A", "jao_backend.common.celery", "worker", "--loglevel=INFO", "--concurrency=4"]
+}
+
+variable "celery_worker_health_check" {
+  description = "Health check command for Celery worker"
+  type        = list(string)
+  default     = ["CMD-SHELL", "poetry run celery -A jao_backend.common.celery inspect ping -d celery@$HOSTNAME"]
+}
+
+variable "celery_worker_concurrency" {
+  description = "Number of concurrent worker processes"
+  type        = number
+  default     = 4
+}
+
+variable "worker_cpu" {
+  description = "CPU units for worker service (1024 = 1 vCPU)"
+  type        = number
+  default     = 1024
+}
+
+variable "worker_memory" {
+  description = "Memory in MB for worker service"
+  type        = number
+  default     = 2048
+}
+
+variable "worker_desired_count" {
+  description = "Number of worker service instances"
+  type        = number
+  default     = 2
+}
+
+# Celery Beat Configuration
+variable "celery_beat_command" {
+  description = "Command to run Celery beat"
+  type        = list(string)
+  default     = ["poetry", "run", "celery", "-A", "jao_backend.common.celery", "beat", "--loglevel=INFO"]
+}
+
+variable "celery_beat_health_check" {
+  description = "Health check command for Celery beat"
+  type        = list(string)
+  default     = ["CMD-SHELL", "poetry run celery -A jao_backend.common.celery inspect ping || exit 1"]
+}
+
+variable "beat_cpu" {
+  description = "CPU units for beat service (1024 = 1 vCPU)"
+  type        = number
+  default     = 256
+}
+
+variable "beat_memory" {
+  description = "Memory in MB for beat service"
+  type        = number
+  default     = 512
+}
+
+variable "enable_worker_autoscaling" {
+  description = "Enable auto scaling for worker"
+  default     = false
+}
+
+variable "worker_min_capacity" {
+  description = "Minimum capacity for worker service"
+  type        = number
+  default     = 1
+}
+
+variable "worker_max_capacity" {
+  description = "Maximum capacity for worker service"
+  type        = number
+  default     = 10
+}
+
+variable "worker_cpu_target_value" {
+  description = "CPU target for worker service"
+  type        = number
+  default     = 40
+}
+
+variable "additional_security_group_ids" {
+  description = "Additional security group IDs to attach to ECS tasks"
+  type        = list(string)
+  default     = []
+}

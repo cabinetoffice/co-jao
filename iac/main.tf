@@ -23,40 +23,40 @@ locals {
   # Environment-specific configurations
   env_config = {
     prod = {
-      force_destroy_buckets       = false
-      single_nat_gateway         = false
-      s3_lifecycle_days          = 365
-      log_retention_days         = 90
-      db_min_capacity           = 1.0
-      db_max_capacity           = 8.0
-      db_backup_retention       = 30
-      db_skip_final_snapshot    = false
-      db_deletion_protection    = true
-      api_rate_limit            = 200
-      api_burst_limit           = 300
-      max_requests_per_min      = "1000"
-      enable_xray_tracing       = true
-      django_debug              = "False"
-      session_cookie_secure     = "true"
-      monitoring_interval       = 60
+      force_destroy_buckets  = false
+      single_nat_gateway     = false
+      s3_lifecycle_days      = 365
+      log_retention_days     = 90
+      db_min_capacity        = 1.0
+      db_max_capacity        = 8.0
+      db_backup_retention    = 30
+      db_skip_final_snapshot = false
+      db_deletion_protection = true
+      api_rate_limit         = 200
+      api_burst_limit        = 300
+      max_requests_per_min   = "1000"
+      enable_xray_tracing    = true
+      django_debug           = "False"
+      session_cookie_secure  = "true"
+      monitoring_interval    = 60
     }
     dev = {
-      force_destroy_buckets       = true
-      single_nat_gateway         = true
-      s3_lifecycle_days          = 90
-      log_retention_days         = 30
-      db_min_capacity           = 0.5
-      db_max_capacity           = 2.0
-      db_backup_retention       = 7
-      db_skip_final_snapshot    = true
-      db_deletion_protection    = false
-      api_rate_limit            = 500
-      api_burst_limit           = 1000
-      max_requests_per_min      = "2000"
-      enable_xray_tracing       = false
-      django_debug              = "True"
-      session_cookie_secure     = "false"
-      monitoring_interval       = 30
+      force_destroy_buckets  = true
+      single_nat_gateway     = true
+      s3_lifecycle_days      = 90
+      log_retention_days     = 30
+      db_min_capacity        = 0.5
+      db_max_capacity        = 2.0
+      db_backup_retention    = 7
+      db_skip_final_snapshot = true
+      db_deletion_protection = false
+      api_rate_limit         = 500
+      api_burst_limit        = 1000
+      max_requests_per_min   = "2000"
+      enable_xray_tracing    = false
+      django_debug           = "True"
+      session_cookie_secure  = "false"
+      monitoring_interval    = 30
     }
   }
 
@@ -64,7 +64,7 @@ locals {
   current_env = local.env_config[var.environment == "prod" ? "prod" : "dev"]
 
   # ECR repository URLs
-  backend_ecr_url = "${aws_ecr_repository.app.repository_url}:${var.image_tag}"
+  backend_ecr_url  = "${aws_ecr_repository.app.repository_url}:${var.image_tag}"
   frontend_ecr_url = "${aws_ecr_repository.frontend.repository_url}:${var.image_tag}"
 }
 
@@ -129,7 +129,16 @@ module "vpc" {
   enable_nat_gateway = true
   single_nat_gateway = local.current_env.single_nat_gateway
 
-
+  # VPC Endpoints configuration
+  create_vpc_endpoints         = var.create_vpc_endpoints
+  create_ecr_dkr_endpoint      = var.create_ecr_dkr_endpoint
+  create_ecr_api_endpoint      = var.create_ecr_api_endpoint
+  create_s3_endpoint           = var.create_s3_endpoint
+  create_logs_endpoint         = var.create_logs_endpoint
+  existing_ecr_dkr_endpoint_id = var.existing_ecr_dkr_endpoint_id
+  existing_ecr_api_endpoint_id = var.existing_ecr_api_endpoint_id
+  existing_s3_endpoint_id      = var.existing_s3_endpoint_id
+  existing_logs_endpoint_id    = var.existing_logs_endpoint_id
 
   tags = local.common_tags
 }
@@ -138,17 +147,18 @@ module "vpc" {
 module "ecs" {
   source = "./modules/ecs"
 
-  name_prefix        = var.app_name
-  environment        = var.environment
-  ecr_repository_url = local.backend_ecr_url
-  container_port     = var.container_port
-  vpc_id             = module.vpc.vpc_id
-  private_subnet_ids = module.vpc.private_subnet_ids
-  public_subnet_ids  = module.vpc.public_subnet_ids
-  cpu                = var.task_cpu
-  memory             = var.task_memory
-  desired_count      = var.desired_count
-  container_name     = var.app_name
+  name_prefix                   = var.app_name
+  environment                   = var.environment
+  ecr_repository_url            = local.backend_ecr_url
+  container_port                = var.container_port
+  vpc_id                        = module.vpc.vpc_id
+  private_subnet_ids            = module.vpc.private_subnet_ids
+  public_subnet_ids             = module.vpc.public_subnet_ids
+  cpu                           = var.task_cpu
+  memory                        = var.task_memory
+  desired_count                 = var.desired_count
+  container_name                = var.app_name
+  additional_security_group_ids = [aws_security_group.redis_client.id]
 
   # Environment variables for the API service
   environment_variables = merge(var.environment_variables, {
@@ -173,8 +183,8 @@ module "ecs" {
     JAO_BACKEND_OLEEO_DATABASE_URL = "mssqlms://user.namey:password@co-grid-database.eu-west-2:1433/DART_Dev"
     JAO_BACKEND_ENABLE_OLEEO       = "true"
     # Celery configuration
-    CELERY_BROKER_URL     = "redis://localhost:6379/0" # Update this with your actual Redis endpoint
-    CELERY_RESULT_BACKEND = "redis://localhost:6379/0" # Update this with your actual Redis endpoint
+    CELERY_BROKER_URL     = module.celery_redis.celery_broker_url
+    CELERY_RESULT_BACKEND = module.celery_redis.celery_result_backend
 
     # LiteLLM integration
     JAO_BACKEND_LITELLM_API_BASE          = "http://127.0.0.1:11434/api/embed" # Default for dev environment
@@ -269,23 +279,23 @@ module "frontend" {
 
   # Environment variables for the frontend service
   environment_variables = {
-    DJANGO_SECRET_KEY = "dummy-placeholder-secret-key"
-    DJANGO_DEBUG      = local.current_env.django_debug
-    BACKEND_API_KEY        = "dummy-placeholder-api-key"
-    DJANGO_SETTINGS_MODULE = "jao_web.settings.dev"
-    PORT                   = "8000"
-    JAO_BACKEND_URL = module.api_gateway.api_gateway_url
-    JAO_BACKEND_TIMEOUT = "15"
+    DJANGO_SECRET_KEY        = "dummy-placeholder-secret-key"
+    DJANGO_DEBUG             = local.current_env.django_debug
+    BACKEND_API_KEY          = "dummy-placeholder-api-key"
+    DJANGO_SETTINGS_MODULE   = "jao_web.settings.dev"
+    PORT                     = "8000"
+    JAO_BACKEND_URL          = module.api_gateway.api_gateway_url
+    JAO_BACKEND_TIMEOUT      = "15"
     JAO_BACKEND_ENABLE_HTTP2 = "true"
-    SESSION_COOKIE_SECURE = local.current_env.session_cookie_secure
-    ENV = var.environment
-    DJANGO_ALLOWED_HOSTS = "*"
-    DB_HOST = module.vectordb.cluster_endpoint
-    DB_PORT = "5432"
-    DB_NAME = module.vectordb.database_name
-    DB_USER = module.vectordb.master_username
-    DB_PASSWORD = "secrettpassword"
-    DATABASE_URL = "postgresql://${module.vectordb.master_username}:secrettpassword@${module.vectordb.cluster_endpoint}:5432/${module.vectordb.database_name}"
+    SESSION_COOKIE_SECURE    = local.current_env.session_cookie_secure
+    ENV                      = var.environment
+    DJANGO_ALLOWED_HOSTS     = "*"
+    DB_HOST                  = module.vectordb.cluster_endpoint
+    DB_PORT                  = "5432"
+    DB_NAME                  = module.vectordb.database_name
+    DB_USER                  = module.vectordb.master_username
+    DB_PASSWORD              = "secrettpassword"
+    DATABASE_URL             = "postgresql://${module.vectordb.master_username}:secrettpassword@${module.vectordb.cluster_endpoint}:5432/${module.vectordb.database_name}"
   }
   health_check_path      = "/health"
   internal_lb            = false # Frontend LB is public-facing
@@ -410,4 +420,79 @@ resource "aws_security_group_rule" "allow_ecs_to_db" {
   security_group_id        = aws_security_group.db_access.id
   source_security_group_id = module.ecs.security_group_id
   description              = "Allow ECS tasks to access database"
+}
+
+module "celery_redis" {
+  source = "./modules/elasticache"
+
+  cluster_id         = "jao-celery-cache"
+  node_type          = "cache.t3.small"
+  subnet_group_name  = aws_elasticache_subnet_group.main.name
+  security_group_ids = [aws_security_group.redis_client.id]
+
+  tags = {
+    Environment = "production"
+    Application = "celery"
+  }
+}
+
+resource "aws_security_group" "redis_client" {
+  name_prefix = "${var.app_name}-${var.environment}-redis-client-"
+  vpc_id      = module.vpc.vpc_id
+  description = "Security group for services that need Redis access"
+
+  egress {
+    from_port       = 6379
+    to_port         = 6379
+    protocol        = "tcp"
+    security_groups = [aws_security_group.redis.id]
+    description     = "Allow Redis connections"
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${var.app_name}-${var.environment}-redis-client-sg"
+  })
+}
+
+
+# Security group for Redis
+resource "aws_security_group" "redis" {
+  name_prefix = "redis-celery-"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    from_port   = 6379
+    to_port     = 6379
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  tags = {
+    Name = "redis-celery-sg"
+  }
+}
+
+
+
+resource "aws_security_group" "celery_workers" {
+  name_prefix = "celery-workers-"
+  vpc_id      = module.vpc.vpc_id
+
+  egress {
+    from_port       = 6379
+    to_port         = 6379
+    protocol        = "tcp"
+    security_groups = [aws_security_group.redis.id]
+    description     = "Allow outbound Redis connections"
+  }
+
+  tags = {
+    Name = "celery-workers-sg"
+  }
+}
+
+# Subnet group
+resource "aws_elasticache_subnet_group" "main" {
+  name       = "celery-redis-subnet-group"
+  subnet_ids = module.vpc.private_subnet_ids
 }
