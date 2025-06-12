@@ -10,9 +10,9 @@ locals {
   frontend_execution_role_name = aws_iam_role.frontend_execution.name
 
   # CloudWatch log group configuration
-  log_group_name = "/ecs/${local.name_prefix}"
+  log_group_name            = "/ecs/${local.name_prefix}"
   cloudwatch_log_group_name = aws_cloudwatch_log_group.frontend.name
-  cloudwatch_log_group_arn = aws_cloudwatch_log_group.frontend.arn
+  cloudwatch_log_group_arn  = aws_cloudwatch_log_group.frontend.arn
 
   tags = merge(
     var.tags,
@@ -49,7 +49,7 @@ locals {
             },
             {
               name  = "LOG_LEVEL"
-              value = "info"
+              value = "debug"
             }
           ] : []
         )
@@ -244,7 +244,7 @@ resource "aws_lb_listener" "frontend_http" {
 
 # ECS Task Execution Role
 resource "aws_iam_role" "frontend_execution" {
-  name  = "${local.name_prefix}-execution-role"
+  name = "${local.name_prefix}-execution-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -264,7 +264,7 @@ resource "aws_iam_role" "frontend_execution" {
 
 # ECS Task Role
 resource "aws_iam_role" "frontend_task" {
-  name  = "${local.name_prefix}-task-role"
+  name = "${local.name_prefix}-task-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

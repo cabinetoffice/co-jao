@@ -164,3 +164,132 @@ resource "aws_route_table_association" "private" {
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = var.single_nat_gateway ? aws_route_table.private[0].id : aws_route_table.private[count.index].id
 }
+
+# Data source for current AWS region
+data "aws_region" "current" {}
+
+# Security group for VPC endpoints
+resource "aws_security_group" "vpc_endpoints" {
+  count       = var.create_vpc_endpoints ? 1 : 0
+  name        = "${local.name}-vpc-endpoints-sg"
+  description = "Security group for VPC endpoints"
+  vpc_id      = local.vpc_id
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+    description = "HTTPS from VPC"
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "All outbound traffic"
+  }
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.name}-vpc-endpoints-sg"
+    }
+  )
+}
+
+# Data sources for existing VPC endpoints
+data "aws_vpc_endpoint" "existing_ecr_dkr" {
+  count        = var.existing_ecr_dkr_endpoint_id != "" ? 1 : 0
+  vpc_id       = local.vpc_id
+  service_name = "com.amazonaws.${data.aws_region.current.name}.ecr.dkr"
+}
+
+data "aws_vpc_endpoint" "existing_ecr_api" {
+  count        = var.existing_ecr_api_endpoint_id != "" ? 1 : 0
+  vpc_id       = local.vpc_id
+  service_name = "com.amazonaws.${data.aws_region.current.name}.ecr.api"
+}
+
+data "aws_vpc_endpoint" "existing_s3" {
+  count        = var.existing_s3_endpoint_id != "" ? 1 : 0
+  vpc_id       = local.vpc_id
+  service_name = "com.amazonaws.${data.aws_region.current.name}.s3"
+}
+
+data "aws_vpc_endpoint" "existing_logs" {
+  count        = var.existing_logs_endpoint_id != "" ? 1 : 0
+  vpc_id       = local.vpc_id
+  service_name = "com.amazonaws.${data.aws_region.current.name}.logs"
+}
+
+# VPC Endpoint for ECR Docker Registry
+resource "aws_vpc_endpoint" "ecr_dkr" {
+  count               = var.create_vpc_endpoints && var.create_ecr_dkr_endpoint && var.existing_ecr_dkr_endpoint_id == "" ? 1 : 0
+  vpc_id              = local.vpc_id
+  service_name        = "com.amazonaws.${data.aws_region.current.name}.ecr.dkr"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.vpc_endpoints[0].id]
+  private_dns_enabled = true
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.name}-ecr-dkr-endpoint"
+    }
+  )
+}
+
+# VPC Endpoint for ECR API - Required for authentication and repository management
+resource "aws_vpc_endpoint" "ecr_api" {
+  count               = var.create_vpc_endpoints && var.create_ecr_api_endpoint && var.existing_ecr_api_endpoint_id == "" ? 1 : 0
+  vpc_id              = local.vpc_id
+  service_name        = "com.amazonaws.${data.aws_region.current.name}.ecr.api"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.vpc_endpoints[0].id]
+  private_dns_enabled = true
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.name}-ecr-api-endpoint"
+    }
+  )
+}
+
+# VPC Endpoint for S3 - Required for ECR image layers (Gateway endpoint for cost efficiency)
+resource "aws_vpc_endpoint" "s3" {
+  count             = var.create_vpc_endpoints && var.create_s3_endpoint && var.existing_s3_endpoint_id == "" ? 1 : 0
+  vpc_id            = local.vpc_id
+  service_name      = "com.amazonaws.${data.aws_region.current.name}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = aws_route_table.private[*].id
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.name}-s3-endpoint"
+    }
+  )
+}
+
+# VPC Endpoint for CloudWatch Logs - Optional but recommended for container logging
+resource "aws_vpc_endpoint" "logs" {
+  count               = var.create_vpc_endpoints && var.create_logs_endpoint && var.existing_logs_endpoint_id == "" ? 1 : 0
+  vpc_id              = local.vpc_id
+  service_name        = "com.amazonaws.${data.aws_region.current.name}.logs"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.vpc_endpoints[0].id]
+  private_dns_enabled = true
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.name}-logs-endpoint"
+    }
+  )
+}

@@ -69,7 +69,7 @@ variable "environment_variables" {
   description = "Environment variables for the container"
   type        = map(string)
   default = {
-    LOG_LEVEL = "INFO"
+    LOG_LEVEL = "DEBUG"
   }
 }
 
@@ -189,7 +189,7 @@ variable "enable_third_party_access" {
 variable "api_log_level" {
   description = "Log level for API (DEBUG, INFO, WARNING, ERROR)"
   type        = string
-  default     = "INFO"
+  default     = "DEBUG"
 }
 
 variable "enable_api_dashboard" {
@@ -213,4 +213,57 @@ variable "image_tag" {
   default     = "latest"
 }
 
-# skip_vpc_validation variable removed for simplification
+# VPC Endpoints Configuration
+variable "create_vpc_endpoints" {
+  description = "Whether to create VPC endpoints"
+  type        = bool
+  default     = true
+}
+
+variable "create_ecr_dkr_endpoint" {
+  description = "Whether to create ECR Docker Registry VPC endpoint"
+  type        = bool
+  default     = false # Set to false to avoid conflict with existing endpoint
+}
+
+variable "create_ecr_api_endpoint" {
+  description = "Whether to create ECR API VPC endpoint"
+  type        = bool
+  default     = true
+}
+
+variable "create_s3_endpoint" {
+  description = "Whether to create S3 Gateway VPC endpoint"
+  type        = bool
+  default     = true
+}
+
+variable "create_logs_endpoint" {
+  description = "Whether to create CloudWatch Logs VPC endpoint"
+  type        = bool
+  default     = true
+}
+
+variable "existing_ecr_dkr_endpoint_id" {
+  description = "ID of existing ECR Docker Registry VPC endpoint (if any)"
+  type        = string
+  default     = ""
+}
+
+variable "existing_ecr_api_endpoint_id" {
+  description = "ID of existing ECR API VPC endpoint (if any)"
+  type        = string
+  default     = ""
+}
+
+variable "existing_s3_endpoint_id" {
+  description = "ID of existing S3 Gateway VPC endpoint (if any)"
+  type        = string
+  default     = ""
+}
+
+variable "existing_logs_endpoint_id" {
+  description = "ID of existing CloudWatch Logs VPC endpoint (if any)"
+  type        = string
+  default     = ""
+}

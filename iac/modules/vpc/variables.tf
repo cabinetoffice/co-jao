@@ -30,9 +30,64 @@ variable "public_subnet_cidrs" {
 }
 
 variable "tags" {
-  description = "Additional tags for all resources"
+  description = "Additional tags to apply to all resources"
   type        = map(string)
   default     = {}
+}
+
+# VPC Endpoints Configuration
+variable "create_vpc_endpoints" {
+  description = "Whether to create VPC endpoints"
+  type        = bool
+  default     = true
+}
+
+variable "create_ecr_dkr_endpoint" {
+  description = "Whether to create ECR Docker Registry VPC endpoint"
+  type        = bool
+  default     = true
+}
+
+variable "create_ecr_api_endpoint" {
+  description = "Whether to create ECR API VPC endpoint"
+  type        = bool
+  default     = true
+}
+
+variable "create_s3_endpoint" {
+  description = "Whether to create S3 Gateway VPC endpoint"
+  type        = bool
+  default     = true
+}
+
+variable "create_logs_endpoint" {
+  description = "Whether to create CloudWatch Logs VPC endpoint"
+  type        = bool
+  default     = true
+}
+
+variable "existing_ecr_dkr_endpoint_id" {
+  description = "ID of existing ECR Docker Registry VPC endpoint (if any)"
+  type        = string
+  default     = ""
+}
+
+variable "existing_ecr_api_endpoint_id" {
+  description = "ID of existing ECR API VPC endpoint (if any)"
+  type        = string
+  default     = ""
+}
+
+variable "existing_s3_endpoint_id" {
+  description = "ID of existing S3 Gateway VPC endpoint (if any)"
+  type        = string
+  default     = ""
+}
+
+variable "existing_logs_endpoint_id" {
+  description = "ID of existing CloudWatch Logs VPC endpoint (if any)"
+  type        = string
+  default     = ""
 }
 
 variable "vpc_tags" {
