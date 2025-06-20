@@ -2,7 +2,7 @@
 
 An application that uses LLMs to assist in job description drafting and recruitment.
 
-![black](https://github.com/cabinetoffice/RecruitmentCoPilot/actions/workflows/black.yml/badge.svg) ![isort](https://github.com/cabinetoffice/RecruitmentCoPilot/actions/workflows/isort.yml/badge.svg) ![test JAO web](https://github.com/cabinetoffice/RecruitmentCoPilot/actions/workflows/pytest-jao-web.yml/badge.svg) ![test recruitmentcopilot shared module](https://github.com/cabinetoffice/RecruitmentCoPilot/actions/workflows/pytest-recruitmentcopilot.yml/badge.svg)
+![black](https://github.com/cabinetoffice/RecruitmentCoPilot/actions/workflows/black.yml/badge.svg) ![isort](https://github.com/cabinetoffice/RecruitmentCoPilot/actions/workflows/isort.yml/badge.svg) ![test JAO web](https://github.com/cabinetoffice/RecruitmentCoPilot/actions/workflows/pytest-jao-web.yml/badge.svg) ![test recruitmentcopilot shared module](https://github.com/cabinetoffice/RecruitmentCoPilot/actions/workflows/pytest-recruitmentcopilot.yml/badge.svg) ![Deploy to AWS](https://github.com/cabinetoffice/RecruitmentCoPilot/actions/workflows/deploy.yml/badge.svg)
 
 ## Workflow
 
@@ -80,6 +80,57 @@ The deployment script automatically handles the chicken-and-egg problem of creat
 - If you encounter "resource already exists" errors, use `--skip-existing`
 - For VPC conflicts, use `--skip-vpc --existing-vpc-id vpc-xxxxxxxx`
 - For CloudWatch log group conflicts, use `--skip-cloudwatch`
+
+## GitHub Actions Deployment
+
+The project includes a GitHub Actions workflow that automatically deploys to AWS when code is pushed to the `main` branch. You can also trigger deployments manually with custom parameters.
+
+### Setup
+
+1. **Configure AWS Secrets**: Add the following secrets to your GitHub repository:
+   - `AWS_ACCESS_KEY_ID`: Your AWS access key ID
+   - `AWS_SECRET_ACCESS_KEY`: Your AWS secret access key
+
+   To add secrets:
+   - Go to your GitHub repository
+   - Navigate to Settings > Secrets and variables > Actions
+   - Click "New repository secret"
+   - Add each secret with the exact names above
+
+2. **Environment Protection** (Optional): The workflow uses a `production` environment for additional security. You can configure branch protection rules and required reviewers in your repository settings.
+
+### Automatic Deployment
+
+The workflow automatically triggers on:
+- Push to `main` branch (deploys to `dev` environment by default)
+
+### Manual Deployment
+
+You can manually trigger deployments with custom parameters:
+
+1. Go to Actions tab in your GitHub repository
+2. Select "Deploy to AWS" workflow
+3. Click "Run workflow"
+4. Configure deployment options:
+   - **Environment**: Choose dev, staging, or prod
+   - **Image Tag**: Specify Docker image tag (default: latest)
+   - **Skip Backend**: Skip backend deployment if needed
+   - **Skip Frontend**: Skip frontend deployment if needed
+   - **Skip Terraform**: Skip infrastructure deployment if needed
+
+### Workflow Features
+
+- **Multi-environment support**: Deploy to dev, staging, or production
+- **Selective deployment**: Skip backend, frontend, or terraform as needed
+- **Artifact upload**: Deployment logs are saved as artifacts for debugging
+- **Status notifications**: Clear success/failure feedback
+- **Manual and automatic triggers**: Push-to-deploy or manual control
+
+### Monitoring Deployments
+
+- Check the Actions tab for deployment status
+- Download deployment artifacts if troubleshooting is needed
+- Monitor AWS resources through the AWS Console
 
 # Set up
 

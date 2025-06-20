@@ -1,5 +1,3 @@
-# This module sets up the frontend container in ECS with load balancer
-
 locals {
   name_prefix                  = "${var.name_prefix}-frontend-${var.environment}"
   container_name               = "${var.name_prefix}-frontend"
@@ -55,7 +53,7 @@ locals {
         )
         healthCheck = {
           command     = ["CMD-SHELL", "curl -f http://localhost:${var.container_port}${var.health_check_path} || exit 1"]
-          interval    = 30
+          interval    = 300
           timeout     = 5
           retries     = 3
           startPeriod = 60
@@ -218,11 +216,10 @@ resource "aws_lb_target_group" "frontend" {
 
   health_check {
     path                = var.health_check_path
-    interval            = 30
+    interval            = 300
     timeout             = 5
     healthy_threshold   = 3
     unhealthy_threshold = 3
-    matcher             = "200"
   }
 
   tags = local.tags
@@ -362,6 +359,7 @@ resource "aws_ecs_service" "frontend" {
 
 # Auto Scaling for the frontend service
 resource "aws_appautoscaling_target" "frontend" {
+  count              = var.environment == "prod" ? 1 : 0
   max_capacity       = var.max_capacity
   min_capacity       = var.min_capacity
   resource_id        = "service/${aws_ecs_cluster.frontend.name}/${aws_ecs_service.frontend.name}"
@@ -371,11 +369,12 @@ resource "aws_appautoscaling_target" "frontend" {
 
 # CPU Utilization Scaling Policy
 resource "aws_appautoscaling_policy" "frontend_cpu" {
+  count              = var.environment == "prod" ? 1 : 0
   name               = "${local.name_prefix}-cpu-scaling"
   policy_type        = "TargetTrackingScaling"
-  resource_id        = aws_appautoscaling_target.frontend.resource_id
-  scalable_dimension = aws_appautoscaling_target.frontend.scalable_dimension
-  service_namespace  = aws_appautoscaling_target.frontend.service_namespace
+  resource_id        = aws_appautoscaling_target.frontend[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.frontend[0].scalable_dimension
+  service_namespace  = aws_appautoscaling_target.frontend[0].service_namespace
 
   target_tracking_scaling_policy_configuration {
     predefined_metric_specification {
@@ -389,11 +388,12 @@ resource "aws_appautoscaling_policy" "frontend_cpu" {
 
 # Memory Utilization Scaling Policy
 resource "aws_appautoscaling_policy" "frontend_memory" {
+  count              = var.environment == "prod" ? 1 : 0
   name               = "${local.name_prefix}-memory-scaling"
   policy_type        = "TargetTrackingScaling"
-  resource_id        = aws_appautoscaling_target.frontend.resource_id
-  scalable_dimension = aws_appautoscaling_target.frontend.scalable_dimension
-  service_namespace  = aws_appautoscaling_target.frontend.service_namespace
+  resource_id        = aws_appautoscaling_target.frontend[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.frontend[0].scalable_dimension
+  service_namespace  = aws_appautoscaling_target.frontend[0].service_namespace
 
   target_tracking_scaling_policy_configuration {
     predefined_metric_specification {

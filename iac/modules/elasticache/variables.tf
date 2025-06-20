@@ -24,7 +24,7 @@ variable "engine_version" {
 variable "port" {
   description = "The port number on which each cache node will accept connections"
   type        = number
-  default     = 6379
+  default     = 6380
 }
 
 variable "parameter_group_name" {
