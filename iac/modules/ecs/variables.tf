@@ -91,9 +91,15 @@ variable "deployment_minimum_healthy_percent" {
 }
 
 variable "internal_lb" {
-  description = "Whether the load balancer should be internal"
+  description = "Whether the NLB should be internal"
   type        = bool
   default     = true
+}
+
+variable "admin_lb_internet_facing" {
+  description = "Whether the admin ALB should be internet-facing (independent of NLB)"
+  type        = bool
+  default     = false
 }
 
 variable "lb_deletion_protection" {
@@ -241,7 +247,7 @@ variable "celery_worker_command" {
 variable "celery_worker_health_check" {
   description = "Health check command for Celery worker"
   type        = list(string)
-  default     = ["CMD-SHELL", "poetry run celery -A jao_backend.common.celery inspect ping -d celery@$HOSTNAME"]
+  default     = ["CMD-SHELL", "poetry run celery -A jao_backend.common.celery inspect ping --timeout=10"]
 }
 
 variable "celery_worker_concurrency" {

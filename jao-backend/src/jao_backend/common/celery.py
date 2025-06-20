@@ -7,7 +7,12 @@ env = os.environ.get("ENV", "common")
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", f"jao_backend.settings.{env}")
 import dotenv
 
-dotenv.load_dotenv()
+# Only load .env file if it exists (for local development)
+try:
+    dotenv.load_dotenv(dotenv.find_dotenv())
+except Exception:
+    # Ignore errors if .env file cannot be loaded (e.g., in containerized environments)
+    pass
 
 # Create a Celery instance and set the broker and result backend.
 app = Celery("jao_backend")

@@ -21,6 +21,11 @@ output "backend_load_balancer_dns" {
   value       = module.ecs.load_balancer_dns_name
 }
 
+output "backend_admin_load_balancer_dns" {
+  description = "Backend Admin ALB DNS Name for Django Admin Access"
+  value       = module.ecs.alb_dns_name
+}
+
 output "frontend_load_balancer_dns" {
   description = "Frontend ALB DNS Name"
   value       = module.frontend.load_balancer_dns_name

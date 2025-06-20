@@ -484,7 +484,9 @@ if [ "$SKIP_SERVICE_UPDATE" = false ]; then
 
     # Expected ECS cluster and service names
     BACKEND_CLUSTER_NAME="${APP_NAME}-${ENV}-cluster"
-    BACKEND_SERVICE_NAME="${APP_NAME}-${ENV}-service"
+    BACKEND_SERVICE_NAME="${APP_NAME}-${ENV}-api-service"
+    BACKEND_SERVICE_WORKER_NAME="${APP_NAME}-${ENV}-worker-service"
+    BACKEND_SERVICE_BEAT_NAME="${APP_NAME}-${ENV}-beat-service"
     FRONTEND_CLUSTER_NAME="${APP_NAME}-frontend-${ENV}-cluster"
     FRONTEND_SERVICE_NAME="${APP_NAME}-frontend-${ENV}-service"
 
@@ -499,16 +501,39 @@ if [ "$SKIP_SERVICE_UPDATE" = false ]; then
         fi
     fi
 
-    # Update frontend service
-    if [ "$SKIP_FRONTEND" = false ]; then
-        echo -e "${BLUE}Updating frontend ECS service: ${FRONTEND_SERVICE_NAME} in cluster: ${FRONTEND_CLUSTER_NAME}${NC}"
-        if ! aws ecs update-service --force-new-deployment --service "${FRONTEND_SERVICE_NAME}" --cluster "${FRONTEND_CLUSTER_NAME}" --region "${AWS_REGION}"; then
-            echo -e "${RED}Error: Failed to update frontend ECS service.${NC}"
-            echo -e "${YELLOW}Check if the service and cluster exist with the names ${FRONTEND_SERVICE_NAME} and ${FRONTEND_CLUSTER_NAME}.${NC}"
+    # Update backend worker service
+    if [ "$SKIP_BACKEND" = false ]; then
+        echo -e "${BLUE}Updating backend worker ECS service: ${BACKEND_SERVICE_WORKER_NAME} in cluster: ${BACKEND_CLUSTER_NAME}${NC}"
+        if ! aws ecs update-service --force-new-deployment --service "${BACKEND_SERVICE_WORKER_NAME}" --cluster "${BACKEND_CLUSTER_NAME}" --region "${AWS_REGION}"; then
+            echo -e "${RED}Error: Failed to update backend worker ECS service.${NC}"
+            echo -e "${YELLOW}Check if the service and cluster exist with the names ${BACKEND_SERVICE_WORKER_NAME} and ${BACKEND_CLUSTER_NAME}.${NC}"
+        else
+            echo -e "${GREEN}Backend worker service update initiated successfully.${NC}"
+        fi
+    fi
+
+    # Update backend beat service
+    if [ "$SKIP_BACKEND" = false ]; then
+        echo -e "${BLUE}Updating backend beat ECS service: ${BACKEND_SERVICE_BEAT_NAME} in cluster: ${BACKEND_CLUSTER_NAME}${NC}"
+        if ! aws ecs update-service --force-new-deployment --service "${BACKEND_SERVICE_BEAT_NAME}" --cluster "${BACKEND_CLUSTER_NAME}" --region "${AWS_REGION}"; then
+            echo -e "${RED}Error: Failed to update backend beat ECS service.${NC}"
+            echo -e "${YELLOW}Check if the service and cluster exist with the names ${BACKEND_SERVICE_BEAT_NAME} and ${BACKEND_CLUSTER_NAME}.${NC}"
         else
             echo -e "${GREEN}Frontend service update initiated successfully.${NC}"
         fi
     fi
+
+    # Update backend worker service
+    if [ "$SKIP_FRONTEND" = false ]; then
+        echo -e "${BLUE}Updating backend worker ECS service: ${FRONTEND_SERVICE_NAME} in cluster: ${FRONTEND_CLUSTER_NAME}${NC}"
+        if ! aws ecs update-service --force-new-deployment --service "${FRONTEND_SERVICE_NAME}" --cluster "${FRONTEND_CLUSTER_NAME}" --region "${AWS_REGION}"; then
+            echo -e "${RED}Error: Failed to update backend worker ECS service.${NC}"
+            echo -e "${YELLOW}Check if the service and cluster exist with the names ${FRONTEND_SERVICE_NAME} and ${FRONTEND_CLUSTER_NAME}.${NC}"
+        else
+            echo -e "${GREEN}Backend worker service update initiated successfully.${NC}"
+        fi
+    fi
+
 fi
 
 # Get URLs and display them

@@ -158,7 +158,7 @@ module "ecs" {
   memory                        = var.task_memory
   desired_count                 = var.desired_count
   container_name                = var.app_name
-  additional_security_group_ids = [aws_security_group.redis_client.id]
+  additional_security_group_ids = [aws_security_group.redis_client.id, aws_security_group.db_access.id]
 
   # Environment variables for the API service
   environment_variables = merge(var.environment_variables, {
@@ -167,7 +167,7 @@ module "ecs" {
     DB_PORT     = "5432"
     DB_NAME     = module.vectordb.database_name
     DB_USER     = module.vectordb.master_username
-    DB_PASSWORD = "secrettpassword" # Matches hardcoded password in Aurora module
+    DB_PASSWORD = "secrettpassword"
 
     # Django environment variables
     ENV                    = "dev" # Required for settings module selection
@@ -182,6 +182,9 @@ module "ecs" {
     DATABASE_URL                   = "postgresql://${module.vectordb.master_username}:secrettpassword@${module.vectordb.cluster_endpoint}:5432/${module.vectordb.database_name}" # Will be built from DB_* vars in entrypoint
     JAO_BACKEND_OLEEO_DATABASE_URL = "mssqlms://user.namey:password@co-grid-database.eu-west-2:1433/DART_Dev"
     JAO_BACKEND_ENABLE_OLEEO       = "true"
+    JAO_BACKEND_SUPERUSER_USERNAME = var.jao_backend_superuser_username
+    JAO_BACKEND_SUPERUSER_PASSWORD = var.jao_backend_superuser_password
+    JAO_BACKEND_SUPERUSER_EMAIL    = var.jao_backend_superuser_email
     # Celery configuration
     CELERY_BROKER_URL     = module.celery_redis.celery_broker_url
     CELERY_RESULT_BACKEND = module.celery_redis.celery_result_backend
@@ -196,9 +199,11 @@ module "ecs" {
     MAX_REQUESTS_PER_MIN = local.current_env.max_requests_per_min
     ENABLE_API_METRICS   = "true"
   })
-  health_check_path      = "/health"
-  internal_lb            = true
-  logs_retention_in_days = local.current_env.log_retention_days
+
+  health_check_path        = "/health"
+  internal_lb              = true
+  admin_lb_internet_facing = true
+  logs_retention_in_days   = local.current_env.log_retention_days
 
   # Enable enhanced monitoring and tracing for the API backend
   enable_enhanced_monitoring = true
@@ -350,7 +355,6 @@ module "vectordb" {
   prevent_destroy    = false
 
 
-  # Additional parameters needed for Django compatibility and API optimization
   additional_parameters = [
     {
       name  = "client_encoding"
@@ -358,34 +362,34 @@ module "vectordb" {
     },
     {
       name  = "max_connections"
-      value = "200" # Increased for API traffic
+      value = "200"
     },
     {
       name  = "shared_buffers"
-      value = "262144" # 256MB in kilobytes, optimized for API workloads
+      value = "262144"
     },
     {
       name  = "pgaudit.log"
-      value = "none" # Disable audit logging to avoid rds.* parameter conflicts
+      value = "none"
     }
   ]
 
   tags = local.common_tags
 }
 
-# Security group for database access
+# Security group for database access from ECS tasks
 resource "aws_security_group" "db_access" {
   name        = "${var.app_name}-${var.environment}-db-access"
-  description = "Security group for database access"
+  description = "Security group for ECS tasks to access database"
   vpc_id      = module.vpc.vpc_id
 
-  # Database access (PostgreSQL)
+  # Allow outbound connections to Aurora database
   egress {
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
-    cidr_blocks = [module.vpc.vpc_cidr_block]
-    description = "PostgreSQL database access"
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [module.vectordb.security_group_id]
+    description     = "PostgreSQL database access to Aurora"
   }
 
   # DNS resolution
@@ -412,15 +416,8 @@ resource "aws_security_group" "db_access" {
 }
 
 
-resource "aws_security_group_rule" "allow_ecs_to_db" {
-  type                     = "ingress"
-  from_port                = 5432
-  to_port                  = 5432
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.db_access.id
-  source_security_group_id = module.ecs.security_group_id
-  description              = "Allow ECS tasks to access database"
-}
+# Security group rule removed - it's now handled by the Aurora module
+# via the allowed_security_groups parameter which includes aws_security_group.db_access.id
 
 module "celery_redis" {
   source = "./modules/elasticache"
@@ -442,8 +439,8 @@ resource "aws_security_group" "redis_client" {
   description = "Security group for services that need Redis access"
 
   egress {
-    from_port       = 6379
-    to_port         = 6379
+    from_port       = 6380
+    to_port         = 6380
     protocol        = "tcp"
     security_groups = [aws_security_group.redis.id]
     description     = "Allow Redis connections"
@@ -461,8 +458,8 @@ resource "aws_security_group" "redis" {
   vpc_id      = module.vpc.vpc_id
 
   ingress {
-    from_port   = 6379
-    to_port     = 6379
+    from_port   = 6380
+    to_port     = 6380
     protocol    = "tcp"
     cidr_blocks = [var.vpc_cidr]
   }
@@ -479,8 +476,8 @@ resource "aws_security_group" "celery_workers" {
   vpc_id      = module.vpc.vpc_id
 
   egress {
-    from_port       = 6379
-    to_port         = 6379
+    from_port       = 6380
+    to_port         = 6380
     protocol        = "tcp"
     security_groups = [aws_security_group.redis.id]
     description     = "Allow outbound Redis connections"

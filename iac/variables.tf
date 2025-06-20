@@ -50,13 +50,13 @@ variable "container_port" {
 variable "task_cpu" {
   description = "CPU units for the ECS task"
   type        = number
-  default     = 256
+  default     = 128
 }
 
 variable "task_memory" {
   description = "Memory for the ECS task"
   type        = number
-  default     = 512
+  default     = 256
 }
 
 variable "desired_count" {
@@ -264,6 +264,24 @@ variable "existing_s3_endpoint_id" {
 
 variable "existing_logs_endpoint_id" {
   description = "ID of existing CloudWatch Logs VPC endpoint (if any)"
+  type        = string
+  default     = ""
+}
+
+variable "jao_backend_superuser_password" {
+  description = "Password for the JAO backend superuser"
+  type        = string
+  default     = ""
+}
+
+variable "jao_backend_superuser_username" {
+  description = "Username for the JAO backend superuser"
+  type        = string
+  default     = ""
+}
+
+variable "jao_backend_superuser_email" {
+  description = "Email for the JAO backend superuser"
   type        = string
   default     = ""
 }

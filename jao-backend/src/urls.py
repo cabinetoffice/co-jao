@@ -3,10 +3,96 @@ from django.contrib import admin
 from django.urls import include
 from django.urls import path
 from django.http import HttpResponse
+from django.core.management import call_command
+from django.contrib.auth import get_user_model
+import sys
+import io
 
 
 def health_check(request):
     return HttpResponse("OK", content_type="text/plain")
+
+def run_migrations(request):
+    """Run Django migrations via web endpoint"""
+    if not settings.DEBUG:
+        return HttpResponse("Migrations endpoint disabled in production", status=403)
+
+    try:
+        from django.db import connection
+
+        # Test database connection first
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                db_status = "Database connection: OK"
+        except Exception as db_e:
+            return HttpResponse(f"Database connection failed: {str(db_e)}", status=500, content_type="text/plain")
+
+        # Capture output
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
+        stdout_buffer = io.StringIO()
+        stderr_buffer = io.StringIO()
+        sys.stdout = stdout_buffer
+        sys.stderr = stderr_buffer
+
+        # Run migrations
+        try:
+            call_command('migrate', verbosity=2)
+            migration_status = "SUCCESS"
+        except Exception as migrate_e:
+            migration_status = f"FAILED: {str(migrate_e)}"
+
+        # Restore stdout/stderr and get output
+        sys.stdout = old_stdout
+        sys.stderr = old_stderr
+        stdout_output = stdout_buffer.getvalue()
+        stderr_output = stderr_buffer.getvalue()
+
+        response_text = f"""Migration Status: {migration_status}
+
+{db_status}
+
+=== STDOUT ===
+{stdout_output}
+
+=== STDERR ===
+{stderr_output}
+"""
+
+        return HttpResponse(response_text, content_type="text/plain")
+
+    except Exception as e:
+        # Restore stdout/stderr if they were changed
+        sys.stdout = old_stdout if 'old_stdout' in locals() else sys.stdout
+        sys.stderr = old_stderr if 'old_stderr' in locals() else sys.stderr
+
+        import traceback
+        error_details = traceback.format_exc()
+        return HttpResponse(f"Migration endpoint error:\n{str(e)}\n\nFull traceback:\n{error_details}", status=500, content_type="text/plain")
+
+def create_superuser(request):
+    """Create Django superuser via web endpoint"""
+    if not settings.DEBUG:
+        return HttpResponse("Superuser creation endpoint disabled in production", status=403)
+
+    User = get_user_model()
+
+    # Use credentials from environment or defaults
+    username = request.GET.get('username', 'admin')
+    email = request.GET.get('email', 'admin@example.com')
+    password = request.GET.get('password', 'admin123')
+
+    try:
+        if User.objects.filter(username=username).exists():
+            return HttpResponse(f"User '{username}' already exists", content_type="text/plain")
+
+        user = User.objects.create_superuser(username=username, email=email, password=password)
+        return HttpResponse(f"Superuser '{username}' created successfully with password '{password}'", content_type="text/plain")
+
+    except Exception as e:
+        return HttpResponse(f"Failed to create superuser: {str(e)}", status=500, content_type="text/plain")
+
 
 urlpatterns = [
     path("", include("jao_backend.home.urls")),
@@ -14,6 +100,8 @@ urlpatterns = [
     path("ingest/", include("jao_backend.ingest.urls")),
     path("django-admin/", admin.site.urls),
     path("health", health_check, name="health_check"),
+    path("migrate", run_migrations, name="run_migrations"),
+    path("create-superuser", create_superuser, name="create_superuser"),
 ]
 
 

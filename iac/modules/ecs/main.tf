@@ -135,23 +135,23 @@ locals {
           "awslogs-stream-prefix" = "worker"
         }
       }
-      healthCheck = {
-        command     = var.celery_worker_health_check
-        interval    = 60
-        timeout     = 30
-        retries     = 3
-        startPeriod = 120
-      }
     }
   ])
 
   # Celery Beat container definitions
   beat_container_definitions = jsonencode([
     {
-      name        = "celery-beat"
-      image       = var.ecr_repository_url
-      essential   = true
-      command     = var.celery_beat_command
+      name      = "celery-beat"
+      image     = var.ecr_repository_url
+      essential = true
+      command   = var.celery_beat_command
+      portMappings = [
+        {
+          containerPort = var.container_port
+          hostPort      = var.container_port
+          protocol      = "tcp"
+        }
+      ]
       environment = local.base_environment
       logConfiguration = {
         logDriver = "awslogs"
@@ -161,18 +161,18 @@ locals {
           "awslogs-stream-prefix" = "beat"
         }
       }
-      healthCheck = {
-        command     = var.celery_beat_health_check
-        interval    = 60
-        timeout     = 30
-        retries     = 3
-        startPeriod = 120
-      }
     }
   ])
 }
 
-# ECS cluster for service discovery
+# Data sources
+data "aws_vpc" "main" {
+  id = var.vpc_id
+}
+
+data "aws_region" "current" {}
+
+# ECS cluster
 resource "aws_ecs_cluster" "main" {
   name = "${local.name}-cluster"
 
@@ -210,10 +210,6 @@ resource "aws_ecs_cluster" "main" {
   )
 }
 
-# Data source to get VPC CIDR
-data "aws_vpc" "main" {
-  id = var.vpc_id
-}
 
 # Security group for ECS tasks
 resource "aws_security_group" "ecs_tasks" {
@@ -226,6 +222,15 @@ resource "aws_security_group" "ecs_tasks" {
     to_port     = var.container_port
     protocol    = "tcp"
     cidr_blocks = [data.aws_vpc.main.cidr_block]
+  }
+
+  # Allow traffic from admin ALB
+  ingress {
+    from_port       = var.container_port
+    to_port         = var.container_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.admin_alb.id]
+    description     = "HTTP from admin ALB"
   }
 
   # HTTP for health checks and external APIs
@@ -288,6 +293,38 @@ resource "aws_security_group" "ecs_tasks" {
   )
 }
 
+# Security group for admin ALB
+resource "aws_security_group" "admin_alb" {
+  name        = "${local.name}-admin-alb-sg"
+  description = "Security group for admin ALB"
+  vpc_id      = var.vpc_id
+
+  # Allow HTTP from internet
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTP from internet"
+  }
+
+  # Allow all outbound traffic to ECS tasks
+  egress {
+    from_port   = var.container_port
+    to_port     = var.container_port
+    protocol    = "tcp"
+    cidr_blocks = [data.aws_vpc.main.cidr_block]
+    description = "HTTP to ECS tasks"
+  }
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.name}-admin-alb-sg"
+    }
+  )
+}
+
 # Network Load Balancer
 resource "aws_lb" "main" {
   name               = "${local.name}-nlb"
@@ -313,7 +350,7 @@ resource "aws_lb" "main" {
 
 # Target group for the NLB
 resource "aws_lb_target_group" "app" {
-  name        = "${local.name}-tg"
+  name        = "${local.name}-nlb-tg"
   port        = var.container_port
   protocol    = "TCP"
   vpc_id      = var.vpc_id
@@ -335,7 +372,7 @@ resource "aws_lb_target_group" "app" {
   tags = merge(
     local.common_tags,
     {
-      Name = "${local.name}-tg"
+      Name = "${local.name}-nlb-tg"
     }
   )
 }
@@ -343,7 +380,7 @@ resource "aws_lb_target_group" "app" {
 # NLB Listener
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
-  port              = "80"
+  port              = 80
   protocol          = "TCP"
 
   default_action {
@@ -351,6 +388,66 @@ resource "aws_lb_listener" "http" {
     target_group_arn = aws_lb_target_group.app.arn
   }
 }
+
+# Amazon Load Balancer for admin user
+resource "aws_lb" "admin" {
+  name               = "${local.name}-alb"
+  internal           = !var.admin_lb_internet_facing
+  load_balancer_type = "application"
+  subnets            = var.admin_lb_internet_facing ? var.public_subnet_ids : var.private_subnet_ids
+  security_groups    = [aws_security_group.admin_alb.id]
+
+  enable_deletion_protection = var.lb_deletion_protection
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.name}-alb"
+    }
+  )
+}
+
+
+# Target group for the ALB
+resource "aws_lb_target_group" "admin" {
+  name        = "${local.name}-alb-tg"
+  port        = var.container_port
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 5
+    interval            = 30
+    path                = "/health"
+    matcher             = "200"
+    protocol            = "HTTP"
+    port                = var.container_port
+  }
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.name}-alb-tg"
+    }
+  )
+}
+
+# ALB Listener
+resource "aws_lb_listener" "admin" {
+  load_balancer_arn = aws_lb.admin.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.admin.arn
+  }
+}
+
 
 # ECS task execution role
 resource "aws_iam_role" "ecs_task_execution_role" {
@@ -458,7 +555,7 @@ resource "aws_iam_role_policy_attachment" "xray_access_policy_attachment" {
   policy_arn = aws_iam_policy.xray_access_policy[0].arn
 }
 
-data "aws_region" "current" {}
+
 
 # CloudWatch log group
 resource "aws_cloudwatch_log_group" "app" {
@@ -586,13 +683,21 @@ resource "aws_ecs_service" "api" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    security_groups  = [aws_security_group.ecs_tasks.id]
+    security_groups  = concat([aws_security_group.ecs_tasks.id], var.additional_security_group_ids)
     subnets          = var.private_subnet_ids
     assign_public_ip = false
   }
 
+  # Load balancer for API interface
   load_balancer {
     target_group_arn = aws_lb_target_group.app.arn
+    container_name   = local.container_name
+    container_port   = var.container_port
+  }
+
+  # Load balancer for admin interface
+  load_balancer {
+    target_group_arn = aws_lb_target_group.admin.arn
     container_name   = local.container_name
     container_port   = var.container_port
   }
@@ -674,7 +779,7 @@ resource "aws_ecs_service" "beat" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    security_groups  = [aws_security_group.ecs_tasks.id]
+    security_groups  = concat([aws_security_group.ecs_tasks.id], var.additional_security_group_ids)
     subnets          = var.private_subnet_ids
     assign_public_ip = false
   }

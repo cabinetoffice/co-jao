@@ -2,7 +2,7 @@
 
 # Resource existence flags - COMMENTED OUT FOR SIMPLIFICATION
 # skip_ecr_creation = true
-aws_account_id    = "860619597616"
+aws_account_id = "860619597616"
 
 # Skip creating resources that already exist - COMMENTED OUT FOR SIMPLIFICATION
 # skip_iam_role_creation        = false
@@ -30,10 +30,11 @@ enable_detailed_metrics      = false
 internal_lb = false
 
 # VPC Endpoints Configuration - Resolve ECR Docker endpoint conflict
-create_ecr_dkr_endpoint = false  # Existing endpoint already present
-create_ecr_api_endpoint = true   # Create missing ECR API endpoint
-create_s3_endpoint = true        # Create S3 Gateway endpoint for ECR layers
-create_logs_endpoint = true      # Create CloudWatch Logs endpoint
+create_vpc_endpoints    = true  # Enable VPC endpoints
+create_ecr_dkr_endpoint = false # Existing endpoint already present
+create_ecr_api_endpoint = true  # Create missing ECR API endpoint
+create_s3_endpoint      = true  # Create S3 Gateway endpoint for ECR layers
+create_logs_endpoint    = true  # Create CloudWatch Logs endpoint
 
 # Self-manage the initialization
 initialization_bucket = "jao-dev-initialization"
@@ -54,3 +55,8 @@ desired_count = 1
 lb_deletion_protection = false
 deletion_protection    = false
 enable_lb_access_logs  = false
+
+# Django admin creds
+jao_backend_superuser_username = "jao-admin"
+jao_backend_superuser_password = "password"
+jao_backend_superuser_email    = "jao-admin@example.com"

@@ -68,4 +68,14 @@ RUN ls -la /app/src
 EXPOSE 8000
 
 # Start the application using hypercorn
-CMD ["poetry", "run", "hypercorn", "src.asgi:application", "--bind", "0.0.0.0:8000"]
+
+CMD sh -c "set -e && \
+    echo 'Running migrations...' && \
+    poetry run python src/manage.py migrate && \
+    echo 'Creating superuser...' && \
+    echo 'Username: $JAO_BACKEND_SUPERUSER_USERNAME' && \
+    echo 'Email: $JAO_BACKEND_SUPERUSER_EMAIL' && \
+    DJANGO_SUPERUSER_USERNAME=$JAO_BACKEND_SUPERUSER_USERNAME DJANGO_SUPERUSER_EMAIL=$JAO_BACKEND_SUPERUSER_EMAIL DJANGO_SUPERUSER_PASSWORD=$JAO_BACKEND_SUPERUSER_PASSWORD \
+    poetry run python src/manage.py createsuperuser --noinput || echo 'Superuser creation failed or user already exists' && \
+    echo 'Starting server...' && \
+    poetry run hypercorn src.asgi:application --bind 0.0.0.0:8000"

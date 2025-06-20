@@ -21,6 +21,28 @@ SECRET_KEY = "django-insecure-0+=k_0_cz_8laec^(@6l*$wb(3(^u-=3iy13=$o_$p1vmg*#t0
 # SECURITY WARNING: define the correct hosts in production!
 ALLOWED_HOSTS = ["*"]
 
+# CSRF settings for Django admin through load balancer
+CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_HTTPONLY = False
+CSRF_USE_SESSIONS = False  # Don't tie CSRF to sessions for load balancer compatibility
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_TRUSTED_ORIGINS = [
+    'http://jao-dev-alb-1122709957.eu-west-2.elb.amazonaws.com',
+    'https://jao-dev-alb-1122709957.eu-west-2.elb.amazonaws.com',
+    'https://t3k4ooptyi.execute-api.eu-west-2.amazonaws.com',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+]
+
+# Allow CSRF cookies to be set from load balancer
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Session cookie settings
+SESSION_COOKIE_SECURE = False
+SESSION_COOKIE_HTTPONLY = True
+
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # WEBPACK_LOADER['DEFAULT']['STATS_FILE'] = BASE_DIR / 'static/webpack-bundles/webpack-stats-dev.json'
