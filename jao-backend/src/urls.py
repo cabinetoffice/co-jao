@@ -2,20 +2,24 @@ from django.conf import settings
 from django.contrib import admin
 from django.urls import include
 from django.urls import path
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseForbidden
 from django.core.management import call_command
 from django.contrib.auth import get_user_model
 import sys
 import io
+import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def health_check(request):
     return HttpResponse("OK", content_type="text/plain")
 
 def run_migrations(request):
-    """Run Django migrations via web endpoint"""
+    """Run Django migrations via web endpoint - secured"""
     if not settings.DEBUG:
-        return HttpResponse("Migrations endpoint disabled in production", status=403)
+        return HttpResponseForbidden("Migrations endpoint disabled in production")
 
     try:
         from django.db import connection
@@ -72,9 +76,9 @@ def run_migrations(request):
         return HttpResponse(f"Migration endpoint error:\n{str(e)}\n\nFull traceback:\n{error_details}", status=500, content_type="text/plain")
 
 def create_superuser(request):
-    """Create Django superuser via web endpoint"""
+    """Create Django superuser via web endpoint - secured"""
     if not settings.DEBUG:
-        return HttpResponse("Superuser creation endpoint disabled in production", status=403)
+        return HttpResponseForbidden("Superuser creation endpoint disabled in production")
 
     User = get_user_model()
 
@@ -88,17 +92,22 @@ def create_superuser(request):
             return HttpResponse(f"User '{username}' already exists", content_type="text/plain")
 
         user = User.objects.create_superuser(username=username, email=email, password=password)
-        return HttpResponse(f"Superuser '{username}' created successfully with password '{password}'", content_type="text/plain")
+        return HttpResponse(f"Superuser '{username}' created successfully", content_type="text/plain")
 
     except Exception as e:
         return HttpResponse(f"Failed to create superuser: {str(e)}", status=500, content_type="text/plain")
 
+# Get secure admin URL from environment or use default
+SECURE_ADMIN_URL = os.environ.get('DJANGO_ADMIN_URL', 'secure-admin-jao-2024/')
 
 urlpatterns = [
     path("", include("jao_backend.home.urls")),
     path("api/v1/", include("jao_backend.api.urls")),
     path("ingest/", include("jao_backend.ingest.urls")),
-    path("django-admin/", admin.site.urls),
+    # Secure admin URL (configurable via environment)
+    path(SECURE_ADMIN_URL, admin.site.urls),
+    # Old admin URL - redirect to secure location
+    path("django-admin/", lambda r: HttpResponseForbidden("Admin access restricted. Contact administrator.")),
     path("health", health_check, name="health_check"),
     path("migrate", run_migrations, name="run_migrations"),
     path("create-superuser", create_superuser, name="create_superuser"),

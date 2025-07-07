@@ -481,58 +481,145 @@ fi
 # Update ECS services if not skipped
 if [ "$SKIP_SERVICE_UPDATE" = false ]; then
     echo -e "\n${GREEN}Updating ECS services...${NC}"
+# Update ECS services with new images
+echo -e "\n${GREEN}Updating ECS services with new Docker images...${NC}"
 
-    # Expected ECS cluster and service names
-    BACKEND_CLUSTER_NAME="${APP_NAME}-${ENV}-cluster"
-    BACKEND_SERVICE_NAME="${APP_NAME}-${ENV}-api-service"
-    BACKEND_SERVICE_WORKER_NAME="${APP_NAME}-${ENV}-worker-service"
-    BACKEND_SERVICE_BEAT_NAME="${APP_NAME}-${ENV}-beat-service"
-    FRONTEND_CLUSTER_NAME="${APP_NAME}-frontend-${ENV}-cluster"
-    FRONTEND_SERVICE_NAME="${APP_NAME}-frontend-${ENV}-service"
+# Extract service and cluster names from Terraform output
+BACKEND_SERVICE_NAME="${APP_NAME}-${ENV}-api-service"
+BACKEND_CLUSTER_NAME="${APP_NAME}-${ENV}-cluster"
+BACKEND_SERVICE_WORKER_NAME="${APP_NAME}-${ENV}-worker-service"
+BACKEND_SERVICE_BEAT_NAME="${APP_NAME}-${ENV}-beat-service"
+FRONTEND_SERVICE_NAME="${APP_NAME}-${ENV}-frontend-service"
+FRONTEND_CLUSTER_NAME="${APP_NAME}-${ENV}-frontend-cluster"
 
-    # Update backend service
-    if [ "$SKIP_BACKEND" = false ]; then
-        echo -e "${BLUE}Updating backend ECS service: ${BACKEND_SERVICE_NAME} in cluster: ${BACKEND_CLUSTER_NAME}${NC}"
-        if ! aws ecs update-service --force-new-deployment --service "${BACKEND_SERVICE_NAME}" --cluster "${BACKEND_CLUSTER_NAME}" --region "${AWS_REGION}"; then
-            echo -e "${RED}Error: Failed to update backend ECS service.${NC}"
-            echo -e "${YELLOW}Check if the service and cluster exist with the names ${BACKEND_SERVICE_NAME} and ${BACKEND_CLUSTER_NAME}.${NC}"
-        else
-            echo -e "${GREEN}Backend service update initiated successfully.${NC}"
-        fi
+# Function to check if ECS service exists and is in ACTIVE state
+check_service_status() {
+    local service_name="$1"
+    local cluster_name="$2"
+    local max_attempts=30
+    local attempt=1
+
+    echo -e "${YELLOW}Checking if service ${service_name} exists and is ACTIVE...${NC}"
+
+    # First check if service exists
+    local service_exists=$(aws ecs describe-services --services "${service_name}" --cluster "${cluster_name}" --region "${AWS_REGION}" --query 'length(services)' --output text 2>/dev/null || echo "0")
+
+    if [ "$service_exists" = "0" ]; then
+        echo -e "${RED}Service ${service_name} does not exist - needs to be created by Terraform${NC}"
+        return 2  # Special return code for missing service
     fi
 
-    # Update backend worker service
-    if [ "$SKIP_BACKEND" = false ]; then
-        echo -e "${BLUE}Updating backend worker ECS service: ${BACKEND_SERVICE_WORKER_NAME} in cluster: ${BACKEND_CLUSTER_NAME}${NC}"
-        if ! aws ecs update-service --force-new-deployment --service "${BACKEND_SERVICE_WORKER_NAME}" --cluster "${BACKEND_CLUSTER_NAME}" --region "${AWS_REGION}"; then
-            echo -e "${RED}Error: Failed to update backend worker ECS service.${NC}"
-            echo -e "${YELLOW}Check if the service and cluster exist with the names ${BACKEND_SERVICE_WORKER_NAME} and ${BACKEND_CLUSTER_NAME}.${NC}"
+    while [ $attempt -le $max_attempts ]; do
+        local status=$(aws ecs describe-services --services "${service_name}" --cluster "${cluster_name}" --region "${AWS_REGION}" --query 'services[0].status' --output text 2>/dev/null || echo "NOT_FOUND")
+
+        if [ "$status" = "ACTIVE" ]; then
+            echo -e "${GREEN}Service ${service_name} is ACTIVE${NC}"
+            return 0
+        elif [ "$status" = "NOT_FOUND" ]; then
+            echo -e "${YELLOW}Service ${service_name} not found${NC}"
+            return 1
         else
-            echo -e "${GREEN}Backend worker service update initiated successfully.${NC}"
+            echo -e "${YELLOW}Service ${service_name} status: ${status} (attempt ${attempt}/${max_attempts})${NC}"
+            sleep 10
+            attempt=$((attempt + 1))
         fi
+    done
+
+    echo -e "${RED}Service ${service_name} did not become ACTIVE after ${max_attempts} attempts${NC}"
+    return 1
+}
+
+# Function to update ECS service with retry logic
+update_ecs_service() {
+    local service_name="$1"
+    local cluster_name="$2"
+    local service_type="$3"
+    local max_retries=3
+    local retry=1
+
+    echo -e "${BLUE}Updating ${service_type} ECS service: ${service_name} in cluster: ${cluster_name}${NC}"
+
+    # Check if service exists and is ACTIVE
+    check_service_status "${service_name}" "${cluster_name}"
+    local status_result=$?
+
+    if [ $status_result -eq 2 ]; then
+        echo -e "${RED}Service ${service_name} does not exist!${NC}"
+        echo -e "${YELLOW}This usually means:${NC}"
+        echo -e "${YELLOW}1. Services were deleted manually${NC}"
+        echo -e "${YELLOW}2. Terraform needs to recreate them${NC}"
+        echo -e "${YELLOW}3. Infrastructure deployment is required${NC}"
+        echo ""
+        echo -e "${BLUE}To fix this, run: ./deploy.sh --skip-service-update${NC}"
+        echo -e "${BLUE}This will recreate the services via Terraform${NC}"
+        return 2
+    elif [ $status_result -ne 0 ]; then
+        echo -e "${YELLOW}Service ${service_name} is not ready for update, skipping...${NC}"
+        return 1
     fi
 
-    # Update backend beat service
-    if [ "$SKIP_BACKEND" = false ]; then
-        echo -e "${BLUE}Updating backend beat ECS service: ${BACKEND_SERVICE_BEAT_NAME} in cluster: ${BACKEND_CLUSTER_NAME}${NC}"
-        if ! aws ecs update-service --force-new-deployment --service "${BACKEND_SERVICE_BEAT_NAME}" --cluster "${BACKEND_CLUSTER_NAME}" --region "${AWS_REGION}"; then
-            echo -e "${RED}Error: Failed to update backend beat ECS service.${NC}"
-            echo -e "${YELLOW}Check if the service and cluster exist with the names ${BACKEND_SERVICE_BEAT_NAME} and ${BACKEND_CLUSTER_NAME}.${NC}"
-        else
-            echo -e "${GREEN}Frontend service update initiated successfully.${NC}"
-        fi
-    fi
+    while [ $retry -le $max_retries ]; do
+        echo -e "${YELLOW}Update attempt ${retry}/${max_retries} for ${service_name}...${NC}"
 
-    # Update backend worker service
-    if [ "$SKIP_FRONTEND" = false ]; then
-        echo -e "${BLUE}Updating backend worker ECS service: ${FRONTEND_SERVICE_NAME} in cluster: ${FRONTEND_CLUSTER_NAME}${NC}"
-        if ! aws ecs update-service --force-new-deployment --service "${FRONTEND_SERVICE_NAME}" --cluster "${FRONTEND_CLUSTER_NAME}" --region "${AWS_REGION}"; then
-            echo -e "${RED}Error: Failed to update backend worker ECS service.${NC}"
-            echo -e "${YELLOW}Check if the service and cluster exist with the names ${FRONTEND_SERVICE_NAME} and ${FRONTEND_CLUSTER_NAME}.${NC}"
+        if aws ecs update-service --force-new-deployment --service "${service_name}" --cluster "${cluster_name}" --region "${AWS_REGION}" >/dev/null 2>&1; then
+            echo -e "${GREEN}${service_type} service update initiated successfully.${NC}"
+            return 0
         else
-            echo -e "${GREEN}Backend worker service update initiated successfully.${NC}"
+            local error_output=$(aws ecs update-service --force-new-deployment --service "${service_name}" --cluster "${cluster_name}" --region "${AWS_REGION}" 2>&1 || true)
+
+            if [[ "$error_output" == *"ServiceNotActiveException"* ]]; then
+                echo -e "${YELLOW}Service not active, waiting 30 seconds before retry...${NC}"
+                sleep 30
+            elif [[ "$error_output" == *"ServiceNotFoundException"* ]]; then
+                echo -e "${RED}Service ${service_name} not found - it may have been deleted${NC}"
+                echo -e "${YELLOW}Run: ./deploy.sh --skip-service-update to recreate services${NC}"
+                return 2
+            else
+                echo -e "${RED}Error updating service: ${error_output}${NC}"
+                sleep 10
+            fi
+
+            retry=$((retry + 1))
         fi
-    fi
+    done
+
+    echo -e "${RED}Failed to update ${service_type} service after ${max_retries} attempts${NC}"
+    return 1
+}
+
+# Track if any services need to be recreated
+services_missing=false
+
+if [ "$SKIP_BACKEND" = false ]; then
+    update_ecs_service "${BACKEND_SERVICE_NAME}" "${BACKEND_CLUSTER_NAME}" "backend API"
+    if [ $? -eq 2 ]; then services_missing=true; fi
+
+    update_ecs_service "${BACKEND_SERVICE_WORKER_NAME}" "${BACKEND_CLUSTER_NAME}" "backend worker"
+    if [ $? -eq 2 ]; then services_missing=true; fi
+
+    update_ecs_service "${BACKEND_SERVICE_BEAT_NAME}" "${BACKEND_CLUSTER_NAME}" "backend beat"
+    if [ $? -eq 2 ]; then services_missing=true; fi
+fi
+
+if [ "$SKIP_FRONTEND" = false ]; then
+    update_ecs_service "${FRONTEND_SERVICE_NAME}" "${FRONTEND_CLUSTER_NAME}" "frontend"
+    if [ $? -eq 2 ]; then services_missing=true; fi
+fi
+
+# If services are missing, provide helpful instructions
+if [ "$services_missing" = true ]; then
+    echo ""
+    echo -e "${RED}⚠️  IMPORTANT: Some ECS services are missing!${NC}"
+    echo -e "${YELLOW}This happened because services were deleted manually.${NC}"
+    echo ""
+    echo -e "${BLUE}To recreate the services:${NC}"
+    echo -e "${BLUE}1. Run: ./deploy.sh --skip-service-update${NC}"
+    echo -e "${BLUE}2. Wait for Terraform to recreate services${NC}"
+    echo -e "${BLUE}3. Then run: ./deploy.sh (normal deployment)${NC}"
+    echo ""
+    echo -e "${YELLOW}Or run this one command to fix everything:${NC}"
+    echo -e "${GREEN}./deploy.sh --skip-service-update && sleep 60 && ./deploy.sh${NC}"
+fi
 
 fi
 

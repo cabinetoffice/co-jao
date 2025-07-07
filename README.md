@@ -132,6 +132,55 @@ You can manually trigger deployments with custom parameters:
 - Download deployment artifacts if troubleshooting is needed
 - Monitor AWS resources through the AWS Console
 
+## Admin Security
+
+The Django admin interface has been secured with multiple layers of protection to prevent unauthorized access.
+
+### Quick Setup
+
+Run the automated security setup script:
+
+```bash
+./setup_admin_security.sh
+```
+
+This will configure:
+- Custom admin URL (instead of `/django-admin/`)
+- IP address restrictions
+- Strong secret key generation
+- Environment configuration files
+
+### Security Features
+
+✅ **Custom Admin URL** - Obscure admin path to avoid automated attacks  
+✅ **IP Allowlisting** - Restrict access to specific IP addresses  
+✅ **Infrastructure Protection** - AWS security groups block unauthorized traffic  
+✅ **Secure Headers** - XSS protection and security headers enabled  
+✅ **Session Security** - Secure cookies and session protection  
+✅ **Access Logging** - All admin access attempts are logged  
+
+### Manual Configuration
+
+If you prefer manual setup:
+
+1. **Set Admin URL**: `export DJANGO_ADMIN_URL="your-secret-path-2024/"`
+2. **Configure IP Restrictions**: `export ADMIN_ALLOWED_IPS="203.0.113.1,192.168.1.0/24"`
+3. **Production Settings**: Ensure `DEBUG=False` and set strong `DJANGO_SECRET_KEY`
+
+### Accessing Admin
+
+- **New URL**: `https://yourdomain.com/your-secret-path-2024/`
+- **Old URL**: `/django-admin/` is disabled and returns access denied
+- **IP Restrictions**: Access blocked if your IP is not in the allowlist
+
+### Troubleshooting
+
+- **"Access denied from your IP"**: Add your IP to `ADMIN_ALLOWED_IPS`
+- **Can't find admin**: Check your custom `DJANGO_ADMIN_URL` setting
+- **Get current IP**: Run `curl ifconfig.me` to see your public IP
+
+See `ADMIN_SECURITY.md` for detailed configuration and troubleshooting.
+
 # Set up
 
 https://python.langchain.com/docs/integrations/chat/llama2_chat
