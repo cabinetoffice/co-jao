@@ -21,6 +21,9 @@ SECRET_KEY = "django-insecure-0+=k_0_cz_8laec^(@6l*$wb(3(^u-=3iy13=$o_$p1vmg*#t0
 # SECURITY WARNING: define the correct hosts in production!
 ALLOWED_HOSTS = ["*"]
 
+# Admin security settings for development
+ADMIN_ALLOWED_IPS = ["127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+
 # CSRF settings for Django admin through load balancer
 CSRF_COOKIE_SECURE = False
 CSRF_COOKIE_HTTPONLY = False

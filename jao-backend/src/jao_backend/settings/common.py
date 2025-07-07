@@ -96,13 +96,14 @@ EMBEDDING_TAGS = {
 }
 
 MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "jao_backend.common.middleware.admin_security.SimpleAdminSecurityMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    # "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    # "django.middleware.security.SecurityMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 ROOT_URLCONF = "urls"
@@ -149,6 +150,14 @@ SESSION_CACHE_ALIAS = "default"
 SESSION_COOKIE_HTTPONLY = True
 
 SESSION_COOKIE_AGE = 1209600  # 2 weeks
+
+# Basic admin security settings
+ADMIN_ALLOWED_IPS = os.getenv('ADMIN_ALLOWED_IPS', '').split(',') if os.getenv('ADMIN_ALLOWED_IPS') else []
+
+# Security headers
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
@@ -234,4 +243,29 @@ S3_ENDPOINTS_FROM_AWS_ENV = os.getenv("S3_ENDPOINTS_FROM_AWS_ENV", "false").lowe
 )
 S3_ENDPOINTS = {
     "default": None,  # AWS configured credentials
+}
+
+# Basic logging for admin access
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+    },
 }

@@ -234,7 +234,13 @@ variable "api_desired_count" {
 variable "enable_celery_services" {
   description = "Enable Celery worker and beat services"
   type        = bool
-  default     = true
+  default     = false
+}
+
+variable "admin_allowed_cidrs" {
+  description = "List of CIDR blocks allowed to access admin interface"
+  type        = list(string)
+  default     = null
 }
 
 # Celery Worker Configuration

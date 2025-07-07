@@ -299,13 +299,28 @@ resource "aws_security_group" "admin_alb" {
   description = "Security group for admin ALB"
   vpc_id      = var.vpc_id
 
-  # Allow HTTP from internet
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "HTTP from internet"
+  # Allow HTTP from allowed IPs only (configured via variable)
+  dynamic "ingress" {
+    for_each = var.admin_allowed_cidrs != null ? var.admin_allowed_cidrs : ["0.0.0.0/0"]
+    content {
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = [ingress.value]
+      description = "HTTP from ${ingress.value}"
+    }
+  }
+
+  # Allow HTTPS from allowed IPs only (configured via variable)
+  dynamic "ingress" {
+    for_each = var.admin_allowed_cidrs != null ? var.admin_allowed_cidrs : ["0.0.0.0/0"]
+    content {
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      cidr_blocks = [ingress.value]
+      description = "HTTPS from ${ingress.value}"
+    }
   }
 
   # Allow all outbound traffic to ECS tasks
