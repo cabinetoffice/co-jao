@@ -1,8 +1,7 @@
-from celery_singleton import Singleton
 from celery.utils.log import get_task_logger
-
-from django.core.exceptions import ImproperlyConfigured
+from celery_singleton import Singleton
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 
 from jao_backend.common.celery import app as celery
 from jao_backend.ingest.ingester.oleeo_ingest import OleeoIngest
@@ -11,18 +10,15 @@ logger = get_task_logger(__name__)
 
 
 @celery.task(base=Singleton)
-def ingest():
+def ingest(max_batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE):
     """
-    Download a Parquet file from S3 and process it.
-
-    Args:
-        s3_url: The S3 URL of the Parquet file to download
-        download_dir: The directory to download the file to. If None then tmpdir is used.
+    Ingest data from OLEEO / R2D2.
     """
 
     if not settings.JAO_BACKEND_ENABLE_OLEEO:
         logger.error("Oleeo ingest is disabled")
         raise ImproperlyConfigured("Oleeo ingest is not enabled")
 
-    ingester = OleeoIngest()
-    ingester.update()
+    logger.info(f"Starting Oleeo ingest with max_batch_size={max_batch_size}")
+    ingester = OleeoIngest(max_batch_size=max_batch_size)
+    ingester.do_ingest()

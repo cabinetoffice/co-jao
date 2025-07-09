@@ -15,10 +15,12 @@ from pathlib import Path
 
 import dj_database_url
 
-from jao_backend.common.fields import uuidv7
+from jao_backend.common.db.fields import uuidv7
 from jao_backend.common.util import is_truthy
 
-IS_DEV_ENVIRONMENT = os.getenv("ENV").lower() == "dev"
+IS_DEV_ENVIRONMENT = os.getenv("ENV", "").lower() == "dev"
+
+SECRET_KEY = os.environ["JAO_BACKEND_SECRET_KEY"]
 
 ENV = os.environ.get("ENV", "dev").lower()
 
@@ -30,6 +32,10 @@ PROJECT_DIR = BASE_DIR.parent
 
 JAO_BACKEND_ENABLE_HTTP2 = True
 JAO_BACKEND_TIMEOUT = os.getenv("JAO_BACKEND_TIMEOUT", 15)
+
+JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE = int(
+    os.environ.get("JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE", 50000)
+)
 
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
@@ -79,7 +85,9 @@ LITELLM_CUSTOM_PROVIDER = os.environ.get("JAO_BACKEND_LITELLM_CUSTOM_PROVIDER")
 TEST_RUNNER = "jao_backend.settings.tests.runner.PytestTestRunner"
 
 # Concatenated job title and responsibilities
-EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID = uuidv7(hex="0196a2a0-61b9-79e2-9ef7-9988b475dda3")
+EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID = uuidv7(
+    hex="0196a2a0-61b9-79e2-9ef7-9988b475dda3"
+)
 EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_MODEL = os.environ.get(
     "JAO_EMBEDDER_SUMMARY_RESPONSIBILITIES", "ollama/nomic-embed-text:latest"
 )
@@ -96,14 +104,13 @@ EMBEDDING_TAGS = {
 }
 
 MIDDLEWARE = [
-    "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
+    # "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "jao_backend.common.middleware.admin_security.SimpleAdminSecurityMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # "django.middleware.security.SecurityMiddleware",
 ]
 
 ROOT_URLCONF = "urls"
@@ -137,10 +144,12 @@ DATABASES = {
     "default": dj_database_url.config(env="JAO_BACKEND_DATABASE_URL"),
 }
 
-JAO_BACKEND_ENABLE_OLEEO = is_truthy(os.environ.get("JAO_BACKEND_ENABLE_OLEEO", "false"))
+JAO_BACKEND_ENABLE_OLEEO = is_truthy(
+    os.environ.get("JAO_BACKEND_ENABLE_OLEEO", "false")
+)
 if JAO_BACKEND_ENABLE_OLEEO:
     DATABASES["oleeo"] = dj_database_url.config(env="JAO_BACKEND_OLEEO_DATABASE_URL")
-    DATABASE_ROUTERS = ['jao_backend.common.routers.router.OleeoRouter']
+    DATABASE_ROUTERS = ["jao_backend.common.routers.router.OleeoRouter"]
 
 # Session engine, use the default database backed sessions
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
@@ -150,14 +159,6 @@ SESSION_CACHE_ALIAS = "default"
 SESSION_COOKIE_HTTPONLY = True
 
 SESSION_COOKIE_AGE = 1209600  # 2 weeks
-
-# Basic admin security settings
-ADMIN_ALLOWED_IPS = os.getenv('ADMIN_ALLOWED_IPS', '').split(',') if os.getenv('ADMIN_ALLOWED_IPS') else []
-
-# Security headers
-SECURE_BROWSER_XSS_FILTER = True
-SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'DENY'
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
@@ -236,6 +237,44 @@ CRISPY_ALLOWED_TEMPLATE_PACKS = ["gds"]
 CRISPY_TEMPLATE_PACK = "gds"
 CRISPY_GDS_FRONTEND_VERSION = "5.0.0"
 
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+            "style": "{",
+        },
+        "simple": {
+            "format": "{levelname} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+            "level": "INFO",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "celery": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
+
 S3_ENDPOINTS_FROM_AWS_ENV = os.getenv("S3_ENDPOINTS_FROM_AWS_ENV", "false").lower() in (
     "true",
     "1",
@@ -243,29 +282,4 @@ S3_ENDPOINTS_FROM_AWS_ENV = os.getenv("S3_ENDPOINTS_FROM_AWS_ENV", "false").lowe
 )
 S3_ENDPOINTS = {
     "default": None,  # AWS configured credentials
-}
-
-# Basic logging for admin access
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
-            'style': '{',
-        },
-    },
-    'handlers': {
-        'console': {
-            'level': 'INFO',
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['console'],
-            'level': 'INFO',
-        },
-    },
 }

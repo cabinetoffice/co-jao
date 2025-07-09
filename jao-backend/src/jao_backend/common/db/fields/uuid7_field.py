@@ -1,9 +1,7 @@
-from typing import Optional
-
-
 import os
 import time
 import uuid
+from typing import Optional
 
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -47,6 +45,7 @@ class UUIDField(models.UUIDField):
     """
     A custom UUID field that generates different UUID versions.
     """
+
     # See: https://abenezer.org/blog/uuidv7-in-django
 
     def __init__(

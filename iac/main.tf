@@ -172,16 +172,15 @@ module "ecs" {
     # Django environment variables
     ENV                    = "dev" # Required for settings module selection
     DJANGO_SETTINGS_MODULE = "jao_backend.settings.dev"
-    DJANGO_SECRET_KEY      = "dummy-placeholder-secret-key" # Will be overridden in production
+    JAO_BACKEND_SECRET_KEY = "8e5c0e0f457aeec89329be09" # Will be overridden in production
     DJANGO_DEBUG           = local.current_env.django_debug
     API_STAGE_NAME         = var.environment
     DJANGO_ALLOWED_HOSTS   = "*"
 
     # Database URL for Django (required by jao_backend settings)
     JAO_BACKEND_DATABASE_URL       = "postgresql://${module.vectordb.master_username}:secrettpassword@${module.vectordb.cluster_endpoint}:5432/${module.vectordb.database_name}"
-    DATABASE_URL                   = "postgresql://${module.vectordb.master_username}:secrettpassword@${module.vectordb.cluster_endpoint}:5432/${module.vectordb.database_name}" # Will be built from DB_* vars in entrypoint
-    JAO_BACKEND_OLEEO_DATABASE_URL = "mssqlms://user.namey:password@co-grid-database.eu-west-2:1433/DART_Dev"
-    JAO_BACKEND_ENABLE_OLEEO       = "true"
+    JAO_BACKEND_OLEEO_DATABASE_URL = "mssqlms://JAO_admin:85h0br7YOr@gridpatpreprodrdssqlstack-rdsdbinstance-kdljxcoy9jmr.cvgiwsy9mkjc.eu-west-2.rds.amazonaws.com:1433/DART_Dev"
+    JAO_BACKEND_ENABLE_OLEEO       = 1
     JAO_BACKEND_SUPERUSER_USERNAME = var.jao_backend_superuser_username
     JAO_BACKEND_SUPERUSER_PASSWORD = var.jao_backend_superuser_password
     JAO_BACKEND_SUPERUSER_EMAIL    = var.jao_backend_superuser_email
@@ -209,6 +208,12 @@ module "ecs" {
   enable_enhanced_monitoring = true
   enable_xray_tracing        = local.current_env.enable_xray_tracing
   enable_circuit_breaker     = true
+
+  # Enable Celery services
+  enable_celery_services = var.enable_celery_services
+
+  # Admin IP whitelisting
+  admin_allowed_cidrs = var.admin_allowed_cidrs
 
   tags = local.common_tags
 }
@@ -284,9 +289,7 @@ module "frontend" {
 
   # Environment variables for the frontend service
   environment_variables = {
-    DJANGO_SECRET_KEY        = "dummy-placeholder-secret-key"
     DJANGO_DEBUG             = local.current_env.django_debug
-    BACKEND_API_KEY          = "dummy-placeholder-api-key"
     DJANGO_SETTINGS_MODULE   = "jao_web.settings.dev"
     PORT                     = "8000"
     JAO_BACKEND_URL          = module.api_gateway.api_gateway_url
@@ -295,12 +298,6 @@ module "frontend" {
     SESSION_COOKIE_SECURE    = local.current_env.session_cookie_secure
     ENV                      = var.environment
     DJANGO_ALLOWED_HOSTS     = "*"
-    DB_HOST                  = module.vectordb.cluster_endpoint
-    DB_PORT                  = "5432"
-    DB_NAME                  = module.vectordb.database_name
-    DB_USER                  = module.vectordb.master_username
-    DB_PASSWORD              = "secrettpassword"
-    DATABASE_URL             = "postgresql://${module.vectordb.master_username}:secrettpassword@${module.vectordb.cluster_endpoint}:5432/${module.vectordb.database_name}"
   }
   health_check_path      = "/health"
   internal_lb            = false # Frontend LB is public-facing

@@ -10,6 +10,8 @@ class VacancySchema(ModelSchema):
         include=[  # type: ignore
             "id",
             "last_updated",
+            "live_date",
+            "closing_date",
             "min_salary",
             "max_salary",
             "title",

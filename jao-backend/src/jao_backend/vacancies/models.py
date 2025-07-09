@@ -1,8 +1,9 @@
-from django.db import models
 from django.conf import settings
+from django.db import models
 
 from jao_backend.embeddings.models import TaggedEmbedding
 from jao_backend.roles.models import Grade
+from jao_backend.roles.models import RoleType
 from jao_backend.vacancies.querysets import VacancyQuerySet
 
 
@@ -15,6 +16,9 @@ class Vacancy(models.Model):
     )
 
     last_updated = models.DateTimeField(help_text="Last updated date and time.")
+
+    live_date = models.DateTimeField()
+    closing_date = models.DateTimeField()
 
     is_deleted = models.BooleanField(
         default=False, help_text="Vacancy is marked as deleted."
@@ -57,7 +61,27 @@ class VacancyGrade(models.Model):
         verbose_name_plural = "Vacancy Grades"
 
     def __str__(self):
-        return f"{self.vacancy.job_title} - {self.grade.name}"
+        return f"{self.vacancy.title} - {self.grade.description}"
+
+
+class VacancyRoleType(models.Model):
+    """
+    A Vacancy can have many grades.
+    """
+
+    vacancy = models.ForeignKey(
+        Vacancy, on_delete=models.CASCADE, help_text="The vacancy."
+    )
+    role_type = models.ForeignKey(
+        RoleType, on_delete=models.CASCADE, help_text="The role type of the vacancy."
+    )
+
+    class Meta:
+        unique_together = ("vacancy", "role_type")
+        verbose_name_plural = "Vacancy Grades"
+
+    def __str__(self):
+        return f"{self.vacancy.title} - {self.grade.description}"
 
 
 class VacancyEmbedding(TaggedEmbedding):

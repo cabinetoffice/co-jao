@@ -2,11 +2,11 @@
 # Primary keys and managers have been added.
 from django.db import models
 
-from jao_backend.oleeo.base_models import UpstreamModelBase
+from jao_backend.oleeo.base_models import OleeoUpstreamModel
 from jao_backend.oleeo.querysets import VacanciesQuerySet
 
 
-class Applications(UpstreamModelBase):
+class Applications(OleeoUpstreamModel):
     application_id = models.IntegerField(primary_key=True)
     vacancy = models.ForeignKey(
         "Vacancies",
@@ -37,7 +37,7 @@ class Applications(UpstreamModelBase):
         db_table = "Applications"
 
 
-class Vacancies(UpstreamModelBase):
+class Vacancies(OleeoUpstreamModel):
     destination_model = "vacancies.Vacancy"
 
     vacancy_id = models.IntegerField(primary_key=True)
@@ -151,7 +151,7 @@ class Vacancies(UpstreamModelBase):
         app_label = "oleeo"
 
 
-class Dandi(UpstreamModelBase):
+class Dandi(OleeoUpstreamModel):
     application = models.OneToOneField(
         Applications,
         models.DO_NOTHING,
@@ -230,7 +230,7 @@ class Dandi(UpstreamModelBase):
         db_table = "DandI"
 
 
-class ListAgeGroup(UpstreamModelBase):
+class ListAgeGroup(OleeoUpstreamModel):
     age_group_id = models.AutoField(primary_key=True)
     age_group_desc = models.TextField()
     row_last_updated = models.DateTimeField()
@@ -242,20 +242,17 @@ class ListAgeGroup(UpstreamModelBase):
         db_table = "List_AgeGroup"
 
 
-# TODO: These models are not yet ingested:
-class ListApplicantType(UpstreamModelBase):
+class ListApplicantType(OleeoUpstreamModel):
     applicant_type_id = models.AutoField(primary_key=True)
     applicant_type_desc = models.TextField()
     row_last_updated = models.DateTimeField()
-
-    # TODO: destination_model
 
     class Meta:
         managed = False  # Created from a view. Don't remove.
         db_table = "List_ApplicantType"
 
 
-class ListApplicationStatus(UpstreamModelBase):
+class ListApplicationStatus(OleeoUpstreamModel):
     application_status_id = models.AutoField(primary_key=True)
     application_status_desc = models.TextField()
     application_status_list_id = models.IntegerField()
@@ -265,53 +262,42 @@ class ListApplicationStatus(UpstreamModelBase):
     status_progress_desc = models.TextField(blank=True, null=True)
     status_group_detailed_desc = models.TextField(blank=True, null=True)
 
-    # TODO: destination_model
-
     class Meta:
         managed = False  # Created from a view. Don't remove.
         db_table = "List_ApplicationStatus"
 
 
-class ListBusinessArea(UpstreamModelBase):
+class ListBusinessArea(OleeoUpstreamModel):
     business_area_id = models.AutoField(primary_key=True)
     business_area_desc = models.TextField()
     row_last_updated = models.DateTimeField()
-
-    # TODO: destination_model
 
     class Meta:
         managed = False  # Created from a view. Don't remove.
         db_table = "List_BusinessArea"
 
 
-class ListCityTown(UpstreamModelBase):
+class ListCityTown(OleeoUpstreamModel):
     city_town_id = models.AutoField(primary_key=True)
     city_town_desc = models.TextField()
     row_last_updated = models.DateTimeField()
-
-    # TODO: destination_model
 
     class Meta:
         managed = False  # Created from a view. Don't remove.
         db_table = "List_CityTown"
 
 
-class ListDepartment(UpstreamModelBase):
+class ListDepartment(OleeoUpstreamModel):
     department_id = models.AutoField(primary_key=True)
     department_desc = models.TextField()
     row_last_updated = models.DateTimeField()
-
-    # TODO: destination_model
 
     class Meta:
         managed = False  # Created from a view. Don't remove.
         db_table = "List_Department"
 
 
-# /End TODO
-
-
-class ListDisability(UpstreamModelBase):
+class ListDisability(OleeoUpstreamModel):
     disability_id = models.AutoField(primary_key=True)
     disability_desc = models.TextField()
     row_last_updated = models.DateTimeField()
@@ -323,7 +309,7 @@ class ListDisability(UpstreamModelBase):
         db_table = "List_Disability"
 
 
-class ListEthnicGroup(UpstreamModelBase):
+class ListEthnicGroup(OleeoUpstreamModel):
     ethnic_group_id = models.AutoField(primary_key=True)
     ethnic_group_desc = models.TextField()
     row_last_updated = models.DateTimeField()
@@ -335,7 +321,7 @@ class ListEthnicGroup(UpstreamModelBase):
         db_table = "List_EthnicGroup"
 
 
-class ListEthnicity(UpstreamModelBase):
+class ListEthnicity(OleeoUpstreamModel):
     ethnicity_id = models.AutoField(primary_key=True)
     ethnicity_desc = models.TextField()
     row_last_updated = models.DateTimeField()
@@ -347,7 +333,7 @@ class ListEthnicity(UpstreamModelBase):
         db_table = "List_Ethnicity"
 
 
-class ListGender(UpstreamModelBase):
+class ListGender(OleeoUpstreamModel):
     gender_id = models.AutoField(primary_key=True)
     gender_desc = models.TextField()
     row_last_updated = models.DateTimeField()
@@ -359,86 +345,79 @@ class ListGender(UpstreamModelBase):
         db_table = "List_Gender"
 
 
-class ListJobGrade(UpstreamModelBase):
+class ListJobGrade(OleeoUpstreamModel):
+    """
+    OLEEO Job Grades are the combination of job grades in a vacancy.
+
+    These get synched to OLEEOGradeGroup in JAO where they can then
+    be exploded into individual roles.
+    """
+
     job_grade_id = models.AutoField(primary_key=True)
     job_grade_desc = models.TextField()
     job_grade_shorthand = models.TextField(blank=True, null=True)
     row_last_updated = models.DateTimeField()
 
-    destination_model = "roles.Grade"
+    destination_model = "roles.OleeoGradeGroup"
 
     class Meta:
         managed = False  # Created from a view. Don't remove.
         db_table = "List_JobGrade"
 
 
-class ListTypeOfRole(UpstreamModelBase):
+class ListTypeOfRole(OleeoUpstreamModel):
     type_of_role_id = models.AutoField(primary_key=True)
     type_of_role_desc = models.TextField()
     row_last_updated = models.DateTimeField()
 
-    destination_model = "roles.RoleType"
+    destination_model = "roles.OleeoRoleTypeGroup"
 
     class Meta:
         managed = False  # Created from a view. Don't remove.
         db_table = "List_TypeOfRole"
 
 
-# TODO: Location ingest is not in this part of the code
-
-
-class ListLocationType(UpstreamModelBase):
+class ListLocationType(OleeoUpstreamModel):
     location_type_id = models.AutoField(primary_key=True)
     location_type_desc = models.TextField()
     row_last_updated = models.DateTimeField()
-
-    # TODO: destination_model
 
     class Meta:
         managed = False  # Created from a view. Don't remove.
         db_table = "List_LocationType"
 
 
-class ListPostcode(UpstreamModelBase):
+class ListPostcode(OleeoUpstreamModel):
     postcode_id = models.AutoField(primary_key=True)
     postcode_desc = models.TextField()
     row_last_updated = models.DateTimeField()
-
-    # TODO: destination_model
 
     class Meta:
         managed = False  # Created from a view. Don't remove.
         db_table = "List_Postcode"
 
 
-class ListProfession(UpstreamModelBase):
+class ListProfession(OleeoUpstreamModel):
     profession_id = models.AutoField(primary_key=True)
     profession_desc = models.TextField()
     row_last_updated = models.DateTimeField()
-
-    # TODO: destination_model
 
     class Meta:
         managed = False  # Created from a view. Don't remove.
         db_table = "List_Profession"
 
 
-class ListRegion(UpstreamModelBase):
+class ListRegion(OleeoUpstreamModel):
     region_id = models.AutoField(primary_key=True)
     region_desc = models.TextField()
     row_last_updated = models.DateTimeField()
-
-    # TODO: destination_model
 
     class Meta:
         managed = False  # Created from a view. Don't remove.
         db_table = "List_Region"
 
 
-# /END TODO
-
-
-class ListReligion(UpstreamModelBase):
+class ListReligion(OleeoUpstreamModel):
     religion_id = models.AutoField(primary_key=True)
     religion_desc = models.TextField()
     row_last_updated = models.DateTimeField()
@@ -450,7 +429,7 @@ class ListReligion(UpstreamModelBase):
         db_table = "List_Religion"
 
 
-class ListSexualOrientation(UpstreamModelBase):
+class ListSexualOrientation(OleeoUpstreamModel):
     sexual_orientation_id = models.AutoField(primary_key=True)
     sexual_orientation_desc = models.TextField()
     row_last_updated = models.DateTimeField()
@@ -462,45 +441,37 @@ class ListSexualOrientation(UpstreamModelBase):
         db_table = "List_SexualOrientation"
 
 
-# TODO: Add Vacancy Approach
-class ListVacancyApproach(UpstreamModelBase):
+class ListVacancyApproach(OleeoUpstreamModel):
     vacancy_approach_id = models.AutoField(primary_key=True)
     vacancy_approach_desc = models.TextField()
     row_last_updated = models.DateTimeField()
-
-    # TODO: destination_model
 
     class Meta:
         managed = False  # Created from a view. Don't remove.
         db_table = "List_VacancyApproach"
 
 
-class ListVacancyPostcode(UpstreamModelBase):
+class ListVacancyPostcode(OleeoUpstreamModel):
     vacancy_postcode_id = models.AutoField(primary_key=True)
     vacancy_postcode_desc = models.TextField()
     row_last_updated = models.DateTimeField()
-
-    # TODO: destination_model
 
     class Meta:
         managed = False  # Created from a view. Don't remove.
         db_table = "List_VacancyPostcode"
 
 
-class ListVacancyStatus(UpstreamModelBase):
+class ListVacancyStatus(OleeoUpstreamModel):
     vacancy_status_id = models.AutoField(primary_key=True)
     vacancy_status_desc = models.TextField()
     row_last_updated = models.DateTimeField()
-
-    # TODO: destination_model
 
     class Meta:
         managed = False  # Created from a view. Don't remove.
         db_table = "List_VacancyStatus"
 
 
-class VacanciesTimestamps(UpstreamModelBase):
-    # TODO: destination_model
+class VacanciesTimestamps(OleeoUpstreamModel):
     vacancy = models.ForeignKey(
         Vacancies, models.DO_NOTHING, db_column="vacancy_id", primary_key=True
     )

@@ -1,5 +1,6 @@
 from django.db import models
-from jao_backend.common.fields import UUIDField
+
+from jao_backend.common.db.fields import UUIDField
 
 
 class Department(models.Model):

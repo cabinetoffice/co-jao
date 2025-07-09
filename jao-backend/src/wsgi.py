@@ -12,12 +12,7 @@ import os
 import dotenv
 from django.core.wsgi import get_wsgi_application
 
-# Only load .env file if it exists (for local development)
-try:
-    dotenv.load_dotenv(dotenv.find_dotenv())
-except Exception:
-    # Ignore errors if .env file cannot be loaded (e.g., in containerized environments)
-    pass
+dotenv.load_dotenv()
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "jao_backend.settings.dev")
 

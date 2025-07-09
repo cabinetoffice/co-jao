@@ -1,8 +1,6 @@
 import pytest
-
 from pytest_unordered import unordered
 
-from jao_backend.common.fields import uuidv7
 from jao_backend.embeddings.models import EmbeddingTag
 from jao_backend.embeddings.service import EmbeddingService
 

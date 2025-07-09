@@ -17,15 +17,20 @@ import nest_asyncio
 from django.conf import settings
 from litellm import embedding
 
-from jao_backend.embeddings.models import EmbeddingTag, EmbeddingModel
+from jao_backend.embeddings.models import EmbeddingModel
+from jao_backend.embeddings.models import EmbeddingTag
 from jao_backend.embeddings.models import TaggedEmbedding
-from jao_backend.vacancies.models import Vacancy, VacancyEmbedding
+from jao_backend.vacancies.models import Vacancy
+from jao_backend.vacancies.models import VacancyEmbedding
 
 logger = logging.getLogger(__name__)
 
-EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID = settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID
+EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID = (
+    settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID
+)
 LITELLM_API_BASE = settings.LITELLM_API_BASE
 LITELLM_CUSTOM_PROVIDER = settings.LITELLM_CUSTOM_PROVIDER
+
 
 class EmbeddingService:
 
@@ -38,12 +43,14 @@ class EmbeddingService:
         This is behind lru_cache as it should only be called once per process.
         """
         for tag_data in settings.EMBEDDING_TAGS.values():
-            model_name = tag_data.pop('model')
-            model, _ = EmbeddingModel.objects.get_or_create(name=model_name, defaults={"is_active": True})
+            model_name = tag_data.pop("model")
+            model, _ = EmbeddingModel.objects.get_or_create(
+                name=model_name, defaults={"is_active": True}
+            )
 
-            tag_data['model'] = model
+            tag_data["model"] = model
             tag, _ = EmbeddingTag.objects.get_or_create(
-                defaults=tag_data, uuid=tag_data['uuid'], version=tag_data['version']
+                defaults=tag_data, uuid=tag_data["uuid"], version=tag_data["version"]
             )
 
     @classmethod
@@ -60,7 +67,9 @@ class EmbeddingService:
         cls.sync_embedding_tags()
 
         # Tags store a unique id and name for the embedding process, as well as the model name
-        tag_data = settings.EMBEDDING_TAGS[settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID]
+        tag_data = settings.EMBEDDING_TAGS[
+            settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID
+        ]
 
         tag, _ = EmbeddingTag.objects.get_or_create(
             defaults=tag_data, uuid=settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID
@@ -81,8 +90,9 @@ class EmbeddingService:
         )
 
         chunks = [
-            response_part['embedding'] for response_part in response.data
-            if response_part['embedding'] is not None
+            response_part["embedding"]
+            for response_part in response.data
+            if response_part["embedding"] is not None
         ]
 
         # Associate a vacancy with the embeddings data and a tag
@@ -92,6 +102,8 @@ class EmbeddingService:
             chunks=chunks,
             vacancy=vacancy,
         )
-        logger.info(f"Generated embeddings for vacancy {vacancy.id} with tag {tag.uuid}")
+        logger.info(
+            f"Generated embeddings for vacancy {vacancy.id} with tag {tag.uuid}"
+        )
 
         return tagged_embeddings

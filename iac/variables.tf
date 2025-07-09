@@ -285,3 +285,15 @@ variable "jao_backend_superuser_email" {
   type        = string
   default     = ""
 }
+
+variable "enable_celery_services" {
+  description = "Enable Celery worker and beat services"
+  type        = bool
+  default     = false
+}
+
+variable "admin_allowed_cidrs" {
+  description = "List of CIDR blocks allowed to access admin interface"
+  type        = list(string)
+  default     = null
+}

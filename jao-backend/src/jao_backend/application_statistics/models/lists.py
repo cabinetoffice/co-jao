@@ -1,4 +1,4 @@
-from jao_backend.common.models import ProtectedCharacteristicList
+from jao_backend.common.db.models.models import ProtectedCharacteristicList
 
 
 #  Protected Characteristics
