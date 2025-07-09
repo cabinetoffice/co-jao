@@ -83,9 +83,9 @@ def create_superuser(request):
     User = get_user_model()
 
     # Use credentials from environment or defaults
-    username = request.GET.get('username', 'admin')
-    email = request.GET.get('email', 'admin@example.com')
-    password = request.GET.get('password', 'admin123')
+    username = request.GET.get('username', os.environ.get('JAO_BACKEND_SUPERUSER_USERNAME', 'admin'))
+    email = request.GET.get('email', os.environ.get('JAO_BACKEND_SUPERUSER_EMAIL', 'admin@example.com'))
+    password = request.GET.get('password', os.environ.get('JAO_BACKEND_SUPERUSER_PASSWORD', 'admin123'))
 
     try:
         if User.objects.filter(username=username).exists():
@@ -97,17 +97,17 @@ def create_superuser(request):
     except Exception as e:
         return HttpResponse(f"Failed to create superuser: {str(e)}", status=500, content_type="text/plain")
 
-# Get secure admin URL from environment or use default
-SECURE_ADMIN_URL = os.environ.get('DJANGO_ADMIN_URL', 'secure-admin-jao-2024/')
+
+
+# Get admin URL from environment or use default
+ADMIN_URL = os.environ.get('DJANGO_ADMIN_URL', 'django-admin/')
 
 urlpatterns = [
     path("", include("jao_backend.home.urls")),
     path("api/v1/", include("jao_backend.api.urls")),
     path("ingest/", include("jao_backend.ingest.urls")),
-    # Secure admin URL (configurable via environment)
-    path(SECURE_ADMIN_URL, admin.site.urls),
-    # Old admin URL - redirect to secure location
-    path("django-admin/", lambda r: HttpResponseForbidden("Admin access restricted. Contact administrator.")),
+    # Django admin URL (configurable via environment)
+    path(ADMIN_URL, admin.site.urls),
     path("health", health_check, name="health_check"),
     path("migrate", run_migrations, name="run_migrations"),
     path("create-superuser", create_superuser, name="create_superuser"),

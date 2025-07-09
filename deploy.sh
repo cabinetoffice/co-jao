@@ -490,7 +490,7 @@ BACKEND_CLUSTER_NAME="${APP_NAME}-${ENV}-cluster"
 BACKEND_SERVICE_WORKER_NAME="${APP_NAME}-${ENV}-worker-service"
 BACKEND_SERVICE_BEAT_NAME="${APP_NAME}-${ENV}-beat-service"
 FRONTEND_SERVICE_NAME="${APP_NAME}-frontend-${ENV}-service"
-FRONTEND_CLUSTER_NAME="${APP_NAME}-${ENV}-frontend-cluster"
+FRONTEND_CLUSTER_NAME="${APP_NAME}-frontend-${ENV}-cluster"
 
 # Function to check if ECS service exists and is in ACTIVE state
 check_service_status() {

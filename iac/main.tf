@@ -197,6 +197,9 @@ module "ecs" {
     ENABLE_RATE_LIMITING = "true"
     MAX_REQUESTS_PER_MIN = local.current_env.max_requests_per_min
     ENABLE_API_METRICS   = "true"
+
+    # Django admin URL configuration - use standard admin URL
+    DJANGO_ADMIN_URL = "django-admin/"
   })
 
   health_check_path        = "/health"
