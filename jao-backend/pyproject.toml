@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "jao_backend"
-version = "0.1.0"
+version = "0.1.2"
 description = ""
 authors = [
     "Anthoni Gleeson <anthoni.gleeson@digital.trade.gov.uk>",
@@ -57,8 +57,10 @@ nbstripout = "^0.7.1"
 pytest = "^8.1.1"
 pytest-picked = "^0.5.0"
 django-debug-toolbar = "4.2"
-jupyter = "^1.1.1"
+jupyter = {extras = ["notebook"], version = "^1.1.1"}
 pytest-env = "^1.1.5"
+ipython = "^9.4.0"
+ipdb = "^0.13.13"
 
 
 [tool.poetry.group.jupyter.dependencies]
