@@ -22,7 +22,6 @@ class Grade(ProtectedCharacteristicList):
     ingest_unique_id_field = "shorthand_name"
 
     class Meta:
-        verbose_name = "CS Job grade"
         ordering = ["description"]
 
     def __repr__(self):

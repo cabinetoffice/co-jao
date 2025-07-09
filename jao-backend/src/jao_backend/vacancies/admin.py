@@ -3,6 +3,7 @@ from django.contrib import admin
 from jao_backend.common.admin import ReadOnlyAdminMixin
 from jao_backend.vacancies.models import Vacancy
 from jao_backend.vacancies.models import VacancyGrade
+from jao_backend.vacancies.models import VacancyRoleType
 
 
 class StatusFilter(admin.SimpleListFilter):
@@ -54,13 +55,31 @@ class VacancyGradeInline(admin.TabularInline):
         return False
 
 
+class VacancyRoleTypeInline(admin.TabularInline):
+    model = VacancyRoleType
+    verbose_name = "Role Type"
+    verbose_name_plural = "Role Types"
+    extra = 0
+    fields = ("role_type",)
+    readonly_fields = ("role_type",)
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(Vacancy)
 class VacancyAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = ("id", "title", "min_salary", "max_salary", "last_updated")
     search_fields = ("title", "description", "summary")
     list_filter = (StatusFilter, "last_updated")
     ordering = ("-last_updated",)
-    inlines = [VacancyGradeInline]
+    inlines = [
+        VacancyGradeInline,
+        VacancyRoleTypeInline
+    ]
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related()
