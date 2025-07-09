@@ -20,7 +20,8 @@ from jao_backend.common.util import is_truthy
 
 IS_DEV_ENVIRONMENT = os.getenv("ENV", "").lower() == "dev"
 
-SECRET_KEY = os.environ["JAO_BACKEND_SECRET_KEY"]
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.environ.get("JAO_BACKEND_SECRET_KEY", "django-insecure-0+=k_0_cz_8laec^(@6l*$wb(3(^u-=3iy13=$o_$p1vmg*#t0")
 
 ENV = os.environ.get("ENV", "dev").lower()
 
