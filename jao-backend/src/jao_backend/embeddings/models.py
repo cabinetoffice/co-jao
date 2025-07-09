@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from functools import lru_cache
 from typing import List
 
@@ -9,8 +8,7 @@ from django.utils.functional import classproperty
 from pgvector.django import VectorField
 from polymorphic.models import PolymorphicModel
 
-
-from jao_backend.common.fields import UUIDField
+from jao_backend.common.db.fields import UUIDField
 
 
 class EmbeddingModel(models.Model):
@@ -35,7 +33,9 @@ class Embedding(PolymorphicModel):
            To support FK relationships to this model abstract is False.
     """
 
-    embedding_model = models.ForeignKey(EmbeddingModel, on_delete=models.PROTECT, db_index=True)
+    embedding_model = models.ForeignKey(
+        EmbeddingModel, on_delete=models.PROTECT, db_index=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     @classmethod
@@ -83,6 +83,7 @@ class EmbeddingTiny(Embedding):
 
     This is fits all-minilm, which is mostly useful during local dev.
     """
+
     embedding = VectorField(dimensions=384, null=True)
 
 
@@ -91,27 +92,34 @@ class EmbeddingSmall(Embedding):
     512-dimensional embedding (nomic-embed-text)
     Storage: ~3KB per vector
     """
+
     embedding = VectorField(dimensions=512, null=True)
+
 
 class EmbeddingBase(Embedding):
     """
     768-dimensional embedding (nomic-embed-text)
     Storage: ~3KB per vector
     """
+
     embedding = VectorField(dimensions=768, null=True)
+
 
 class EmbeddingLarge(Embedding):
     """
     1024-dimensional embedding, e.g.: mxbai-embed-large-v1
     Storage: ~4KB per vector
     """
+
     embedding = VectorField(dimensions=1024, null=True)
+
 
 class EmbeddingXL(Embedding):
     """
     1536-dimensional embedding, e.g.: text-embedding-ada-002
     Storage: ~6KB per vector
     """
+
     embedding = VectorField(dimensions=1536, null=True)
 
 
@@ -133,7 +141,10 @@ class EmbeddingTag(models.Model):
     uuid = UUIDField(db_index=True, version=7)
     name = models.CharField(max_length=50, unique=True)
     model = models.ForeignKey(
-        EmbeddingModel, on_delete=models.PROTECT, db_index=True, help_text="The embedding model."
+        EmbeddingModel,
+        on_delete=models.PROTECT,
+        db_index=True,
+        help_text="The embedding model.",
     )
     model.__doc__ = "The embedding model may differ per config or instance."
     description = models.TextField()
@@ -153,19 +164,21 @@ class EmbeddingTag(models.Model):
     def __str__(self):
         return self.name
 
+
 class TaggedEmbedding(models.Model):
     """
     Tagged embeddings allow us to specify embeddings by their purpose,
     using tag names to differentiate them.
     """
 
-    tag = models.ForeignKey(EmbeddingTag, on_delete=models.CASCADE, help_text="The tag of the embedding.")
+    tag = models.ForeignKey(
+        EmbeddingTag, on_delete=models.CASCADE, help_text="The tag of the embedding."
+    )
     embedding = models.ForeignKey(
         Embedding, on_delete=models.CASCADE, help_text="The embedding."
     )
     chunk_index = models.IntegerField(
-        help_text="The chunk ID of the embedding.",
-        default=0, blank=True, null=True
+        help_text="The chunk ID of the embedding.", default=0, blank=True, null=True
     )
 
     class Meta:
@@ -194,15 +207,17 @@ class TaggedEmbedding(models.Model):
                 return []
 
             first_chunk = chunks[0]
-            embedding_model = Embedding.get_subclass_for_embedding_dimensions(len(first_chunk))
+            embedding_model = Embedding.get_subclass_for_embedding_dimensions(
+                len(first_chunk)
+            )
 
             return cls.objects.bulk_create(
                 [
                     cls(
                         tag=tag,
                         embedding=embedding_model.objects.create(
-                            embedding=chunk,
-                            embedding_model=tag.model),
+                            embedding=chunk, embedding_model=tag.model
+                        ),
                         chunk_index=i,
                         **kwargs,
                     )

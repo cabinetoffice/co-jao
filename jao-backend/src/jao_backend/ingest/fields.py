@@ -1,5 +1,6 @@
 from django import forms
-from s3_parse_url import parse_s3_url, UnsupportedStorage
+from s3_parse_url import UnsupportedStorage
+from s3_parse_url import parse_s3_url
 
 
 class S3URLField(forms.CharField):

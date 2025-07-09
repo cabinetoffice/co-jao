@@ -6,10 +6,9 @@ from django.apps import apps
 from django.db import models
 
 from jao_backend.oleeo.querysets import UpstreamModelQuerySet
-from jao_backend.oleeo.querysets import VacanciesQuerySet
 
 
-class UpstreamModelBase(models.Model):
+class UpstreamModelMixin:
     """
     Base class for List views on OLEEO/R2D2 List* that are reflected on JAO.
 
@@ -37,12 +36,35 @@ class UpstreamModelBase(models.Model):
     See: bulk_create_pending(), bulk_update_pending() and bulk_delete_pending() in ListModelQuerySet.
     """
 
-    class Meta:
-        abstract = True
-
     destination_model: Union[str, Type[models.Model]] = None
+    ingest_last_updated_field = None
+    ingest_unique_id_field = "pk"
+    """
+    During ingest the field named here will be used to match records from upstream and downstream models.
+    
+    The upstream field and equivalent downstream field must both be unique. 
+    """
 
     objects = UpstreamModelQuerySet.as_manager()
+
+    @classmethod
+    def get_ingest_unique_id_field(cls):
+        if cls.ingest_unique_id_field == "pk":
+            return cls._meta.pk.name  # noqa
+
+        return cls.ingest_unique_id_field
+
+    @classmethod
+    def get_ingest_last_updated_field(cls):
+        """
+        :return: name of the field used to store the last updated time.
+
+        This field is used as an initial filter to find upstream data for ingest.
+        """
+        if cls.ingest_last_updated_field:
+            return cls.ingest_last_updated_field
+
+        return ValueError(f"last updated field is not set on {cls.__name__}.")
 
     @classmethod
     @lru_cache(maxsize=1)
@@ -73,3 +95,13 @@ class UpstreamModelBase(models.Model):
                 f"{cls.__name__}.destination_model '{model_path}' does not exist. "
             )
         return model_class
+
+
+class OleeoUpstreamModel(models.Model, UpstreamModelMixin):
+
+    ingest_last_updated_field = "row_last_updated"
+
+    objects = UpstreamModelQuerySet.as_manager()
+
+    class Meta:
+        abstract = True

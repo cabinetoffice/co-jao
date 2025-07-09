@@ -60,3 +60,13 @@ enable_lb_access_logs  = false
 jao_backend_superuser_username = "jao-admin"
 jao_backend_superuser_password = "password"
 jao_backend_superuser_email    = "jao-admin@example.com"
+
+# Enable Celery services
+enable_celery_services = true
+
+# Admin IP whitelisting - restrict Django admin access to specific IPs
+# Replace with your actual IP addresses/CIDR blocks
+admin_allowed_cidrs = [
+  "195.144.8.62/32",
+  "51.149.8.8/32"
+]

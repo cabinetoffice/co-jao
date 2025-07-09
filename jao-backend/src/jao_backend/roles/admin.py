@@ -1,16 +1,21 @@
 from django.contrib import admin
-from .models import RoleType, Grade
+
+from jao_backend.common.admin import ReadOnlyAdminMixin
+from jao_backend.roles.models import Grade
+from jao_backend.roles.models import RoleType
 
 
 @admin.register(RoleType)
-class RoleTypeAdmin(admin.ModelAdmin):
-    list_display = ('description',)
-    search_fields = ('description',)
-    ordering = ('description',)
+class RoleTypeAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
+    list_display = ("id", "description", "last_updated", "is_deleted")
+    search_fields = ("description",)
+    list_filter = ("is_deleted", "last_updated")
+    ordering = ("description",)
 
 
 @admin.register(Grade)
-class GradeAdmin(admin.ModelAdmin):
-    list_display = ('description',)
-    search_fields = ('description',)
-    ordering = ('description',)
+class GradeAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
+    list_display = ("id", "description", "last_updated", "is_deleted")
+    search_fields = ("description",)
+    list_filter = ("is_deleted", "last_updated")
+    ordering = ("description",)

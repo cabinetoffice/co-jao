@@ -1,10 +1,12 @@
 """
 We carry our own small uuid7 implementation, based on
 """
+
 import time
 import uuid
 
-from jao_backend.common.fields import uuidv7
+from jao_backend.common.db.fields import uuidv7
+
 
 def test_uuid7_from_hex():
     """
@@ -15,6 +17,7 @@ def test_uuid7_from_hex():
 
     assert isinstance(value, uuid.UUID)
     assert str(value) == hex_string
+
 
 def test_uuid7_timestamp_ordering():
     """

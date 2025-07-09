@@ -1,10 +1,12 @@
-from django.shortcuts import render, redirect
-from django.views import View
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib import messages
 from celery.result import AsyncResult
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.shortcuts import redirect
+from django.shortcuts import render
+from django.views import View
 
-from .forms import S3IngestForm
+from .forms import IngestForm
 from .tasks import ingest
 
 
@@ -36,12 +38,13 @@ class IngestStatusView(LoginRequiredMixin, View):
         return None
 
     def get(self, request):
+        print("IngestStatusView GET request received")
         # Check if task is running
         task_id = self.get_task_status()
 
         # Initialize context with a new form
         context = {
-            "form": S3IngestForm(),
+            "form": IngestForm(),
             "task_id": task_id,
             "task_running": task_id is not None,
             "task_result": None,
@@ -59,7 +62,7 @@ class IngestStatusView(LoginRequiredMixin, View):
         return render(request, self.template_name, context)
 
     def post(self, request):
-        form = S3IngestForm(request.POST)
+        form = IngestForm(request.POST)
 
         # Check if task is already running
         task_id = self.get_task_status()
@@ -68,12 +71,11 @@ class IngestStatusView(LoginRequiredMixin, View):
             return redirect("ingest_status")
 
         if form.is_valid():
-            s3_url = form.cleaned_data["s3_url"]
-            s3_endpoint = form.cleaned_data["s3_endpoint"]
-            # Start the ingest task
-            task = ingest.delay(s3_url, s3_endpoint)
+            print("Starting ingest with form data:", form.cleaned_data)
+            max_batch_size = form.cleaned_data.get("max_batch_size") or settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE
+            task = ingest.delay(max_batch_size=max_batch_size)
             messages.success(request, f"Ingest task started with ID: {task.id}")
             return redirect("ingest_status")
 
-        # If form is invalid, render it again
+        print("Form is not valid:", form.errors)
         return render(request, self.template_name, {"form": form})

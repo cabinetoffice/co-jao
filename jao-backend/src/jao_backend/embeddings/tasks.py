@@ -1,16 +1,13 @@
 from celery import shared_task
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.log import logging
+from litellm.exceptions import APIConnectionError
+from litellm.exceptions import RateLimitError
+from litellm.exceptions import ServiceUnavailableError
+from litellm.exceptions import Timeout
 
 from jao_backend.embeddings.service import EmbeddingService
 from jao_backend.vacancies.models import Vacancy
-
-from litellm.exceptions import (
-    APIConnectionError,
-    Timeout,
-    ServiceUnavailableError,
-    RateLimitError,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +15,9 @@ RETRYABLE_EXCEPTIONS = (
     APIConnectionError,
     RateLimitError,
     ServiceUnavailableError,
-    Timeout
+    Timeout,
 )
+
 
 @shared_task(autoretry_for=RETRYABLE_EXCEPTIONS, retry_backoff=True)
 def generate_embeddings_task(vacancy_id: int):

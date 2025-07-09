@@ -1,8 +1,9 @@
-import factory
 import random
-from factory.faker import Faker
 from decimal import Decimal
+
+import factory
 from django.utils import timezone
+from factory.faker import Faker
 
 from jao_backend.vacancies.models import Vacancy
 

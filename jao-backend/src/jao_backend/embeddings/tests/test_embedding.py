@@ -1,19 +1,23 @@
 import pytest
 
 from jao_backend.embeddings.models import Embedding
-from jao_backend.embeddings.models import EmbeddingTiny
-from jao_backend.embeddings.models import EmbeddingSmall
 from jao_backend.embeddings.models import EmbeddingBase
 from jao_backend.embeddings.models import EmbeddingLarge
+from jao_backend.embeddings.models import EmbeddingSmall
+from jao_backend.embeddings.models import EmbeddingTiny
 from jao_backend.embeddings.models import EmbeddingXL
 
-@pytest.mark.parametrize("dimensions, embedding_subclass", [
-    (384, EmbeddingTiny),
-    (512, EmbeddingSmall),
-    (768, EmbeddingBase),
-    (1024, EmbeddingLarge),
-    (1536, EmbeddingXL)
-])
+
+@pytest.mark.parametrize(
+    "dimensions, embedding_subclass",
+    [
+        (384, EmbeddingTiny),
+        (512, EmbeddingSmall),
+        (768, EmbeddingBase),
+        (1024, EmbeddingLarge),
+        (1536, EmbeddingXL),
+    ],
+)
 @pytest.mark.django_db
 def test_get_embedding_subclass_by_dimension(dimensions, embedding_subclass):
     """
@@ -23,6 +27,7 @@ def test_get_embedding_subclass_by_dimension(dimensions, embedding_subclass):
 
     assert actual_subclass is embedding_subclass
     assert actual_subclass.embedding.field.dimensions == dimensions
+
 
 def test_get_embedding_subclass_by_invalid_dimension():
     """

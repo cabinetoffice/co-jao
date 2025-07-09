@@ -17,6 +17,19 @@ class Command(BaseCommand):
             help="Validate the data without ingesting it",
         )
 
+        parser.add_argument(
+            "--no-wait",
+            action="store_true",
+            help="Do not wait for the ingest task to complete; run it asynchronously",
+        )
+
+        parser.add_argument(
+            "--batch-size",
+            type=int,
+            default=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE,
+            help="Maximum batch size for processing records in chunks",
+        )
+
     def handle(self, *args, **options):
         """
         To be sparing with memory, and IO this divides the file into chunks and
@@ -29,6 +42,9 @@ class Command(BaseCommand):
             logger.error("OLEEO ingest is disabled")
             raise ValueError("OLEEO ingest is not enabled")
 
+        max_batch_size = (
+            options["batch_size"] or settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE
+        )
         if options["local"]:
             # This option is for validating the ingester, and running locally.
             # In this mode, it's possible to ingest from a file, this wouldn't
@@ -39,8 +55,10 @@ class Command(BaseCommand):
                     "The --local flag can only be used in development mode."
                 )
 
-            ingest_task()
+            ingest_task(max_batch_size=max_batch_size)
         else:
-            ingest_result = ingest_task.delay()
-            self.stdout.write("Ingest task started...")
-            ingest_result.get()
+            ingest_result = ingest_task.delay(max_batch_size=max_batch_size)
+            self.stdout.write(f"Ingest {ingest_result.id} task started.")
+
+            if not options["no_wait"]:
+                ingest_result.get()

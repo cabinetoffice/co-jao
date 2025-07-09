@@ -1,12 +1,12 @@
 import numpy as np
 import pytest
 
-from .factories import VacancyFactory
-
-from jao_backend.embeddings.service import EmbeddingService
-from jao_backend.embeddings.models import EmbeddingTiny
 from jao_backend.embeddings.models import EmbeddingTag
+from jao_backend.embeddings.models import EmbeddingTiny
+from jao_backend.embeddings.service import EmbeddingService
 from jao_backend.vacancies.models import VacancyEmbedding
+
+from .factories import VacancyFactory
 
 
 @pytest.mark.django_db
