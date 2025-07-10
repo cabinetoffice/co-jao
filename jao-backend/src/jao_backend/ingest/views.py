@@ -74,7 +74,7 @@ class IngestStatusView(LoginRequiredMixin, View):
                 form.cleaned_data.get("max_batch_size")
                 or settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE
             )
-            task = ingest.delay(max_batch_size=batch_size)
+            task = ingest_vacancies.delay(max_batch_size=batch_size)
             messages.success(request, f"Ingest task started with ID: {task.id}")
             return redirect("ingest_status")
 
