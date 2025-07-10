@@ -29,7 +29,7 @@ class TaskCommandMixin:
 
         (Will call as a function if local is True)
         """
-        if options["local"]:
+        if options.get("local"):
             # This option is for validating the ingester, and running locally.
             # In this mode, it's possible to ingest from a file, this wouldn't
             # be possible in production where the the actual ingest runs in a celery
