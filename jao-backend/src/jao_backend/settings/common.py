@@ -15,15 +15,38 @@ from pathlib import Path
 
 import dj_database_url
 
+from django.core.exceptions import ImproperlyConfigured
+
 from jao_backend.common.db.fields import uuidv7
 from jao_backend.common.util import is_truthy
 
-IS_DEV_ENVIRONMENT = os.getenv("ENV", "").lower() == "dev"
+ENV = os.environ.get("ENV", "dev").lower()
+IS_DEV_ENVIRONMENT = ENV in ["dev", "ci", "local"]
+
+# DEPLOYMENT_TYPE determines which models and embedding backend to use.
+# - local:  Ollama backend, public models.
+# - aws:    Bedrock backend, proprietary models.
+DEPLOYMENT_TYPE = os.environ.get("DEPLOYMENT_TYPE", "local").lower()
+if DEPLOYMENT_TYPE not in ["local", "aws"]:
+    raise ImproperlyConfigured(
+        "DEPLOYMENT_TYPE must be either 'local' or 'aws'. "
+        "Current value: {}".format(DEPLOYMENT_TYPE)
+    )
+
+LITELLM_CUSTOM_PROVIDER = "ollama" if DEPLOYMENT_TYPE == "local" else "bedrock"
+if LITELLM_CUSTOM_PROVIDER not in ["ollama", "bedrock"]:
+    raise ImproperlyConfigured(
+        "EMBEDDING_BACKEND must be either 'ollama' or 'bedrock'. "
+        "Current value: {}".format(LITELLM_CUSTOM_PROVIDER)
+    )
+
+LITELLM_API_BASE = os.environ.get("JAO_BACKEND_LITELLM_API_BASE")
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get("JAO_BACKEND_SECRET_KEY", "django-insecure-0+=k_0_cz_8laec^(@6l*$wb(3(^u-=3iy13=$o_$p1vmg*#t0")
-
-ENV = os.environ.get("ENV", "dev").lower()
+SECRET_KEY = os.environ.get(
+    "JAO_BACKEND_SECRET_KEY",
+    "django-insecure-0+=k_0_cz_8laec^(@6l*$wb(3(^u-=3iy13=$o_$p1vmg*#t0",
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 PROJECT_DIR = BASE_DIR.parent
@@ -33,6 +56,14 @@ PROJECT_DIR = BASE_DIR.parent
 
 JAO_BACKEND_ENABLE_HTTP2 = True
 JAO_BACKEND_TIMEOUT = os.getenv("JAO_BACKEND_TIMEOUT", 15)
+
+# Embedding costs resources (and on AWS money), this setting decides
+JAO_BACKEND_VACANCY_EMBED_LIMIT = int(
+    os.environ.get("JAO_BACKEND_VACANCY_EMBED_LIMIT", 70_000) or None
+)
+JAO_BACKEND_VACANCY_EMBED_BATCH_SIZE = int(
+    os.environ.get("JAO_BACKEND_VACANCY_EMBED_BATCH_SIZE", 1000)
+)
 
 JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE = int(
     os.environ.get("JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE", 50000)
@@ -68,8 +99,6 @@ INSTALLED_APPS = [
     "jao_backend.oleeo",
 ]
 
-LITELLM_API_BASE = os.environ.get("JAO_BACKEND_LITELLM_API_BASE")
-LITELLM_CUSTOM_PROVIDER = os.environ.get("JAO_BACKEND_LITELLM_CUSTOM_PROVIDER")
 
 # Embedding tags:
 #
@@ -85,13 +114,25 @@ LITELLM_CUSTOM_PROVIDER = os.environ.get("JAO_BACKEND_LITELLM_CUSTOM_PROVIDER")
 # Users should usually run pytest directly, e.g: `$ pytest`
 TEST_RUNNER = "jao_backend.settings.tests.runner.PytestTestRunner"
 
-# Concatenated job title and responsibilities
+# Text embedding models, for lookup by LITELLM_CUSTOM_PROVIDER.
+TEXT_EMBEDDING_MODEL_OPTIONS = {
+    "ollama": "nomic-embed-text:latest",
+    "bedrock": "bedrock/amazon.titan-embed-text-v1",
+}
+
+AWS_TAGS_FOR_EMBEDDING = {"project": "jao", "environment": ENV}
+
+
+# Concatenated job title and responsibilities embedding tag
 EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID = uuidv7(
     hex="0196a2a0-61b9-79e2-9ef7-9988b475dda3"
 )
+
 EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_MODEL = os.environ.get(
-    "JAO_EMBEDDER_SUMMARY_RESPONSIBILITIES", "ollama/nomic-embed-text:latest"
+    "JAO_EMBEDDER_SUMMARY_RESPONSIBILITIES",
+    TEXT_EMBEDDING_MODEL_OPTIONS[LITELLM_CUSTOM_PROVIDER],
 )
+
 
 EMBEDDING_TAGS = {
     EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID: {

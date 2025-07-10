@@ -9,15 +9,31 @@ from .fields import S3URLField
 
 
 class IngestForm(forms.Form):
-    max_batch_size = forms.IntegerField(required=False, initial=50000, label="Max Batch Size")
+    batch_size = forms.IntegerField(
+        required=False, initial=50000, label="Max Batch Size"
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Populate the endpoint choices dynamically from settings
+        self.helper = FormHelper()
+        self.helper.form_method = "post"
+        self.helper.layout = Layout("batch_size", GovSubmit("submit", "Start Ingest"))
+
+
+class EmbedForm(forms.Form):
+    batch_size = forms.IntegerField(
+        required=False,
+        initial=settings.JAO_BACKEND_VACANCY_EMBED_BATCH_SIZE,
+        label="Vacancies to ingest",
+        max_value=settings.JAO_BACKEND_VACANCY_EMBED_BATCH_SIZE,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         self.helper = FormHelper()
         self.helper.form_method = "post"
         self.helper.layout = Layout(
-            "max_batch_size", GovSubmit("submit", "Start Ingest")
+            "batch_size", "s3_url", GovSubmit("submit", "Start Embedding")
         )

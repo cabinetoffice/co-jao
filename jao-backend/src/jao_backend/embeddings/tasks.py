@@ -1,15 +1,20 @@
+import logging
+
 from celery import shared_task
+from celery_singleton import Singleton
+from celery.utils.log import get_task_logger
 from django.core.exceptions import ObjectDoesNotExist
-from django.utils.log import logging
+from django.conf import settings
 from litellm.exceptions import APIConnectionError
 from litellm.exceptions import RateLimitError
 from litellm.exceptions import ServiceUnavailableError
 from litellm.exceptions import Timeout
 
+from jao_backend.common.celery import app as celery
 from jao_backend.embeddings.service import EmbeddingService
 from jao_backend.vacancies.models import Vacancy
 
-logger = logging.getLogger(__name__)
+logger = get_task_logger(__name__)
 
 RETRYABLE_EXCEPTIONS = (
     APIConnectionError,
@@ -19,25 +24,19 @@ RETRYABLE_EXCEPTIONS = (
 )
 
 
-@shared_task(autoretry_for=RETRYABLE_EXCEPTIONS, retry_backoff=True)
-def generate_embeddings_task(vacancy_id: int):
+@celery.task(base=Singleton, autoretry_for=RETRYABLE_EXCEPTIONS, retry_backoff=True)
+def embed_vacancies():
     """
-    Celery task for async embedding generation
+    Run embedding, on vacancies (limited by the setting `JAO_BACKEND_VACANCY_EMBED_LIMIT`).
 
-    Args:
-    - vacancy_id: ID of Vacancy to process
-
-    Raises:
-    - ObjectDoesNotExist: If vacancy not found
-    - Exception: Retries on transient failures
-
+    This is a singleton task as embedding typically
     """
-    try:
-        vacancy = Vacancy.objects.get(pk=vacancy_id)
+    vacancies = Vacancy.objects.filter(is_deleted=False).requires_embedding()
+
+    logger.info(
+        "Embed vacancies.  JAO_BACKEND_EMBEDDING_GENERATION_LIMIT=%s, vacancies to embed: %s",
+        settings.JAO_BACKEND_VACANCY_EMBED_LIMIT,
+        len(vacancies),
+    )
+    for vacancy in vacancies:
         EmbeddingService().create_for_vacancy(vacancy)
-    except ObjectDoesNotExist as e:
-        logger.error(f"Vacancy {vacancy_id} not found")
-        raise
-    except RETRYABLE_EXCEPTIONS as e:
-        logger.warning(f"Retrying embedding generation for {vacancy_id}: {str(e)}")
-        raise

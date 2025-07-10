@@ -38,8 +38,14 @@ class Vacancy(models.Model):
     description = models.TextField(null=True, blank=True, help_text="Job description.")
     summary = models.TextField(null=True, blank=True, help_text="Blerb about teams.")
 
-    grades = models.ManyToManyField(through="VacancyGrade", to=Grade, help_text="The grades of the vacancy.")
-    role_types = models.ManyToManyField(through="VacancyRoleType", to=RoleType, help_text="The role types of the vacancy.")
+    grades = models.ManyToManyField(
+        through="VacancyGrade", to=Grade, help_text="The grades of the vacancy."
+    )
+    role_types = models.ManyToManyField(
+        through="VacancyRoleType",
+        to=RoleType,
+        help_text="The role types of the vacancy.",
+    )
 
     objects = VacancyQuerySet.as_manager()
 
@@ -114,4 +120,4 @@ class VacancyEmbedding(TaggedEmbedding):
         ]
 
     def __str__(self):
-        return f"{self.vacancy.job_title} - {self.tag.name}"
+        return f"{self.vacancy.title} - {self.tag.name}"

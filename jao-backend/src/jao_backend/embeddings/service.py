@@ -15,7 +15,8 @@ from functools import lru_cache
 
 import nest_asyncio
 from django.conf import settings
-from litellm import embedding
+from litellm import embedding, APIConnectionError
+from litellm import completion_cost
 
 from jao_backend.embeddings.models import EmbeddingModel
 from jao_backend.embeddings.models import EmbeddingTag
@@ -64,29 +65,40 @@ class EmbeddingService:
         Returns:
             TaggedEmbedding: TaggedEmbedding instances created for the vacancy.
         """
-        cls.sync_embedding_tags()
+        tag = EmbeddingTag.get_tag(settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID)
 
-        # Tags store a unique id and name for the embedding process, as well as the model name
-        tag_data = settings.EMBEDDING_TAGS[
-            settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID
-        ]
-
-        tag, _ = EmbeddingTag.objects.get_or_create(
-            defaults=tag_data, uuid=settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID
-        )
-
-        job_info_text = f"{vacancy.job_title}\n{vacancy.responsibilities}"
+        job_info_text = f"{vacancy.title}\n{vacancy.summary}\n{vacancy.description}"
 
         # Fix for ollama connection issue, remove if https://github.com/BerriAI/litellm/pull/7625 is merged:
         nest_asyncio.apply()
 
         # Request embedding using litellm, model is a litellm model name.
         # Note: api_base must not end with a slash '/'.
-        response = embedding(
+
+        try:
+            response = embedding(
+                model=tag.model.name,
+                input=job_info_text,
+                api_base=LITELLM_API_BASE,
+                custom_llm_provider=LITELLM_CUSTOM_PROVIDER,
+            )
+        except APIConnectionError as e:
+            logger.error(
+                "Connection refused to the embedding service. "
+                "Ensure the service is running and accessible: %s",
+                e,
+            )
+            raise
+
+        cost = completion_cost(
+            completion_response=response,
             model=tag.model.name,
-            input=job_info_text,
-            api_base=LITELLM_API_BASE,
-            custom_llm_provider=LITELLM_CUSTOM_PROVIDER,
+        )
+        # TODO - surface cost.
+        logger.info(
+            "Embedding cost for model %s: $%.6f",
+            tag.model.name,
+            cost,
         )
 
         chunks = [
@@ -102,8 +114,13 @@ class EmbeddingService:
             chunks=chunks,
             vacancy=vacancy,
         )
+
         logger.info(
-            f"Generated embeddings for vacancy {vacancy.id} with tag {tag.uuid}"
+            f'Embedded vacancy %s in %d chunks with tag %s "%s"',
+            vacancy.id,
+            len(chunks),
+            tag.uuid,
+            tag.name,
         )
 
         return tagged_embeddings

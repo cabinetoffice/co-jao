@@ -72,8 +72,11 @@ class IngestStatusView(LoginRequiredMixin, View):
 
         if form.is_valid():
             print("Starting ingest with form data:", form.cleaned_data)
-            max_batch_size = form.cleaned_data.get("max_batch_size") or settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE
-            task = ingest.delay(max_batch_size=max_batch_size)
+            batch_size = (
+                form.cleaned_data.get("max_batch_size")
+                or settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE
+            )
+            task = ingest.delay(max_batch_size=batch_size)
             messages.success(request, f"Ingest task started with ID: {task.id}")
             return redirect("ingest_status")
 

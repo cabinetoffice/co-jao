@@ -2,6 +2,7 @@ from functools import lru_cache
 from typing import List
 
 import numpy as np
+from django.conf import settings
 from django.db import models
 from django.db import transaction
 from django.utils.functional import classproperty
@@ -37,6 +38,7 @@ class Embedding(PolymorphicModel):
         EmbeddingModel, on_delete=models.PROTECT, db_index=True
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    """This is the output of `litellm.completion_cost` for the embedding model used."""
 
     @classmethod
     @lru_cache(maxsize=None)
@@ -161,6 +163,45 @@ class EmbeddingTag(models.Model):
             ),
         ]
 
+    @classmethod
+    @lru_cache(maxsize=None)
+    def get_configured_tags(cls):
+        """
+        :return: dict[str, EmbeddingTag]
+
+        Also, syncronises the tags in the database with the tags configured in settings.
+
+        Tags are setup in settings, this allows us to have different models on AWS vs local,
+        for the different named tags speciried there.
+        """
+        tags = {}
+        for tag_data in settings.EMBEDDING_TAGS.values():
+            model_name = tag_data.pop("model")
+            model, _ = EmbeddingModel.objects.get_or_create(
+                name=model_name, defaults={"is_active": True}
+            )
+
+            tag_data["model"] = model
+            tag, _ = cls.objects.get_or_create(
+                defaults=tag_data, uuid=tag_data["uuid"], version=tag_data["version"]
+            )
+
+            tags[tag.uuid] = tag
+
+        return tags
+
+    @classmethod
+    def get_tag(cls, uuid: str):
+        """
+        Get a tag by its UUID.
+
+        This is used to get the tag for a specific embedding.
+
+        Calls `get_configured_tags` which syncs tags from settings.
+        """
+        tags = EmbeddingTag.get_configured_tags()
+        return tags.get(uuid)
+
     def __str__(self):
         return self.name
 
@@ -181,6 +222,8 @@ class TaggedEmbedding(models.Model):
         help_text="The chunk ID of the embedding.", default=0, blank=True, null=True
     )
 
+    objects = models.Manager()
+
     class Meta:
         verbose_name_plural = "Tagged Embeddings"
         abstract = True
@@ -197,11 +240,15 @@ class TaggedEmbedding(models.Model):
         """
         Save an embedding(s) for this vacancy, associated with an EmbeddingTag.
 
-        If a subclass of TaggedEmbedding is used, it will be used to save the embedding,
-        extra arguments can be passed to the save method using **kwargs.
+        kwargs should be used to filter to a specific model of cls, this is used to
+        clear previous embeddings.
         """
+        assert kwargs, "kwargs must be provided to filter the model of cls."
+
         with transaction.atomic():
-            cls.objects.filter(tag__uuid=tag.uuid, tag__model=tag.model).delete()
+            cls.objects.filter(
+                tag__uuid=tag.uuid, tag__model=tag.model, **kwargs
+            ).delete()
             if not chunks:
                 # No chunks to save, stick to the contract by returning an empty list.
                 return []
