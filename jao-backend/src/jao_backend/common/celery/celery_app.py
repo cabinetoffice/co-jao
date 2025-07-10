@@ -1,12 +1,11 @@
+import dotenv
 import os
 
 from celery import Celery
 
 # Set the default Django settings module for the 'celery' program.
-
 env = os.environ.get("ENV", "common")
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", f"jao_backend.settings.{env}")
-import dotenv
 
 dotenv.load_dotenv()
 

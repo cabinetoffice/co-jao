@@ -7,7 +7,7 @@ from django.shortcuts import render
 from django.views import View
 
 from .forms import IngestForm
-from .tasks import ingest
+from jao_backend.vacancies.tasks import ingest_vacancies
 
 
 class IngestStatusView(LoginRequiredMixin, View):
@@ -19,7 +19,7 @@ class IngestStatusView(LoginRequiredMixin, View):
         Returns task_id if running, None otherwise.
         """
         # Get Celery app from your task
-        app = ingest.app
+        app = ingest_vacancies.app
 
         # Create inspector to look at active tasks
         inspector = app.control.inspect()
@@ -38,7 +38,6 @@ class IngestStatusView(LoginRequiredMixin, View):
         return None
 
     def get(self, request):
-        print("IngestStatusView GET request received")
         # Check if task is running
         task_id = self.get_task_status()
 
@@ -71,7 +70,6 @@ class IngestStatusView(LoginRequiredMixin, View):
             return redirect("ingest_status")
 
         if form.is_valid():
-            print("Starting ingest with form data:", form.cleaned_data)
             batch_size = (
                 form.cleaned_data.get("max_batch_size")
                 or settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE
@@ -80,5 +78,4 @@ class IngestStatusView(LoginRequiredMixin, View):
             messages.success(request, f"Ingest task started with ID: {task.id}")
             return redirect("ingest_status")
 
-        print("Form is not valid:", form.errors)
         return render(request, self.template_name, {"form": form})
