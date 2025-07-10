@@ -3,7 +3,6 @@ import pytest
 
 from jao_backend.embeddings.models import EmbeddingTag
 from jao_backend.embeddings.models import EmbeddingTiny
-from jao_backend.embeddings.service import EmbeddingService
 from jao_backend.vacancies.models import VacancyEmbedding
 
 from .factories import VacancyFactory
@@ -15,8 +14,8 @@ def test_vacancy_embedding_save_embeddings():
     VacancyEmbedding.save_embeddings should save VacancyEmbedding instances,
     that link Vacancy and EmbeddingTag instances.
     """
-    EmbeddingService.sync_embedding_tags.cache_clear()
-    EmbeddingService.sync_embedding_tags()
+    EmbeddingTag.get_configured_tags.cache_clear()
+    EmbeddingTag.get_configured_tags()
 
     tag = EmbeddingTag.objects.order_by("-version").get(
         name="job-title-responsibilities"
