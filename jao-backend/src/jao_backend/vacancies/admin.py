@@ -76,10 +76,7 @@ class VacancyAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     search_fields = ("title", "description", "summary")
     list_filter = (StatusFilter, "last_updated")
     ordering = ("-last_updated",)
-    inlines = [
-        VacancyGradeInline,
-        VacancyRoleTypeInline
-    ]
+    inlines = [VacancyGradeInline, VacancyRoleTypeInline]
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related()

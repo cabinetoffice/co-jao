@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 def health_check(request):
     return HttpResponse("OK", content_type="text/plain")
 
+
 def run_migrations(request):
     """Run Django migrations via web endpoint - secured"""
     if not settings.DEBUG:
@@ -30,7 +31,11 @@ def run_migrations(request):
                 cursor.execute("SELECT 1")
                 db_status = "Database connection: OK"
         except Exception as db_e:
-            return HttpResponse(f"Database connection failed: {str(db_e)}", status=500, content_type="text/plain")
+            return HttpResponse(
+                f"Database connection failed: {str(db_e)}",
+                status=500,
+                content_type="text/plain",
+            )
 
         # Capture output
         old_stdout = sys.stdout
@@ -42,7 +47,7 @@ def run_migrations(request):
 
         # Run migrations
         try:
-            call_command('migrate', verbosity=2)
+            call_command("migrate", verbosity=2)
             migration_status = "SUCCESS"
         except Exception as migrate_e:
             migration_status = f"FAILED: {str(migrate_e)}"
@@ -68,39 +73,62 @@ def run_migrations(request):
 
     except Exception as e:
         # Restore stdout/stderr if they were changed
-        sys.stdout = old_stdout if 'old_stdout' in locals() else sys.stdout
-        sys.stderr = old_stderr if 'old_stderr' in locals() else sys.stderr
+        sys.stdout = old_stdout if "old_stdout" in locals() else sys.stdout
+        sys.stderr = old_stderr if "old_stderr" in locals() else sys.stderr
 
         import traceback
+
         error_details = traceback.format_exc()
-        return HttpResponse(f"Migration endpoint error:\n{str(e)}\n\nFull traceback:\n{error_details}", status=500, content_type="text/plain")
+        return HttpResponse(
+            f"Migration endpoint error:\n{str(e)}\n\nFull traceback:\n{error_details}",
+            status=500,
+            content_type="text/plain",
+        )
+
 
 def create_superuser(request):
     """Create Django superuser via web endpoint - secured"""
     if not settings.DEBUG:
-        return HttpResponseForbidden("Superuser creation endpoint disabled in production")
+        return HttpResponseForbidden(
+            "Superuser creation endpoint disabled in production"
+        )
 
     User = get_user_model()
 
     # Use credentials from environment or defaults
-    username = request.GET.get('username', os.environ.get('JAO_BACKEND_SUPERUSER_USERNAME', 'admin'))
-    email = request.GET.get('email', os.environ.get('JAO_BACKEND_SUPERUSER_EMAIL', 'admin@example.com'))
-    password = request.GET.get('password', os.environ.get('JAO_BACKEND_SUPERUSER_PASSWORD', 'admin123'))
+    username = request.GET.get(
+        "username", os.environ.get("JAO_BACKEND_SUPERUSER_USERNAME", "admin")
+    )
+    email = request.GET.get(
+        "email", os.environ.get("JAO_BACKEND_SUPERUSER_EMAIL", "admin@example.com")
+    )
+    password = request.GET.get(
+        "password", os.environ.get("JAO_BACKEND_SUPERUSER_PASSWORD", "admin123")
+    )
 
     try:
         if User.objects.filter(username=username).exists():
-            return HttpResponse(f"User '{username}' already exists", content_type="text/plain")
+            return HttpResponse(
+                f"User '{username}' already exists", content_type="text/plain"
+            )
 
-        user = User.objects.create_superuser(username=username, email=email, password=password)
-        return HttpResponse(f"Superuser '{username}' created successfully", content_type="text/plain")
+        user = User.objects.create_superuser(
+            username=username, email=email, password=password
+        )
+        return HttpResponse(
+            f"Superuser '{username}' created successfully", content_type="text/plain"
+        )
 
     except Exception as e:
-        return HttpResponse(f"Failed to create superuser: {str(e)}", status=500, content_type="text/plain")
-
+        return HttpResponse(
+            f"Failed to create superuser: {str(e)}",
+            status=500,
+            content_type="text/plain",
+        )
 
 
 # Get admin URL from environment or use default
-ADMIN_URL = os.environ.get('DJANGO_ADMIN_URL', 'django-admin/')
+ADMIN_URL = os.environ.get("DJANGO_ADMIN_URL", "django-admin/")
 
 urlpatterns = [
     path("", include("jao_backend.home.urls")),

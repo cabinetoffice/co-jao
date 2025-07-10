@@ -13,8 +13,4 @@ def health_check(request):
     """
     Health check endpoint for load balancers and monitoring.
     """
-    return {
-        "status": "healthy",
-        "service": "jao-backend-api",
-        "version": "1.0.0"
-    }
+    return {"status": "healthy", "service": "jao-backend-api", "version": "1.0.0"}

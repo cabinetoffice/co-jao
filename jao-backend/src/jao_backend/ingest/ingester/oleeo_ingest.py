@@ -105,8 +105,8 @@ class OleeoIngest:
         valid_objects = source_model.objects.valid_for_ingest()
         if in_bulk:
             for (
-                    source_instances,
-                    destination_instances,
+                source_instances,
+                destination_instances,
             ) in valid_objects.bulk_create_pending(max_batch_size=self.max_batch_size):
                 logger.info(
                     "Created %s/%s %s instances",
@@ -122,9 +122,9 @@ class OleeoIngest:
                 )
 
             for (
-                    source_instances,
-                    destination_instances,
-                    count,
+                source_instances,
+                destination_instances,
+                count,
             ) in valid_objects.bulk_update_pending():
                 logger.info(
                     "Updated %s/%s %s instances",
@@ -188,7 +188,11 @@ class OleeoIngest:
         return role_types
 
     def update_vacancy_grades(self, source_instances=None, destination_instances=None):
-        logger.info("Updating vacancy grades for %d/%d", len(destination_instances), len(source_instances))
+        logger.info(
+            "Updating vacancy grades for %d/%d",
+            len(destination_instances),
+            len(source_instances),
+        )
 
         # in_bulk isn't used as source_instances may have been limited, preventing it's use.
         source_vacancies = {
@@ -214,9 +218,13 @@ class OleeoIngest:
                 destination_instance.grades.set(source_grades)
 
     def update_vacancy_role_types(
-            self, source_instances=None, destination_instances=None
+        self, source_instances=None, destination_instances=None
     ):
-        logger.info("Updating vacancy role types for %d/%d", len(destination_instances), len(source_instances))
+        logger.info(
+            "Updating vacancy role types for %d/%d",
+            len(destination_instances),
+            len(source_instances),
+        )
 
         # in_bulk isn't used as source_instances may have been limited, preventing it's use.
         source_vacancies = {
@@ -243,11 +251,11 @@ class OleeoIngest:
 
     @dispatch
     def after_ingest(
-            self,
-            source_model,
-            destination_model,
-            source_instances=None,
-            destination_instances=None,
+        self,
+        source_model,
+        destination_model,
+        source_instances=None,
+        destination_instances=None,
     ):
         """
         default dispatch (see plum dispatch docs https://beartype.github.io/plum/basic_usage.html)
@@ -258,11 +266,11 @@ class OleeoIngest:
 
     @dispatch
     def after_ingest(
-            self,
-            source_model: Type[ListJobGrade],
-            destination_model: Type[OleeoGradeGroup],
-            source_instances=None,
-            destination_instances=None,
+        self,
+        source_model: Type[ListJobGrade],
+        destination_model: Type[OleeoGradeGroup],
+        source_instances=None,
+        destination_instances=None,
     ):
         """
         Invalidate the cache of Grade combinations, after ingest.
@@ -271,11 +279,11 @@ class OleeoIngest:
 
     @dispatch
     def after_ingest(
-            self,
-            source_model: Type[ListTypeOfRole],
-            destination_model: Type[OleeoRoleTypeGroup],
-            source_instances=None,
-            destination_instances=None,
+        self,
+        source_model: Type[ListTypeOfRole],
+        destination_model: Type[OleeoRoleTypeGroup],
+        source_instances=None,
+        destination_instances=None,
     ):
         """
         Invalidate the cache of Role Type combinations, after ingest.
@@ -284,21 +292,29 @@ class OleeoIngest:
 
     @dispatch
     def after_ingest(
-            self,
-            source_model: Type[Vacancies],
-            destination_model: Type[Vacancy],
-            source_instances=None,
-            destination_instances=None,
+        self,
+        source_model: Type[Vacancies],
+        destination_model: Type[Vacancy],
+        source_instances=None,
+        destination_instances=None,
     ):
         """
         After creating or updating vacancies, build the foreign key relationships for vacancies.
         """
         if not destination_instances:
-            logger.info("No destination instances to update relationships for %s %s %s", destination_model.__name__,
-                        readable_pk_range(source_instances), readable_pk_range(destination_instances))
+            logger.info(
+                "No destination instances to update relationships for %s %s %s",
+                destination_model.__name__,
+                readable_pk_range(source_instances),
+                readable_pk_range(destination_instances),
+            )
             return
 
-        logger.info("Updating relationships for %s %s %s", destination_model.__name__,
-                    readable_pk_range(source_instances), readable_pk_range(destination_instances))
+        logger.info(
+            "Updating relationships for %s %s %s",
+            destination_model.__name__,
+            readable_pk_range(source_instances),
+            readable_pk_range(destination_instances),
+        )
         self.update_vacancy_grades(source_instances, destination_instances)
         self.update_vacancy_role_types(source_instances, destination_instances)
