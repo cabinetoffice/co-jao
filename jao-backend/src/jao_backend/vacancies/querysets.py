@@ -24,20 +24,31 @@ class VacancyQuerySet(models.QuerySet):
             )
         )
 
-    def configured_for_embed(self):
+    def configured_for_embed(self, limit=None):
         """
         Filter vacancies that are configured for embedding.
+
+        :param limit: Optional limit on the number of vacancies to return.
+
+        If None, it defaults to the setting `JAO_BACKEND_VACANCY_EMBED_LIMIT`, this
+        may also be None, in which case all vacancies are returned.
         """
+        if limit is None:
+            limit = settings.JAO_BACKEND_VACANCY_EMBED_LIMIT
+            # limit can still be None at this point.
+        else:
+            limit = max(limit, settings.JAO_BACKEND_VACANCY_EMBED_LIMIT)
+
         qs = self.order_by("live_date")
-        if settings.JAO_BACKEND_VACANCY_EMBED_LIMIT is None:
+        if limit is None:
             return qs
 
         count = qs.count()
-        pk = qs[count - settings.JAO_BACKEND_VACANCY_EMBED_LIMIT].pk
+        pk = qs[max(count - limit, 0)].pk
 
         return qs.filter(pk__gt=pk)
 
-    def requires_embedding(self):
+    def requires_embedding(self, limit=None):
         """
         Filter vacancies that require embedding.
 
@@ -47,7 +58,7 @@ class VacancyQuerySet(models.QuerySet):
         expected_tags_count = len(expected_embed_tag_uuids)
 
         result = (
-            self.configured_for_embed()
+            self.configured_for_embed(limit=limit)
             .annotate(
                 existing_tags_count=Count(
                     "vacancyembedding__tag",

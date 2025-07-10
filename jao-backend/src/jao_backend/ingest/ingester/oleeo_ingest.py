@@ -87,8 +87,9 @@ class OleeoIngest:
     Model pairs listed here will use bulk ingest.
     """
 
-    def __init__(self, max_batch_size=5000):
+    def __init__(self, max_batch_size=5000, progress_callback=None):
         self.max_batch_size = max_batch_size
+        self.progress_callback = progress_callback
 
     def do_ingest(self, progress_bar=None):
         for source_model in self.models:
