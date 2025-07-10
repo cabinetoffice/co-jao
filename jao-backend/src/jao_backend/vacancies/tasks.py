@@ -11,10 +11,8 @@ from jao_backend.embeddings.service import EmbeddingService
 from jao_backend.vacancies.models import Vacancy
 
 
-
 from jao_backend.common.celery import app as celery
 from jao_backend.ingest.ingester.oleeo_ingest import OleeoIngest
-
 
 
 logger = get_task_logger(__name__)
@@ -54,7 +52,7 @@ def embed_vacancies(limit=settings.JAO_BACKEND_VACANCY_EMBED_LIMIT):
     return len(vacancies)
 
 
-@celery.task(base=Singleton, lock_expires=60*60)
+@celery.task(base=Singleton, lock_expires=60 * 60)
 def ingest_vacancies(max_batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE):
     """
     Ingest data from OLEEO / R2D2.
@@ -78,6 +76,7 @@ def reset_ingest_lock():
     In certain states the ingest lock may not be released properly.
     """
     pass
+
 
 update_vacancies = chain(ingest_vacancies.s(), embed_vacancies.s())
 """
