@@ -2,7 +2,6 @@ import pytest
 from pytest_unordered import unordered
 
 from jao_backend.embeddings.models import EmbeddingTag
-from jao_backend.embeddings.service import EmbeddingService
 
 
 @pytest.mark.django_db
@@ -31,7 +30,7 @@ def test_sync_embedding_tags(settings):
     # On a fresh database there should be no embedding tags yet
     assert EmbeddingTag.objects.exists() is False
 
-    EmbeddingService.sync_embedding_tags()
+    EmbeddingTag.get_configured_tags()
 
     actual_tags = [
         *EmbeddingTag.objects.values(

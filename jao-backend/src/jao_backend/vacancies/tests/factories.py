@@ -14,6 +14,8 @@ class VacancyFactory(factory.django.DjangoModelFactory):
 
     id = factory.Sequence(lambda n: 10000 + n)
     last_updated = factory.LazyFunction(timezone.now)
+    live_date = Faker("date_time_between", start_date="-30d", end_date="now")
+    closing_date = Faker("date_time_between", start_date="now", end_date="+90d")
     title = Faker("job")
     description = Faker("paragraph", nb_sentences=8)
     summary = Faker("paragraph", nb_sentences=3)

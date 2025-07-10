@@ -7,7 +7,8 @@ from litellm.exceptions import APIConnectionError
 from litellm.exceptions import RateLimitError
 from litellm.exceptions import ServiceUnavailableError
 from litellm.exceptions import Timeout
-from jao_backend.embeddings.service import EmbeddingService
+
+from jao_backend.vacancies.embed import embed_vacancy
 from jao_backend.vacancies.models import Vacancy
 
 
@@ -43,7 +44,7 @@ def embed_vacancies(limit=settings.JAO_BACKEND_VACANCY_EMBED_LIMIT):
     )
     try:
         for vacancy in vacancies:
-            EmbeddingService().create_for_vacancy(vacancy)
+            embed_vacancy(vacancy)
     except Exception as e:
         raise e
     finally:

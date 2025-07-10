@@ -56,12 +56,16 @@ def valid_test_vacancy_data():
             "vacancy_title": "Valid Vacancy 1",
             "salary_minimum": "50000",
             "salary_maximum_optional": "60000",
+            "live_date": "2023-01-01T00:00:00Z",
+            "closing_date": "2023-01-31T00:00:00Z",
         },
         {
             "vacancy_id": 2,
             "vacancy_title": "Valid Vacancy 2 - No Max",
             "salary_minimum": "45000",
             "salary_maximum_optional": None,
+            "live_date": "2023-02-01T00:00:00Z",
+            "closing_date": "2023-02-28T00:00:00Z",
         },
         {
             "vacancy_id": 3,

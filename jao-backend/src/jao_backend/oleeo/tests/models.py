@@ -58,3 +58,24 @@ class TestVacancies(OleeoUpstreamModel):
         """
 
         managed = True
+
+
+class TestVacanciesTimestamps(OleeoUpstreamModel):
+    vacancy = models.ForeignKey(
+        primary_key=True,
+        to=TestVacancies,
+        on_delete=models.CASCADE,
+        related_name="vacanciestimestamps",
+    )
+    live_date = models.DateTimeField()
+    closing_date = models.DateTimeField()
+
+    class Meta:
+        """
+        Unlike the actual Vacancies model this is managed,
+        and in the default database.
+
+        This allows the use of factories.
+        """
+
+        managed = True
