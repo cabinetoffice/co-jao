@@ -42,7 +42,7 @@ class TaskCommandMixin:
             return task(*args, **kwargs)
         else:
             result = task.delay(*args, **kwargs)
-            self.stdout.write(f"{task.__name__} {result.id} started.")  # noqa
+            self.stdout.write(f"{task} {result.id} started.")  # noqa
 
             if not options["no_wait"]:
                 result.get()
