@@ -69,7 +69,7 @@
                     {% gds_accordion id="accordion-1" %}
                         {% for vacancy in similar_vacancies %}
                             {% gds_accordion_item heading=vacancy.job_title summary="" %}
-                                <p>{{ vacancy.full_job_desc }}</p>
+                                <p id="{{ vacancy.vacancy_id }}">{{ vacancy.full_job_desc|safe }}</p>
                             {% endgds_accordion_item %}
                         {% endfor %}
                     {% endgds_accordion %}
