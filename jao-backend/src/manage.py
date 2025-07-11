@@ -5,7 +5,6 @@ import sys
 
 import dotenv
 
-
 def set_settings_module():
     in_test = bool({*sys.argv[1:]} & {"pytest", "test"})
     if in_test:
