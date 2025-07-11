@@ -1,0 +1,6 @@
+from django.apps import AppConfig
+
+
+class HealthCheck(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "jao_backend.healthcheck"
