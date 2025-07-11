@@ -176,6 +176,7 @@ module "ecs" {
     DJANGO_DEBUG           = local.current_env.django_debug
     API_STAGE_NAME         = var.environment
     DJANGO_ALLOWED_HOSTS   = "*"
+    DEPLOYMENT_TYPE        = "aws"
 
     # Database URL for Django (required by jao_backend settings)
     JAO_BACKEND_DATABASE_URL       = "postgresql://${module.vectordb.master_username}:secrettpassword@${module.vectordb.cluster_endpoint}:5432/${module.vectordb.database_name}"
