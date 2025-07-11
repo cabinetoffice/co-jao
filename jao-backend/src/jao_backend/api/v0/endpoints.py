@@ -13,7 +13,7 @@ from jao_backend_schemas.vacancies import SimilarVacanciesResponse
 from jao_backend_schemas.vacancies import JobDescriptionRequest
 from jao_backend_schemas.vacancies import VacancyListing
 
-from jao_backend.common.text_processing.clean_bbcode import strip_bbcode
+from jao_backend.common.text_processing.clean_oleeo import parse_oleeo_bbcode
 from jao_backend.embeddings.models import EmbeddingTag
 from jao_backend.vacancies.models import VacancyEmbedding
 
@@ -69,7 +69,7 @@ def similar_adverts(
         VacancyListing.model_validate(
             {
                 "job_title": vacancy.title,
-                "full_job_desc": strip_bbcode(vacancy.description),
+                "full_job_desc": parse_oleeo_bbcode(vacancy.description),
                 "vacancy_id": vacancy.pk,
             }
         )
