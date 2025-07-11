@@ -87,3 +87,33 @@ output "xray_policy_arn" {
   description = "ARN of the X-Ray policy if enabled"
   value       = var.enable_xray_tracing ? aws_iam_policy.xray_access_policy[0].arn : null
 }
+
+output "execution_role_arn" {
+  description = "ARN of the ECS task execution role"
+  value       = aws_iam_role.ecs_task_execution_role.arn
+}
+
+output "task_role_arn" {
+  description = "ARN of the ECS task role"
+  value       = aws_iam_role.ecs_task_role.arn
+}
+
+output "execution_role_name" {
+  description = "Name of the ECS task execution role"
+  value       = aws_iam_role.ecs_task_execution_role.name
+}
+
+output "task_role_name" {
+  description = "Name of the ECS task role"
+  value       = aws_iam_role.ecs_task_role.name
+}
+
+output "cluster_arn" {
+  description = "ARN of the ECS cluster"
+  value       = aws_ecs_cluster.main.arn
+}
+
+output "backend_log_group_name" {
+  description = "Name of the backend CloudWatch log group"
+  value       = aws_cloudwatch_log_group.app.name
+}

@@ -4,6 +4,8 @@ locals {
   # IAM configuration
   task_execution_role_arn  = aws_iam_role.ecs_task_execution_role.arn
   task_execution_role_name = aws_iam_role.ecs_task_execution_role.name
+  task_role_arn            = aws_iam_role.ecs_task_role.arn
+  task_role_name           = aws_iam_role.ecs_task_role.name
 
   # CloudWatch configuration
   log_group_name            = "/ecs/${local.name}"
@@ -489,6 +491,53 @@ resource "aws_iam_role" "ecs_task_execution_role" {
   )
 }
 
+# IAM role for ECS tasks (allows tasks to make AWS API calls)
+resource "aws_iam_role" "ecs_task_role" {
+  name = "${local.name}-ecs-task-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.name}-ecs-task-role"
+    }
+  )
+}
+
+# Policy to allow ECS exec access
+resource "aws_iam_role_policy" "ecs_exec_policy" {
+  name = "${local.name}-ecs-exec-policy"
+  role = aws_iam_role.ecs_task_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel",
+          "ssmmessages:OpenDataChannel"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 # Attach the task execution role policy
 resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
   role       = aws_iam_role.ecs_task_execution_role.name
@@ -624,6 +673,7 @@ resource "aws_ecs_task_definition" "api" {
   cpu                      = var.api_cpu
   memory                   = var.api_memory
   execution_role_arn       = local.task_execution_role_arn
+  task_role_arn            = local.task_role_arn
   container_definitions    = local.api_container_definitions
 
   # Enable AWS X-Ray tracing for API monitoring
@@ -659,6 +709,7 @@ resource "aws_ecs_task_definition" "worker" {
   cpu                      = var.worker_cpu
   memory                   = var.worker_memory
   execution_role_arn       = local.task_execution_role_arn
+  task_role_arn            = local.task_role_arn
   container_definitions    = local.worker_container_definitions
 
   tags = merge(
@@ -679,6 +730,7 @@ resource "aws_ecs_task_definition" "beat" {
   cpu                      = var.beat_cpu
   memory                   = var.beat_memory
   execution_role_arn       = local.task_execution_role_arn
+  task_role_arn            = local.task_role_arn
   container_definitions    = local.beat_container_definitions
 
   tags = merge(
@@ -691,11 +743,12 @@ resource "aws_ecs_task_definition" "beat" {
 
 # ECS service
 resource "aws_ecs_service" "api" {
-  name            = "${local.name}-api-service"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.api.arn
-  desired_count   = var.desired_count
-  launch_type     = "FARGATE"
+  name                   = "${local.name}-api-service"
+  cluster                = aws_ecs_cluster.main.id
+  task_definition        = aws_ecs_task_definition.api.arn
+  desired_count          = var.desired_count
+  launch_type            = "FARGATE"
+  enable_execute_command = true
 
   network_configuration {
     security_groups  = concat([aws_security_group.ecs_tasks.id], var.additional_security_group_ids)
@@ -749,11 +802,12 @@ resource "aws_ecs_service" "api" {
 resource "aws_ecs_service" "worker" {
   count = local.enable_celery ? 1 : 0
 
-  name            = "${local.name}-worker-service"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.worker[0].arn
-  desired_count   = var.worker_desired_count
-  launch_type     = "FARGATE"
+  name                   = "${local.name}-worker-service"
+  cluster                = aws_ecs_cluster.main.id
+  task_definition        = aws_ecs_task_definition.worker[0].arn
+  desired_count          = var.worker_desired_count
+  launch_type            = "FARGATE"
+  enable_execute_command = true
 
   network_configuration {
     security_groups  = concat([aws_security_group.ecs_tasks.id], var.additional_security_group_ids)
@@ -787,11 +841,12 @@ resource "aws_ecs_service" "worker" {
 resource "aws_ecs_service" "beat" {
   count = local.enable_celery ? 1 : 0
 
-  name            = "${local.name}-beat-service"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.beat[0].arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
+  name                   = "${local.name}-beat-service"
+  cluster                = aws_ecs_cluster.main.id
+  task_definition        = aws_ecs_task_definition.beat[0].arn
+  desired_count          = 1
+  launch_type            = "FARGATE"
+  enable_execute_command = true
 
   network_configuration {
     security_groups  = concat([aws_security_group.ecs_tasks.id], var.additional_security_group_ids)

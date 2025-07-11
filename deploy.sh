@@ -663,6 +663,55 @@ if [ "$SKIP_TERRAFORM" = false ]; then
     echo -e "To use the API, add the 'x-api-key' header to your requests with the appropriate API key."
 fi
 
+# Post-deployment tasks
+if [ "$SKIP_SERVICE_UPDATE" = false ]; then
+    echo -e "\n${GREEN}Running post-deployment tasks...${NC}"
+
+    # Wait for service to stabilize before running management commands
+    echo -e "${YELLOW}Waiting for services to stabilize...${NC}"
+    sleep 120
+
+    # Get the running task ARN for the backend service
+    echo -e "${YELLOW}Getting backend task ARN...${NC}"
+    CLUSTER_NAME="${APP_NAME}-${ENV}-cluster"
+    SERVICE_NAME="${APP_NAME}-${ENV}-api-service"
+
+    TASK_ARN=$(aws ecs list-tasks \
+        --cluster "${CLUSTER_NAME}" \
+        --service-name "${SERVICE_NAME}" \
+        --region "${AWS_REGION}" \
+        --query 'taskArns[0]' \
+        --output text 2>/dev/null || echo "")
+
+    if [ -n "$TASK_ARN" ] && [ "$TASK_ARN" != "None" ] && [ "$TASK_ARN" != "null" ]; then
+        echo -e "${GREEN}Found backend task: ${TASK_ARN}${NC}"
+
+        # Run update_vacancies command
+        echo -e "${YELLOW}Running update_vacancies management command...${NC}"
+
+        if aws ecs execute-command \
+            --cluster "${CLUSTER_NAME}" \
+            --task "${TASK_ARN}" \
+            --container "${APP_NAME}-backend" \
+            --interactive \
+            --command "python src/manage.py update_vacancies --no-wait" \
+            --region "${AWS_REGION}" 2>/dev/null; then
+            echo -e "${GREEN}✅ update_vacancies command completed successfully${NC}"
+        else
+            echo -e "${YELLOW}⚠️ update_vacancies command failed or ECS exec not available${NC}"
+            echo -e "${BLUE}To run manually:${NC}"
+            echo -e "aws ecs execute-command --cluster ${CLUSTER_NAME} --task ${TASK_ARN} --container ${APP_NAME}-backend --interactive --command 'python src/manage.py update_vacancies --no-wait' --region ${AWS_REGION}"
+        fi
+    else
+        echo -e "${YELLOW}⚠️ Could not find running backend task${NC}"
+        echo -e "${BLUE}To run update_vacancies manually after deployment:${NC}"
+        echo -e "1. Get task ARN: aws ecs list-tasks --cluster ${CLUSTER_NAME} --service-name ${SERVICE_NAME} --region ${AWS_REGION}"
+        echo -e "2. Run command: aws ecs execute-command --cluster ${CLUSTER_NAME} --task TASK_ARN --container ${APP_NAME}-backend --interactive --command 'python src/manage.py update_vacancies --no-wait' --region ${AWS_REGION}"
+    fi
+else
+    echo -e "\n${YELLOW}Service updates were skipped - post-deployment tasks not executed${NC}"
+fi
+
 # Final steps and validation
 echo -e "\n${GREEN}Deployment completed!${NC}"
 echo -e "${BLUE}Deployment summary:${NC}"
