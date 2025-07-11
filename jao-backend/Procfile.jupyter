@@ -1,0 +1,1 @@
+jupyter: python src/manage.py shell_plus --lab
