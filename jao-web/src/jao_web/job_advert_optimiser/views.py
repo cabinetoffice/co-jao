@@ -150,32 +150,31 @@ class JobAdvertOptimiserView(FormView):
         # Handle possible exceptions from asyncio.gather
         service_errors = []
         if isinstance(advice_response, Exception):
+            logger.error("Error fetching advice: %s", format_error(advice_response))
             service_errors.append(advice_response)
             advice_response = None
 
         if isinstance(similar_vacancies_response, Exception):
             service_errors.append(similar_vacancies_response)
-            # print traceback for similar_vacancies_response
-            import traceback
-
-            logger.error(
-                "".join(traceback.format_exception(similar_vacancies_response))
-            )
+            logger.error("Error fetching similar vacancies: %s", format_error(similar_vacancies_response))
             similar_vacancies_response = None
 
         if isinstance(demographics_plots, Exception):
             service_errors.append(demographics_plots)
+            logger.error("Error fetching demographics plots: %s", format_error(demographics_plots))
             demographic_figures = None
         else:
             demographic_figures = demographics_plots.get_figures()
 
         if isinstance(skills_plots, Exception):
             service_errors.append(skills_plots)
+            logger.error("Error fetching skills plots: %s", format_error(skills_plots))
             skills_figures = None
         else:
             skills_figures = skills_plots.get_figures()
 
         if isinstance(applicant_locations, Exception):
+            logger.error("Error fetching applicant locations: %s", format_error(applicant_locations))
             service_errors.append(applicant_locations)
             applicant_map_data = None
         else:

@@ -7,9 +7,10 @@ from django.db.models import Value
 from django.db.models.functions import Concat
 
 from jao_backend.embeddings.models import EmbeddingTag
+from jao_backend.embeddings.querysets import PolymorphicEmbeddingQuerySetMixin
 
 
-class VacancyQuerySet(models.QuerySet):
+class VacancyQuerySet(PolymorphicEmbeddingQuerySetMixin, models.QuerySet):
 
     def annotate_responsibilities(self):
         """
@@ -70,3 +71,9 @@ class VacancyQuerySet(models.QuerySet):
             .annotate_responsibilities()
         )
         return result
+
+
+class VacancyEmbeddingQuerySet(PolymorphicEmbeddingQuerySetMixin, models.QuerySet):
+    """
+    QuerySet for VacancyEmbedding model.
+    """

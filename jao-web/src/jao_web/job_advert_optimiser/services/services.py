@@ -22,7 +22,7 @@ JAO_SERVICE_TIMEOUT = settings.JAO_BACKEND_TIMEOUT
 async def get_advice(client: httpx.AsyncClient, description: str) -> AdviceResponse:
     request = JobDescriptionRequest(description=description)
     response = await client.post(
-        "advisor/advice", json=request.model_dump(), timeout=JAO_SERVICE_TIMEOUT
+        "advice", json=request.model_dump(), timeout=JAO_SERVICE_TIMEOUT
     )
     raise_exception_on_problem(response)
     return AdviceResponse.model_validate(response.json())
@@ -77,6 +77,5 @@ async def get_applicant_locations(
     response = await client.post(
         "applicant_locations", json=request.model_dump(), timeout=JAO_SERVICE_TIMEOUT
     )
-
     raise_exception_on_problem(response)
     return AreaFrequenciesResponse.model_validate(response.json(), strict=True)
