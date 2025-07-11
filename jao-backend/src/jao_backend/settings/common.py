@@ -97,6 +97,7 @@ INSTALLED_APPS = [
     "jao_backend.embeddings",
     "jao_backend.ingest",
     "jao_backend.oleeo",
+    "jao_backend.healthcheck",
 ]
 
 
