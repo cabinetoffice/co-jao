@@ -692,9 +692,9 @@ if [ "$SKIP_SERVICE_UPDATE" = false ]; then
         if aws ecs execute-command \
             --cluster "${CLUSTER_NAME}" \
             --task "${TASK_ARN}" \
-            --container "${APP_NAME}-backend" \
+            --container "${APP_NAME}" \
             --interactive \
-            --command "python src/manage.py update_vacancies --no-wait" \
+            --command "poetry run python src/manage.py update_vacancies --no-wait" \
             --region "${AWS_REGION}" 2>/dev/null; then
             echo -e "${GREEN}✅ update_vacancies command completed successfully${NC}"
         else
