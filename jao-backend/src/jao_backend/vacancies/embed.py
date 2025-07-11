@@ -15,7 +15,7 @@ import logging
 import nest_asyncio
 from django.conf import settings
 
-from jao_backend.common.text_processing.clean_bbcode import strip_bbcode
+from jao_backend.common.text_processing.clean_oleeo import strip_oleeo_bbcode
 from jao_backend.embeddings.models import EmbeddingTag
 from jao_backend.embeddings.models import TaggedEmbedding
 from jao_backend.vacancies.models import Vacancy
@@ -43,7 +43,7 @@ def embed_vacancy(vacancy: "Vacancy"):
     tag = EmbeddingTag.get_tag(settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID)
 
     # Data from OLEEO can contain bbcode, strip it before embedding.
-    job_info_text = strip_bbcode(
+    job_info_text = strip_oleeo_bbcode(
         f"{vacancy.title}\n{vacancy.summary}\n{vacancy.description}"
     )
 
