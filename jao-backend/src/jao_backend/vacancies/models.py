@@ -5,6 +5,7 @@ from jao_backend.embeddings.models import TaggedEmbedding
 from jao_backend.roles.models import Grade
 from jao_backend.roles.models import RoleType
 from jao_backend.vacancies.querysets import VacancyQuerySet
+from jao_backend.vacancies.querysets import VacancyEmbeddingQuerySet
 
 
 class Vacancy(models.Model):
@@ -107,6 +108,8 @@ class VacancyEmbedding(TaggedEmbedding):
     ]
 
     deprecated_tags = []
+
+    objects = VacancyEmbeddingQuerySet.as_manager()
 
     class Meta:
         unique_together = ("vacancy", "tag", "embedding")

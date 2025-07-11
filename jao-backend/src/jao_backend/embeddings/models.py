@@ -1,7 +1,10 @@
+import logging
+
 from functools import lru_cache
 from typing import List
 
 import numpy as np
+
 from django.conf import settings
 from django.db import models
 from django.db import transaction
@@ -9,7 +12,16 @@ from django.utils.functional import classproperty
 from pgvector.django import VectorField
 from polymorphic.models import PolymorphicModel
 
+from litellm import APIConnectionError, completion_cost
+from litellm import embedding
+
 from jao_backend.common.db.fields import UUIDField
+from jao_backend.embeddings.querysets import EmbeddingTagQuerySet
+
+logger = logging.getLogger(__name__)
+
+LITELLM_API_BASE = settings.LITELLM_API_BASE
+LITELLM_CUSTOM_PROVIDER = settings.LITELLM_CUSTOM_PROVIDER
 
 
 class EmbeddingModel(models.Model):
@@ -17,6 +29,9 @@ class EmbeddingModel(models.Model):
 
     name = models.CharField(max_length=50, unique=True)
     is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
 
 
 class Embedding(PolymorphicModel):
@@ -43,6 +58,9 @@ class Embedding(PolymorphicModel):
     @classmethod
     @lru_cache(maxsize=None)
     def get_subclasses_by_dimensions(cls):
+        """
+        Note: not recursive, though hasn't been needed yet.
+        """
         return {
             subclass.embedding.field.dimensions: subclass
             for subclass in cls.__subclasses__()
@@ -154,6 +172,8 @@ class EmbeddingTag(models.Model):
         help_text="The version of the embedding tag.", default=0, blank=True, null=True
     )
 
+    objects = EmbeddingTagQuerySet.as_manager()
+
     class Meta:
         verbose_name_plural = "Embedding Tags"
         constraints = [
@@ -163,13 +183,67 @@ class EmbeddingTag(models.Model):
             ),
         ]
 
+    @lru_cache(maxsize=None)
+    def embed(self, text: str):
+        """
+        Call LITELLM to embed the text using this tag's model.
+
+        :return: litellm.EmbeddingResponse, see litellm.embedding
+                https://deepwiki.com/mikeplavsky/litellm/2.1-completion-and-embedding-functions#example-usage---embedding
+        """
+        # Request embedding using litellm, model is a litellm model name.
+        # Note: api_base must not end with a slash '/'.
+        try:
+            response = embedding(
+                model=self.model.name,
+                input=text,
+                api_base=LITELLM_API_BASE,
+                custom_llm_provider=LITELLM_CUSTOM_PROVIDER,
+            )
+        except APIConnectionError as e:
+            logger.error(
+                "Connection refused to the embedding service. "
+                "Ensure the service is running and accessible: %s",
+                e,
+            )
+            raise
+
+        return response
+
+    @staticmethod
+    def completion_cost(response, **kwargs):
+        """
+        Call with the output of .embed to get an estimate of the cost,
+        see litellm.completion_cost.
+        """
+        cost = completion_cost(
+            completion_response=response,
+            model=kwargs.get("model") or response.model,
+        )
+        return cost
+
+    @staticmethod
+    def response_chunks(response):
+        """
+        Get the chunks of the embedding response.
+
+        These chunks can be passed save_embeddings as implemented by
+        subclasses of `Embedding`, to link embeddings to a specific
+        record in a table.
+        """
+        return [
+            response_part["embedding"]
+            for response_part in response.data
+            if response_part["embedding"] is not None
+        ]
+
     @classmethod
     @lru_cache(maxsize=None)
     def get_configured_tags(cls):
         """
         :return: dict[str, EmbeddingTag]
 
-        Also, syncronises the tags in the database with the tags configured in settings.
+        Also, synchronizes the tags in the database with the tags configured in settings.
 
         Tags are setup in settings, this allows us to have different models on AWS vs local,
         for the different named tags speciried there.
@@ -203,7 +277,7 @@ class EmbeddingTag(models.Model):
         return tags.get(uuid)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} (v{self.version}) model={self.model.name}"
 
 
 class TaggedEmbedding(models.Model):

@@ -11,14 +11,11 @@ Adds:
 """
 
 import logging
-from functools import lru_cache
 
 import nest_asyncio
 from django.conf import settings
-from litellm import embedding, APIConnectionError
-from litellm import completion_cost
 
-from jao_backend.embeddings.models import EmbeddingModel
+from jao_backend.common.text_processing.clean_bbcode import strip_bbcode
 from jao_backend.embeddings.models import EmbeddingTag
 from jao_backend.embeddings.models import TaggedEmbedding
 from jao_backend.vacancies.models import Vacancy
@@ -45,45 +42,24 @@ def embed_vacancy(vacancy: "Vacancy"):
     """
     tag = EmbeddingTag.get_tag(settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID)
 
-    job_info_text = f"{vacancy.title}\n{vacancy.summary}\n{vacancy.description}"
+    # Data from OLEEO can contain bbcode, strip it before embedding.
+    job_info_text = strip_bbcode(
+        f"{vacancy.title}\n{vacancy.summary}\n{vacancy.description}"
+    )
 
     # Fix for ollama connection issue, remove if https://github.com/BerriAI/litellm/pull/7625 is merged:
     nest_asyncio.apply()
 
-    # Request embedding using litellm, model is a litellm model name.
-    # Note: api_base must not end with a slash '/'.
+    response = tag.embed(job_info_text)
+    cost = tag.completion_cost(response)  # noqa
 
-    try:
-        response = embedding(
-            model=tag.model.name,
-            input=job_info_text,
-            api_base=LITELLM_API_BASE,
-            custom_llm_provider=LITELLM_CUSTOM_PROVIDER,
-        )
-    except APIConnectionError as e:
-        logger.error(
-            "Connection refused to the embedding service. "
-            "Ensure the service is running and accessible: %s",
-            e,
-        )
-        raise
-
-    cost = completion_cost(
-        completion_response=response,
-        model=tag.model.name,
-    )
-    # TODO - surface cost.
     logger.info(
         "Embedding cost for model %s: $%.6f",
         tag.model.name,
         cost,
     )
 
-    chunks = [
-        response_part["embedding"]
-        for response_part in response.data
-        if response_part["embedding"] is not None
-    ]
+    chunks = tag.response_chunks(response)
 
     # Associate a vacancy with the embeddings data and a tag
     # to specifies the version of the embedding process and the model.
