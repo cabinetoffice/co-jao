@@ -664,62 +664,100 @@ if [ "$SKIP_TERRAFORM" = false ]; then
 fi
 
 # Post-deployment tasks
-if [ "$SKIP_SERVICE_UPDATE" = false ]; then
-    echo -e "\n${GREEN}Running post-deployment tasks...${NC}"
+# if [ "$SKIP_SERVICE_UPDATE" = false ]; then
+#     echo -e "\n${GREEN}Running post-deployment tasks...${NC}"
 
-    # Wait for service to stabilize before running management commands
-    echo -e "${YELLOW}Waiting for services to stabilize...${NC}"
-    sleep 120
+#     # Wait for service to stabilize before running management commands
+#     echo -e "${YELLOW}Waiting for services to stabilize...${NC}"
+#     sleep 120
 
-    # Get the running task ARN for the backend service
-    echo -e "${YELLOW}Getting backend task ARN...${NC}"
-    CLUSTER_NAME="${APP_NAME}-${ENV}-cluster"
-    SERVICE_NAME="${APP_NAME}-${ENV}-api-service"
+#     # Get the running task ARN for the backend service
+#     echo -e "${YELLOW}Getting backend task ARN...${NC}"
+#     CLUSTER_NAME="${APP_NAME}-${ENV}-cluster"
+#     SERVICE_NAME="${APP_NAME}-${ENV}-api-service"
 
-    TASK_ARN=$(aws ecs list-tasks \
-        --cluster "${CLUSTER_NAME}" \
-        --service-name "${SERVICE_NAME}" \
-        --region "${AWS_REGION}" \
-        --query 'taskArns[0]' \
-        --output text 2>/dev/null || echo "")
+#     TASK_ARN=$(aws ecs list-tasks \
+#         --cluster "${CLUSTER_NAME}" \
+#         --service-name "${SERVICE_NAME}" \
+#         --region "${AWS_REGION}" \
+#         --query 'taskArns[0]' \
+#         --output text 2>/dev/null || echo "")
 
-    if [ -n "$TASK_ARN" ] && [ "$TASK_ARN" != "None" ] && [ "$TASK_ARN" != "null" ]; then
-        echo -e "${GREEN}Found backend task: ${TASK_ARN}${NC}"
+#     if [ -n "$TASK_ARN" ] && [ "$TASK_ARN" != "None" ] && [ "$TASK_ARN" != "null" ]; then
 
-        # Run update_vacancies command
-        echo -e "${YELLOW}Running update_vacancies management command...${NC}"
 
-        if aws ecs execute-command \
-            --cluster "${CLUSTER_NAME}" \
-            --task "${TASK_ARN}" \
-            --container "${APP_NAME}" \
-            --interactive \
-            --command "poetry run python src/manage.py update_vacancies --no-wait" \
-            --region "${AWS_REGION}" 2>/dev/null; then
-            echo -e "${GREEN}✅ update_vacancies command completed successfully${NC}"
-        else
-            echo -e "${YELLOW}⚠️ update_vacancies command failed or ECS exec not available${NC}"
-            echo -e "${BLUE}To run manually:${NC}"
-            echo -e "aws ecs execute-command --cluster ${CLUSTER_NAME} --task ${TASK_ARN} --container ${APP_NAME}-backend --interactive --command 'python src/manage.py update_vacancies --no-wait' --region ${AWS_REGION}"
-        fi
-    else
-        echo -e "${YELLOW}⚠️ Could not find running backend task${NC}"
-        echo -e "${BLUE}To run update_vacancies manually after deployment:${NC}"
-        echo -e "1. Get task ARN: aws ecs list-tasks --cluster ${CLUSTER_NAME} --service-name ${SERVICE_NAME} --region ${AWS_REGION}"
-        echo -e "2. Run command: aws ecs execute-command --cluster ${CLUSTER_NAME} --task TASK_ARN --container ${APP_NAME}-backend --interactive --command 'python src/manage.py update_vacancies --no-wait' --region ${AWS_REGION}"
-    fi
-else
-    echo -e "\n${YELLOW}Service updates were skipped - post-deployment tasks not executed${NC}"
-fi
+
+#         echo -e "${GREEN}Found backend task: ${TASK_ARN}${NC}"
+
+#         # Run update_vacancies command
+#         echo -e "${YELLOW}Running update_vacancies management command...${NC}"
+
+#         if aws ecs execute-command \
+#             --cluster "${CLUSTER_NAME}" \
+#             --task "${TASK_ARN}" \
+#             --container "${APP_NAME}" \
+#             --interactive \
+#             --command "poetry run celery -A jao_backend.common.celery worker --loglevel=INFO" \
+#             --region "${AWS_REGION}" 2>/dev/null; then
+#             echo -e "${GREEN}✅ update_vacancies command completed successfully${NC}"
+#         else
+#             echo -e "${YELLOW}⚠️ update_vacancies command failed or ECS exec not available${NC}"
+#             echo -e "${BLUE}To run manually:${NC}"
+#             echo -e "aws ecs execute-command --cluster ${CLUSTER_NAME} --task ${TASK_ARN} --container ${APP_NAME}-backend --interactive --command 'python src/manage.py update_vacancies --no-wait' --region ${AWS_REGION}"
+#         fi
+
+#         if aws ecs execute-command \
+#             --cluster "${CLUSTER_NAME}" \
+#             --task "${TASK_ARN}" \
+#             --container "${APP_NAME}" \
+#             --interactive \
+#             --command "poetry run python src/manage.py update_vacancies --no-wait" \
+#             --region "${AWS_REGION}" 2>/dev/null; then
+#             echo -e "${GREEN}✅ update_vacancies command completed successfully${NC}"
+#         else
+#             echo -e "${YELLOW}⚠️ update_vacancies command failed or ECS exec not available${NC}"
+#             echo -e "${BLUE}To run manually:${NC}"
+#             echo -e "aws ecs execute-command --cluster ${CLUSTER_NAME} --task ${TASK_ARN} --container ${APP_NAME}-backend --interactive --command 'python src/manage.py update_vacancies --no-wait' --region ${AWS_REGION}"
+#         fi
+
+#     else
+#         echo -e "${YELLOW}⚠️ Could not find running backend task${NC}"
+#         echo -e "${BLUE}To run update_vacancies manually after deployment:${NC}"
+#         echo -e "1. Get task ARN: aws ecs list-tasks --cluster ${CLUSTER_NAME} --service-name ${SERVICE_NAME} --region ${AWS_REGION}"
+#         echo -e "2. Run command: aws ecs execute-command --cluster ${CLUSTER_NAME} --task TASK_ARN --container ${APP_NAME}-backend --interactive --command 'python src/manage.py update_vacancies --no-wait' --region ${AWS_REGION}"
+#     fi
+# else
+#     echo -e "\n${YELLOW}Service updates were skipped - post-deployment tasks not executed${NC}"
+# fi
 
 # Final steps and validation
 echo -e "\n${GREEN}Deployment completed!${NC}"
 echo -e "${BLUE}Deployment summary:${NC}"
-echo -e "Backend deployment: $(if [ "$SKIP_BACKEND" = true ]; then echo "${YELLOW}SKIPPED${NC}"; else echo "${GREEN}COMPLETED${NC}"; fi)"
-echo -e "Frontend deployment: $(if [ "$SKIP_FRONTEND" = true ]; then echo "${YELLOW}SKIPPED${NC}"; else echo "${GREEN}COMPLETED${NC}"; fi)"
-echo -e "Terraform deployment: $(if [ "$SKIP_TERRAFORM" = true ]; then echo "${YELLOW}SKIPPED${NC}"; else echo "${GREEN}COMPLETED${NC}"; fi)"
-echo -e "Service updates: $(if [ "$SKIP_SERVICE_UPDATE" = true ]; then echo "${YELLOW}SKIPPED${NC}"; else echo "${GREEN}COMPLETED${NC}"; fi)"
-echo -e "Resource skipping: $(if [ "$SKIP_EXISTING" = true ] || [ "$SKIP_VPC" = true ] || [ "$SKIP_CLOUDWATCH" = true ] || [ "$SKIP_IAM_ROLES" = true ]; then echo "${YELLOW}ENABLED${NC}"; else echo "${GREEN}DISABLED${NC}"; fi)"
+if [ "$SKIP_BACKEND" = true ]; then
+    echo -e "Backend deployment: ${YELLOW}SKIPPED${NC}"
+else
+    echo -e "Backend deployment: ${GREEN}COMPLETED${NC}"
+fi
+if [ "$SKIP_FRONTEND" = true ]; then
+    echo -e "Frontend deployment: ${YELLOW}SKIPPED${NC}"
+else
+    echo -e "Frontend deployment: ${GREEN}COMPLETED${NC}"
+fi
+if [ "$SKIP_TERRAFORM" = true ]; then
+    echo -e "Terraform deployment: ${YELLOW}SKIPPED${NC}"
+else
+    echo -e "Terraform deployment: ${GREEN}COMPLETED${NC}"
+fi
+if [ "$SKIP_SERVICE_UPDATE" = true ]; then
+    echo -e "Service updates: ${YELLOW}SKIPPED${NC}"
+else
+    echo -e "Service updates: ${GREEN}COMPLETED${NC}"
+fi
+if [ "$SKIP_EXISTING" = true ] || [ "$SKIP_VPC" = true ] || [ "$SKIP_CLOUDWATCH" = true ] || [ "$SKIP_IAM_ROLES" = true ]; then
+    echo -e "Resource skipping: ${YELLOW}ENABLED${NC}"
+else
+    echo -e "Resource skipping: ${GREEN}DISABLED${NC}"
+fi
 echo -e "${YELLOW}Important notes:${NC}"
 echo -e "1. The backend API now has enhanced monitoring and throttling for third-party consumers"
 echo -e "2. Different usage plans are in place for frontend (20%), partners (30%), and public (50%) traffic"

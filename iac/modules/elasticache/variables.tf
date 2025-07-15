@@ -1,4 +1,4 @@
-variable "cluster_id" {
+variable "replication_group_id" {
   description = "The cluster identifier"
   type        = string
 }

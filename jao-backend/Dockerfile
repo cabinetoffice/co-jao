@@ -1,26 +1,39 @@
 # Use the official Python runtime as a parent image
 FROM python:3.12-slim AS base
 
-# Install Node.js and npm
+# Install system dependencies including ODBC driver
 RUN apt-get update && \
-    apt-get install -y curl && \
+    apt-get install -y curl gnupg2 apt-transport-https ca-certificates && \
     curl -sL https://deb.nodesource.com/setup_18.x | bash - && \
     apt-get install -y nodejs && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Manual ODBC library setup
-RUN apt-get update && apt-get install -y \
+# Add Microsoft GPG key and repository
+RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg && \
+    echo "deb [arch=amd64,arm64,armhf signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" | tee /etc/apt/sources.list.d/mssql-release.list
+
+# Install ODBC driver and build tools
+RUN apt-get update && \
+    ACCEPT_EULA=Y apt-get install -y \
+    msodbcsql17 \
+    mssql-tools \
     unixodbc \
     unixodbc-dev \
     gcc \
     g++ \
-    && ldconfig
+    && ldconfig && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* \
+    ls -la /opt/microsoft/msodbcsql17/lib64/ \
+    ls -la /usr/lib/x86_64-linux-gnu/odbc/\
+    odbcinst -q -d
+
+# Verify ODBC driver installation
+RUN odbcinst -q -d || echo "ODBC driver check failed"
 
 # Create the app directory
 RUN mkdir /app
-
-# Set the working directory inside the container
 WORKDIR /app
 
 # Set environment variables to optimize Python
@@ -31,8 +44,6 @@ ENV PYTHONUNBUFFERED=1
 
 # Install Poetry
 RUN curl -sSL https://install.python-poetry.org | python -
-
-# Add Poetry to the PATH
 ENV PATH="/root/.local/bin:$PATH"
 
 # Copy the poetry.lock and pyproject.toml files
@@ -58,18 +69,24 @@ COPY ./jao-backend/webpack.config.js ./webpack.config.js
 RUN npm run build
 
 # Create frontend module directory
-RUN mkdir -p /app/src/frontend
-RUN touch /app/src/frontend/__init__.py
+RUN mkdir -p /app/src/frontend && \
+    touch /app/src/frontend/__init__.py
 
-RUN ls -la /app
-RUN ls -la /app/src
+# Debug: List directory contents and check ODBC
+RUN ls -la /app && \
+    ls -la /app/src && \
+    echo "=== ODBC Drivers Available ===" && \
+    odbcinst -q -d && \
+    echo "=== Python ODBC Test ===" && \
+    poetry run python -c "import pyodbc; print('Available drivers:', pyodbc.drivers())" || echo "pyodbc test failed"
 
 # Expose the Django port
 EXPOSE 8000
 
 # Start the application using hypercorn
-
 CMD sh -c "set -e && \
+    echo 'Checking ODBC drivers...' && \
+    odbcinst -q -d && \
     echo 'Running migrations...' && \
     poetry run python src/manage.py migrate && \
     echo 'Creating superuser...' && \
