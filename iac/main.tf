@@ -423,10 +423,10 @@ resource "aws_security_group" "db_access" {
 module "celery_redis" {
   source = "./modules/elasticache"
 
-  cluster_id         = "jao-celery-cache"
-  node_type          = "cache.t3.small"
-  subnet_group_name  = aws_elasticache_subnet_group.main.name
-  security_group_ids = [aws_security_group.redis_client.id]
+  replication_group_id = "jao-celery-cache"
+  node_type            = "cache.t3.small"
+  subnet_group_name    = aws_elasticache_subnet_group.main.name
+  security_group_ids   = [aws_security_group.redis_client.id]
 
   tags = {
     Environment = "production"
