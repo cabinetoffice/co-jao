@@ -49,3 +49,5 @@ Reference one particular part of the text.
 Decision:
 
 Use Text Spans to implement checks and highlighting of issues, this will allow associating runs of text with particular checks.
+
+An Addendum (ADR-0007) to complement this ADR, has been created to document the hybrid approach of using regex for initial matching and programmatic validation for precise highlighting.
