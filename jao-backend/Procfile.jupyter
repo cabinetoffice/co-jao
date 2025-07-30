@@ -1,1 +1,8 @@
+# When running locally you can use honcho to run this Procfile to start
+# jupyterlab
+#
+# Run all services:
+# $ honcho start -f Procfile.jupyter
+#
 jupyter: python src/manage.py shell_plus --lab
+
