@@ -7,7 +7,6 @@ locals {
   frontend_task_role_arn       = aws_iam_role.frontend_task.arn
   frontend_execution_role_name = aws_iam_role.frontend_execution.name
 
-  # CloudWatch log group configuration
   log_group_name            = "/ecs/${local.name_prefix}"
   cloudwatch_log_group_name = aws_cloudwatch_log_group.frontend.name
   cloudwatch_log_group_arn  = aws_cloudwatch_log_group.frontend.arn
