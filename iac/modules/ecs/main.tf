@@ -351,7 +351,6 @@ resource "aws_lb" "main" {
 
   enable_deletion_protection = var.lb_deletion_protection
 
-  # Enable cross-zone load balancing for high availability
   enable_cross_zone_load_balancing = var.enable_cross_zone_load_balancing
 
   tags = merge(
@@ -361,9 +360,6 @@ resource "aws_lb" "main" {
     }
   )
 }
-
-# Network Load Balancer for API Gateway VPC Link
-
 
 # Target group for the NLB
 resource "aws_lb_target_group" "app" {
@@ -491,7 +487,6 @@ resource "aws_iam_role" "ecs_task_execution_role" {
   )
 }
 
-# IAM role for ECS tasks (allows tasks to make AWS API calls)
 resource "aws_iam_role" "ecs_task_role" {
   name = "${local.name}-ecs-task-role"
 
@@ -516,7 +511,6 @@ resource "aws_iam_role" "ecs_task_role" {
   )
 }
 
-# Policy to allow ECS exec access
 resource "aws_iam_role_policy" "ecs_exec_policy" {
   name = "${local.name}-ecs-exec-policy"
   role = aws_iam_role.ecs_task_role.id
@@ -777,11 +771,9 @@ resource "aws_ecs_service" "api" {
   deployment_maximum_percent         = var.deployment_maximum_percent
   deployment_minimum_healthy_percent = var.deployment_minimum_healthy_percent
 
-  # Enable CloudWatch Container Insights for detailed monitoring
   enable_ecs_managed_tags = true
   propagate_tags          = "SERVICE"
 
-  # Circuit breaker to detect and handle failed deployments automatically
   deployment_circuit_breaker {
     enable   = var.enable_circuit_breaker
     rollback = var.enable_circuit_breaker
