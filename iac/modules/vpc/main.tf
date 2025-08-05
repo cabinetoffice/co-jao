@@ -1,9 +1,7 @@
-# VPC module - main.tf
+# VPC module
 locals {
-  # Resource naming
   name = "${var.name_prefix}-${var.environment}"
 
-  # Common tags for all resources
   common_tags = merge(
     var.tags,
     {
@@ -12,10 +10,9 @@ locals {
       Name        = local.name
     }
   )
-  
+
   vpc_id = aws_vpc.main.id
-  
-  # Determine the number of NAT gateways to create
+
   nat_gateway_count = var.enable_nat_gateway ? (var.single_nat_gateway ? 1 : length(var.public_subnet_cidrs)) : 0
 }
 
@@ -33,9 +30,6 @@ resource "aws_vpc" "main" {
     }
   )
 }
-
-# Data source to fetch existing VPC if skipping creation
-
 
 # Public subnets
 resource "aws_subnet" "public" {
@@ -150,7 +144,6 @@ resource "aws_route_table" "private" {
   )
 }
 
-# Associate public subnets with public route table
 # Route table association for public subnets
 resource "aws_route_table_association" "public" {
   count          = length(var.public_subnet_cidrs)

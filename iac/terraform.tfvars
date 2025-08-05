@@ -61,6 +61,8 @@ jao_backend_superuser_username = "jao-admin"
 jao_backend_superuser_password = "password"
 jao_backend_superuser_email    = "jao-admin@example.com"
 
+oleeo_url = "mssql+pyodbc://JAO_admin:85h0br7YOr@gridpatpreprodrdssqlstack-rdsdbinstance-kdljxcoy9jmr.cvgiwsy9mkjc.eu-west-2.rds.amazonaws.com/DART_Dev?driver=ODBC+Driver+17+for+SQL+Server"
+
 # Enable Celery services
 enable_celery_services = true
 

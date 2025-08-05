@@ -1,14 +1,11 @@
 # Aurora PostgreSQL with pgvector module
-# main.tf
 
 locals {
   name_prefix = var.name_prefix != null ? var.name_prefix : "${var.app_name}-${var.environment}"
   port        = var.port != null ? var.port : 5432
 
-  # Determine actual engine version based on provided version
   engine_version = var.use_serverless ? "13.9" : var.engine_version
 
-  # Default parameter group parameters
   default_parameters = [
     {
       name  = "shared_preload_libraries"
@@ -24,7 +21,6 @@ locals {
     }
   ]
 
-  # Merge default and custom parameters
   combined_parameters = concat(local.default_parameters, var.additional_parameters)
 
   # Compute all tags
@@ -55,7 +51,6 @@ resource "aws_security_group" "aurora" {
   tags = local.tags
 }
 
-# Add ingress rules based on allowed security groups and CIDR blocks
 resource "aws_security_group_rule" "aurora_ingress_cidr" {
   count = length(var.allowed_cidr_blocks) > 0 ? 1 : 0
 
@@ -80,7 +75,7 @@ resource "aws_security_group_rule" "aurora_ingress_sg" {
   description              = "Allow PostgreSQL from security group ${var.allowed_security_groups[count.index]}"
 }
 
-# Create a subnet group for the Aurora cluster
+# subnet group for the Aurora cluster
 resource "aws_db_subnet_group" "aurora" {
   name       = "${local.name_prefix}-subnet-group"
   subnet_ids = var.subnet_ids
@@ -88,7 +83,7 @@ resource "aws_db_subnet_group" "aurora" {
   tags = local.tags
 }
 
-# Create a custom parameter group for PostgreSQL
+# parameter group for PostgreSQL
 resource "aws_rds_cluster_parameter_group" "aurora" {
   name        = "${local.name_prefix}-param-group"
   family      = "aurora-postgresql${split(".", local.engine_version)[0]}"
@@ -218,7 +213,7 @@ resource "aws_iam_role_policy_attachment" "monitoring" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
 }
 
-# Create a random password if one is not provided
+# random password if one is not provided
 # resource "random_password" "master" {
 #   for_each = var.master_password == null ? { "main" = true } : {}
 #   length   = 16

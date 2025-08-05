@@ -1,6 +1,3 @@
-# outputs.tf file with S3 bucket outputs
-# Outputs for the main Terraform configuration
-
 output "api_gateway_url" {
   description = "API Gateway URL"
   value       = module.api_gateway.api_gateway_url

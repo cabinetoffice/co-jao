@@ -184,3 +184,5 @@ iac/tfplan
 iac/.DS_Store
 
 .DS_Store
+
+db_dumps/*

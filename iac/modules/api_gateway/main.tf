@@ -178,7 +178,6 @@ resource "aws_api_gateway_method" "proxy" {
   http_method   = "ANY"
   authorization = "NONE"
 
-  # Add request parameters to pass all headers, query strings, and path parameters to the integration
   request_parameters = {
     "method.request.path.proxy" = true
   }
@@ -190,7 +189,7 @@ resource "aws_api_gateway_method" "routes" {
 
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.routes[count.index].id
-  http_method   = element(local.routes[count.index + 1].methods, 0) # Use first method from methods array
+  http_method   = element(local.routes[count.index + 1].methods, 0)
   authorization = "NONE"
 
   # Forward query parameters
@@ -235,8 +234,6 @@ resource "aws_api_gateway_integration" "routes" {
   timeout_milliseconds = 29000
 }
 
-# For API key functionality, we need to use REST API Gateway
-# REST API Gateway (APIGatewayV1) for API key management
 resource "aws_api_gateway_rest_api" "api_keys_api" {
   count = local.create_api_keys ? 1 : 0
 

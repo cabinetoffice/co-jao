@@ -1,4 +1,3 @@
-# variables.tf
 variable "aws_region" {
   description = "The AWS region to deploy resources"
   type        = string
@@ -282,6 +281,12 @@ variable "jao_backend_superuser_username" {
 
 variable "jao_backend_superuser_email" {
   description = "Email for the JAO backend superuser"
+  type        = string
+  default     = ""
+}
+
+variable "oleeo_url" {
+  description = "URL for the OLEEO database"
   type        = string
   default     = ""
 }

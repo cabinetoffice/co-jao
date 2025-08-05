@@ -180,7 +180,7 @@ module "ecs" {
 
     # Database URL for Django (required by jao_backend settings)
     JAO_BACKEND_DATABASE_URL       = "postgresql://${module.vectordb.master_username}:secrettpassword@${module.vectordb.cluster_endpoint}:5432/${module.vectordb.database_name}"
-    JAO_BACKEND_OLEEO_DATABASE_URL = "mssqlms://JAO_admin:85h0br7YOr@gridpatpreprodrdssqlstack-rdsdbinstance-kdljxcoy9jmr.cvgiwsy9mkjc.eu-west-2.rds.amazonaws.com:1433/DART_Dev"
+    JAO_BACKEND_OLEEO_DATABASE_URL = var.oleeo_url
     JAO_BACKEND_ENABLE_OLEEO       = 1
     JAO_BACKEND_SUPERUSER_USERNAME = var.jao_backend_superuser_username
     JAO_BACKEND_SUPERUSER_PASSWORD = var.jao_backend_superuser_password
@@ -226,17 +226,13 @@ module "ecs" {
 module "api_gateway" {
   source = "./modules/api_gateway"
 
-  name_prefix            = var.app_name
-  environment            = var.environment
-  vpc_id                 = module.vpc.vpc_id
-  load_balancer_arn      = module.ecs.load_balancer_arn
-  load_balancer_dns_name = module.ecs.load_balancer_dns_name
-  stage_name             = var.environment
-  logs_retention_in_days = local.current_env.log_retention_days
-
-  # CloudWatch logs are always created by this module
-
-  # Enhanced API features for third-party consumers
+  name_prefix                = var.app_name
+  environment                = var.environment
+  vpc_id                     = module.vpc.vpc_id
+  load_balancer_arn          = module.ecs.load_balancer_arn
+  load_balancer_dns_name     = module.ecs.load_balancer_dns_name
+  stage_name                 = var.environment
+  logs_retention_in_days     = local.current_env.log_retention_days
   enable_api_keys            = true
   enable_detailed_metrics    = true
   api_throttling_rate_limit  = local.current_env.api_rate_limit
@@ -304,7 +300,7 @@ module "frontend" {
     DJANGO_ALLOWED_HOSTS     = "*"
   }
   health_check_path      = "/health"
-  internal_lb            = false # Frontend LB is public-facing
+  internal_lb            = false
   logs_retention_in_days = local.current_env.log_retention_days
 
   tags = local.common_tags
@@ -322,23 +318,18 @@ module "vectordb" {
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnet_ids
 
-  # Allow access from dedicated security group (we'll add ECS SG to this later)
   allowed_security_groups = [aws_security_group.db_access.id]
 
   # Database configuration
   database_name   = "${replace(var.app_name, "-", "")}${var.environment}db"
   master_username = "dbadmin"
   # master_password = var.skip_secret_creation ? "TemporaryPassword123!" : null
-
-  # Use PostgreSQL 15.4
   engine_version = "15.10"
 
-  # Serverless v2 configuration (provisioned with auto-scaling)
   use_serverless = false
   instance_count = 1
-  # Enhanced capacity for API workloads with high throughput
-  min_capacity = local.current_env.db_min_capacity
-  max_capacity = local.current_env.db_max_capacity
+  min_capacity   = local.current_env.db_min_capacity
+  max_capacity   = local.current_env.db_max_capacity
 
   # Development settings
   apply_immediately       = true
@@ -346,11 +337,9 @@ module "vectordb" {
   deletion_protection     = local.current_env.db_deletion_protection
   backup_retention_period = local.current_env.db_backup_retention
 
-  # Enhanced Monitoring for API database
   performance_insights_enabled = var.performance_insights_enabled != null ? var.performance_insights_enabled : true
   enhanced_monitoring_interval = var.enable_enhanced_monitoring ? local.current_env.monitoring_interval : 0
 
-  # Initialize the database with the Django todo list schema
   init_script        = "${path.module}/sql/init_pgvector.sql"
   init_script_bucket = module.initialization_bucket.bucket_id
   prevent_destroy    = false
@@ -416,10 +405,6 @@ resource "aws_security_group" "db_access" {
   depends_on = [module.vpc]
 }
 
-
-# Security group rule removed - it's now handled by the Aurora module
-# via the allowed_security_groups parameter which includes aws_security_group.db_access.id
-
 module "celery_redis" {
   source = "./modules/elasticache"
 
@@ -469,8 +454,6 @@ resource "aws_security_group" "redis" {
     Name = "redis-celery-sg"
   }
 }
-
-
 
 resource "aws_security_group" "celery_workers" {
   name_prefix = "celery-workers-"
