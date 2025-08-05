@@ -21,16 +21,16 @@ RUN apt-get update && \
     unixodbc \
     unixodbc-dev \
     gcc \
-    g++ \
-    && ldconfig && \
+    g++ && \
+    ldconfig && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/* \
-    ls -la /opt/microsoft/msodbcsql17/lib64/ \
-    ls -la /usr/lib/x86_64-linux-gnu/odbc/\
-    odbcinst -q -d
+    rm -rf /var/lib/apt/lists/*
 
-# Verify ODBC driver installation
-RUN odbcinst -q -d || echo "ODBC driver check failed"
+# Verify ODBC installation in separate layer for better debugging
+RUN echo "=== Checking ODBC installation ===" && \
+    ls -la /opt/microsoft/msodbcsql17/lib64/ || echo "msodbcsql17 lib64 directory not found" && \
+    ls -la /usr/lib/x86_64-linux-gnu/odbc/ || echo "ODBC directory not found" && \
+    odbcinst -q -d || echo "ODBC driver check failed"
 
 # Create the app directory
 RUN mkdir /app
