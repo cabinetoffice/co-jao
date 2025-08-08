@@ -12,3 +12,10 @@ def test_text_span_merge():
     assert merged.text == "quick brown"
     assert merged.start_index == 4
     assert merged.end_index == 15
+
+def test_text_span_positioning():
+    # Verify issue spans match source text positions
+    span = TextSpan("Sample text", 7, 11)
+    assert span.text == "text"
+    assert span.start_index == 7
+    assert span.end_index == 11
