@@ -81,42 +81,6 @@ class HybridChecker(Check): # Not abstract - concrete pattern documentation
 It eliminates abstraction layers from traditional OOP linters, with measured efficiency gains in our implementation
 
 
-.. # Core flow
-.. text = "GDPR applies"
-.. doc_span = TextSpan(text)
-.. issues = []
-.. for checker in [AcronymHybridChecker(), ListFormatHybridChecker()]:
-..     issues.extend(checker.check(doc_span))
-
-
-.. Consequences
-.. ✅ Benefits:
-.. Accurate highlighting
-.. Memory efficiency
-.. Clean checker contracts
-.. ⚠️ Constraints:
-.. Spans become invalid if source text changes
-.. Careful span boundary handling required
-
-.. ### Key Principles
-
-.. # 1. **Span Immutability**: Critical for:
-.. #    - Thread safety
-.. #    - Predictable behavior
-.. #    - Cacheability
-
-.. # 2. **Checker Protocol** enables:
-.. #    ```python
-.. #    def run_check(checker: Check, text: str) -> List[Issue]:
-.. #        return list(checker.check(TextSpan(text)))
-
-.. # 3. Service Layer best practices:
-.. # Keeps span creation in one place
-.. # Maintains clean separation:
-
-.. # text
-.. # API -> Service (orchestration) -> Checkers (validation)
-
 4. Recommended Actions**  
 
 a. **Immediate**:  
