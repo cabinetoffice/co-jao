@@ -27,7 +27,7 @@ Addendum (Not Replacement)
 ADR-0007:
 ✅ Augments ADR-006's checker contract with hybrid pattern specifics
 ✅ Documents emergent best practices (e.g, `_find_definitions()` helper pattern)
-✅ Standardises the `*HybridChecker` naminf convention
+✅ Standardises the `*HybridChecker` naming convention
 
 ADR-0006 remains valid for:
 ✅ Core `TextSpan/Issue` contracts
@@ -81,43 +81,64 @@ class HybridChecker(Check): # Not abstract - concrete pattern documentation
 It eliminates abstraction layers from traditional OOP linters, with measured efficiency gains in our implementation
 
 
-# Core flow
-text = "GDPR applies"
-doc_span = TextSpan(text)
-issues = []
-for checker in [AcronymHybridChecker(), ListFormatHybridChecker()]:
-    issues.extend(checker.check(doc_span))
+.. # Core flow
+.. text = "GDPR applies"
+.. doc_span = TextSpan(text)
+.. issues = []
+.. for checker in [AcronymHybridChecker(), ListFormatHybridChecker()]:
+..     issues.extend(checker.check(doc_span))
 
 
-Consequences
-✅ Benefits:
-Accurate highlighting
-Memory efficiency
-Clean checker contracts
-⚠️ Constraints:
-Spans become invalid if source text changes
-Careful span boundary handling required
+.. Consequences
+.. ✅ Benefits:
+.. Accurate highlighting
+.. Memory efficiency
+.. Clean checker contracts
+.. ⚠️ Constraints:
+.. Spans become invalid if source text changes
+.. Careful span boundary handling required
 
-### Key Principles
+.. ### Key Principles
 
-# 1. **Span Immutability**: Critical for:
-#    - Thread safety
-#    - Predictable behavior
-#    - Cacheability
+.. # 1. **Span Immutability**: Critical for:
+.. #    - Thread safety
+.. #    - Predictable behavior
+.. #    - Cacheability
 
-# 2. **Checker Protocol** enables:
-#    ```python
-#    def run_check(checker: Check, text: str) -> List[Issue]:
-#        return list(checker.check(TextSpan(text)))
+.. # 2. **Checker Protocol** enables:
+.. #    ```python
+.. #    def run_check(checker: Check, text: str) -> List[Issue]:
+.. #        return list(checker.check(TextSpan(text)))
 
-# 3. Service Layer best practices:
-# Keeps span creation in one place
-# Maintains clean separation:
+.. # 3. Service Layer best practices:
+.. # Keeps span creation in one place
+.. # Maintains clean separation:
 
-# text
-# API -> Service (orchestration) -> Checkers (validation)
+.. # text
+.. # API -> Service (orchestration) -> Checkers (validation)
 
-4. xxx
+4. Recommended Actions**  
+
+a. **Immediate**:  
+   - Ratify ADR-0007 as living documentation  
+   - Add `HybridChecker` as a concrete (not abstract) template class  
+
+b. **Medium-term**:  
+   ```python
+   # services.py
+   class LintingService:
+       def register_hybrid(self, name: str, *, patterns: Dict[str, str]):
+           """Decorator for hybrid checkers"""
+           def wrapper(cls):
+               cls.compiled_patterns = {k: re.compile(v) for k,v in patterns.items()}
+               self.available_checks[name] = cls
+               return cls
+
+c. Long-term:
+    - Migrate existing checkers to hybrid pattern
+    - Document span math best practices
+    - Ensure all new checkers follow the `HybridChecker` template
+
 
 5. Justification for Addendum Approach
 
@@ -147,5 +168,11 @@ class OptimisedHybridChecker(Check):
 
 ##  Maintenance Guidelines
 
-### For Developer not conversant with the code base
-1. Always  
+### Consider having preference for:
+1. Always use `span.slice()` over manual math
+2. The validation snippet below conceptualises it clearly:
+```python
+if not 0 <= rel_start <= rel_end <= len(span):
+    raise ValueError(f"Invalid slice {rel_start}-{rel_end}")
+    return TextSpan(span.source_text, rel_start, rel_end)  
+```
