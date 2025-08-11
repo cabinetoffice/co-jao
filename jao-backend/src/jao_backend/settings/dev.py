@@ -71,11 +71,11 @@ except ImportError:
 
 os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 JUPYTER_TOKEN = os.getenv("JAO_BACKEND_JUPYTER_TOKEN", "")
-JUPYTER_PORT = os.getenv("JAO_BACKEND_JUPYTER_PORT")
+JUPYTER_PORT = os.getenv("JAO_BACKEND_JUPYTER_PORT") or 8888
 
 NOTEBOOK_ARGUMENTS = [
     "--ip=0.0.0.0",
-    f"--port={JUPYTER_PORT}" if JUPYTER_PORT else "",
+    f"--port={JUPYTER_PORT}",
     "--no-browser",
     f'--IdentityProvider.token="{JUPYTER_TOKEN}"' if JUPYTER_TOKEN else "",
     "--IdentityProvider.password_required=false",
