@@ -147,18 +147,22 @@ module "vpc" {
 module "ecs" {
   source = "./modules/ecs"
 
-  name_prefix                   = var.app_name
-  environment                   = var.environment
-  ecr_repository_url            = local.backend_ecr_url
-  container_port                = var.container_port
-  vpc_id                        = module.vpc.vpc_id
-  private_subnet_ids            = module.vpc.private_subnet_ids
-  public_subnet_ids             = module.vpc.public_subnet_ids
-  cpu                           = var.task_cpu
-  memory                        = var.task_memory
-  desired_count                 = var.desired_count
-  container_name                = var.app_name
-  additional_security_group_ids = [aws_security_group.redis_client.id, aws_security_group.db_access.id]
+  name_prefix        = var.app_name
+  environment        = var.environment
+  ecr_repository_url = local.backend_ecr_url
+  container_port     = var.container_port
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+  public_subnet_ids  = module.vpc.public_subnet_ids
+  cpu                = var.task_cpu
+  memory             = var.task_memory
+  desired_count      = var.desired_count
+  container_name     = var.app_name
+  additional_security_group_ids = [
+    aws_security_group.redis_client.id,
+    aws_security_group.db_access.id,
+    aws_security_group.oleeo.id
+  ]
 
   # Environment variables for the API service
   environment_variables = merge(var.environment_variables, {
@@ -382,6 +386,8 @@ resource "aws_security_group" "db_access" {
     description     = "PostgreSQL database access to Aurora"
   }
 
+
+
   # DNS resolution
   egress {
     from_port   = 53
@@ -476,4 +482,22 @@ resource "aws_security_group" "celery_workers" {
 resource "aws_elasticache_subnet_group" "main" {
   name       = "celery-redis-subnet-group"
   subnet_ids = module.vpc.private_subnet_ids
+}
+
+resource "aws_security_group" "oleeo" {
+
+  name_prefix = "oleeo-"
+  vpc_id      = module.vpc.vpc_id
+
+  egress {
+    from_port   = 1433
+    to_port     = 1433
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow outbound MSSQL connection to database VPC"
+  }
+
+  tags = {
+    Name = "oleeo-sg"
+  }
 }
