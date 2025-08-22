@@ -134,7 +134,8 @@ EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_MODEL = os.environ.get(
     TEXT_EMBEDDING_MODEL_OPTIONS[LITELLM_CUSTOM_PROVIDER],
 )
 
-
+# Tag definitions here are synced to the database in `EmbeddingTag.get_configured_tags`
+# unique id is across uuid and model.
 EMBEDDING_TAGS = {
     EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID: {
         # UUID is in UUID7 format, see

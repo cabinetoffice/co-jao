@@ -30,10 +30,13 @@ from jao_backend.application_statistics.ingest_schemas.django_schema import (
 from jao_backend.application_statistics.ingest_schemas.django_schema import (
     SexualOrientationSchema,
 )
-from jao_backend.ingest.ingester.schema_registry import register_upstream_mapping
+from jao_backend.ingest.ingester.schema_registry import register_model_transform
 from jao_backend.roles.ingest_schemas.django_schema import OleeoGradeGroupSchema
 from jao_backend.roles.ingest_schemas.django_schema import OleeoRoleTypeSchema
-from jao_backend.vacancies.ingest_schemas.django_schema import VacancySchema
+from jao_backend.vacancies.ingest_schemas.django_schema import (
+    VacancySchema,
+    AggregatedStatisticSchema,
+)
 
 
 def parse_datetime(value: datetime) -> datetime:
@@ -102,42 +105,42 @@ def list_mixin_schema_factory(
     return type(f"ListSchemaMixin{key_prefix.rstrip('_').title()}", (), class_attrs)
 
 
-@register_upstream_mapping
+@register_model_transform
 class IngestAgeGroups(list_mixin_schema_factory("age_group_"), AgeGroupSchema):
     """Map from OLEEO ListAgeGroup field names to JAO names."""
 
     pass
 
 
-@register_upstream_mapping
+@register_model_transform
 class IngestDisabilities(list_mixin_schema_factory("disability_"), DisabilitySchema):
     """Map from OLEEO ListDisability field names to JAO names."""
 
     pass
 
 
-@register_upstream_mapping
+@register_model_transform
 class IngestEthnicGroup(list_mixin_schema_factory("ethnic_group_"), EthnicGroupSchema):
     """Map from OLEEO ListEthnicGroup field names to JAO names."""
 
     pass
 
 
-@register_upstream_mapping
+@register_model_transform
 class IngestEthnicity(list_mixin_schema_factory("ethnicity_"), EthnicitySchema):
     """Map from OLEEO ListEthnicity field names to JAO names."""
 
     pass
 
 
-@register_upstream_mapping
+@register_model_transform
 class IngestGender(list_mixin_schema_factory("gender_"), GenderSchema):
     """Map from OLEEO ListGender field names to JAO names."""
 
     pass
 
 
-@register_upstream_mapping
+@register_model_transform
 class IngestOleeoGradeGroup(
     list_mixin_schema_factory("job_grade_", override_annotations={"description": list}),
     OleeoGradeGroupSchema,
@@ -159,14 +162,14 @@ class IngestOleeoGradeGroup(
         return parse_comma_seperated_list(value)
 
 
-@register_upstream_mapping
+@register_model_transform
 class IngestReligion(list_mixin_schema_factory("religion_"), ReligionSchema):
     """Map from OLEEO ListReligion field names to JAO names."""
 
     pass
 
 
-@register_upstream_mapping
+@register_model_transform
 class IngestRoleType(
     list_mixin_schema_factory(
         "type_of_role_", override_annotations={"description": list}
@@ -182,7 +185,7 @@ class IngestRoleType(
         return parse_comma_seperated_list(value)
 
 
-@register_upstream_mapping
+@register_model_transform
 class IngestSexualOrientation(
     list_mixin_schema_factory("sexual_orientation_"), SexualOrientationSchema
 ):
@@ -191,7 +194,7 @@ class IngestSexualOrientation(
     pass
 
 
-@register_upstream_mapping
+@register_model_transform
 class IngestVacancy(VacancySchema):
     """Map from OLEEO ListVacancy field names to JAO names."""
 
@@ -231,3 +234,8 @@ class IngestVacancy(VacancySchema):
     def validate_last_updated(cls, value: Union[str, datetime]) -> datetime:
         """Ensure that last_updated is in the correct format."""
         return parse_datetime(value)
+
+
+@register_model_transform
+class IngestAggregatedStatistic(AggregatedStatisticSchema):
+    pass

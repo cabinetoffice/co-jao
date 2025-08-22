@@ -1,5 +1,3 @@
-from dataclasses import Field
-
 from djantic import ModelSchema
 from pydantic import ConfigDict
 
@@ -14,7 +12,7 @@ class OleeoGradeGroupSchema(ModelSchema):
     Schema for OleeoGradeGroup model, which represents groups of job grades.
     """
 
-    model_config = ConfigDict(model=OleeoGradeGroup, include=["id", "description", "shorthand", "last_updated"])  # type: ignoref
+    model_config = ConfigDict(model=OleeoGradeGroup, include=["id", "description", "shorthand", "last_updated"])  # type: ignore
 
 
 class OleeoRoleTypeSchema(ModelSchema):

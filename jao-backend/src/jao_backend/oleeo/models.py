@@ -31,6 +31,7 @@ class Applications(OleeoUpstreamModel):
         null=True,
     )
     employment_history = models.TextField(blank=True, null=True)
+    row_last_updated = models.DateTimeField()
 
     class Meta:
         managed = False  # Created from a view. Don't remove.
