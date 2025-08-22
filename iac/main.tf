@@ -226,6 +226,40 @@ module "ecs" {
   tags = local.common_tags
 }
 
+# Frontend Module
+module "frontend" {
+  source = "./modules/frontend"
+
+  name_prefix        = var.app_name
+  environment        = var.environment
+  ecr_repository_url = local.frontend_ecr_url
+  container_port     = 8000
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+  public_subnet_ids  = module.vpc.public_subnet_ids
+  cpu                = var.task_cpu
+  memory             = var.task_memory
+  desired_count      = var.desired_count
+
+  # Environment variables for the frontend service
+  environment_variables = {
+    DJANGO_DEBUG             = local.current_env.django_debug
+    DJANGO_SETTINGS_MODULE   = "jao_web.settings.dev"
+    PORT                     = "8000"
+    JAO_BACKEND_URL          = module.api_gateway.api_gateway_url
+    JAO_BACKEND_TIMEOUT      = "15"
+    JAO_BACKEND_ENABLE_HTTP2 = "true"
+    SESSION_COOKIE_SECURE    = local.current_env.session_cookie_secure
+    ENV                      = var.environment
+    DJANGO_ALLOWED_HOSTS     = "*"
+  }
+  health_check_path      = "/health"
+  internal_lb            = false
+  logs_retention_in_days = local.current_env.log_retention_days
+
+  tags = local.common_tags
+}
+
 # API Gateway with enhanced third-party API features
 module "api_gateway" {
   source = "./modules/api_gateway"
@@ -276,40 +310,6 @@ module "api_gateway" {
   tags = local.common_tags
 }
 
-# Frontend Module
-module "frontend" {
-  source = "./modules/frontend"
-
-  name_prefix        = var.app_name
-  environment        = var.environment
-  ecr_repository_url = local.frontend_ecr_url
-  container_port     = 8000
-  vpc_id             = module.vpc.vpc_id
-  private_subnet_ids = module.vpc.private_subnet_ids
-  public_subnet_ids  = module.vpc.public_subnet_ids
-  cpu                = var.task_cpu
-  memory             = var.task_memory
-  desired_count      = var.desired_count
-
-  # Environment variables for the frontend service
-  environment_variables = {
-    DJANGO_DEBUG             = local.current_env.django_debug
-    DJANGO_SETTINGS_MODULE   = "jao_web.settings.dev"
-    PORT                     = "8000"
-    JAO_BACKEND_URL          = module.api_gateway.api_gateway_url
-    JAO_BACKEND_TIMEOUT      = "15"
-    JAO_BACKEND_ENABLE_HTTP2 = "true"
-    SESSION_COOKIE_SECURE    = local.current_env.session_cookie_secure
-    ENV                      = var.environment
-    DJANGO_ALLOWED_HOSTS     = "*"
-  }
-  health_check_path      = "/health"
-  internal_lb            = false
-  logs_retention_in_days = local.current_env.log_retention_days
-
-  tags = local.common_tags
-}
-
 
 # Database Module - Aurora PostgreSQL with pgvector
 module "vectordb" {
@@ -323,6 +323,10 @@ module "vectordb" {
   subnet_ids = module.vpc.private_subnet_ids
 
   allowed_security_groups = [aws_security_group.db_access.id]
+
+  # Enable data science read replica if SageMaker is enabled
+  create_data_science_replica = var.enable_sagemaker_environment
+  data_science_instance_class = var.environment == "prod" ? "db.r6g.xlarge" : "db.serverless"
 
   # Database configuration
   database_name   = "${replace(var.app_name, "-", "")}${var.environment}db"
@@ -369,6 +373,20 @@ module "vectordb" {
   ]
 
   tags = local.common_tags
+}
+
+# Security group rule to allow SageMaker to connect to Aurora
+# Created here to avoid circular dependency
+resource "aws_security_group_rule" "sagemaker_to_aurora" {
+  count = var.enable_sagemaker_environment ? 1 : 0
+
+  type                     = "ingress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  source_security_group_id = module.sagemaker[0].security_group_id
+  security_group_id        = module.vectordb.security_group_id
+  description              = "Allow SageMaker notebook to connect to Aurora PostgreSQL"
 }
 
 # Security group for database access from ECS tasks
@@ -500,4 +518,73 @@ resource "aws_security_group" "oleeo" {
   tags = {
     Name = "oleeo-sg"
   }
+}
+
+# S3 Bucket for Data Science Work
+module "data_science_bucket" {
+  count  = var.enable_sagemaker_environment ? 1 : 0
+  source = "./modules/s3_bucket"
+
+  bucket_name       = "${var.app_name}-${var.environment}-data-science"
+  enable_versioning = true
+  enable_encryption = true
+  force_destroy     = local.current_env.force_destroy_buckets
+
+  lifecycle_rules = [
+    {
+      id     = "expire-old-data"
+      status = "Enabled"
+      expiration = {
+        days = 90
+      }
+    }
+  ]
+
+  tags = merge(local.common_tags, {
+    Purpose = "data-science"
+  })
+}
+
+# SageMaker Notebook Instance
+module "sagemaker" {
+  count  = var.enable_sagemaker_environment ? 1 : 0
+  source = "./modules/sagemaker"
+
+  app_name    = var.app_name
+  environment = var.environment
+
+  # Network Configuration
+  vpc_id                 = module.vpc.vpc_id
+  vpc_cidr_block         = var.vpc_cidr
+  subnet_id              = module.vpc.private_subnet_ids[0]
+  direct_internet_access = var.environment == "dev" ? "Enabled" : "Disabled"
+
+  # Aurora Database Connection
+  aurora_endpoint = coalesce(
+    module.vectordb.data_science_replica_endpoint,
+    module.vectordb.reader_endpoint
+  )
+  aurora_port       = module.vectordb.port
+  database_name     = module.vectordb.database_name
+  database_username = var.sagemaker_db_username
+  database_password = var.sagemaker_db_password
+
+  # S3 Configuration
+  data_bucket_name = module.data_science_bucket[0].bucket_id
+  data_bucket_arn  = module.data_science_bucket[0].bucket_arn
+
+  # Notebook Configuration
+  notebook_instance_type  = var.environment == "prod" ? "ml.t3.xlarge" : "ml.t3.medium"
+  volume_size             = var.environment == "prod" ? 50 : 20
+  auto_shutdown_idle_time = var.environment == "prod" ? 60 : 120
+
+  # Monitoring
+  enable_monitoring  = true
+  log_retention_days = local.current_env.log_retention_days
+
+  tags = merge(local.common_tags, {
+    Team = "data-science"
+  })
+
+  depends_on = [module.vectordb]
 }
