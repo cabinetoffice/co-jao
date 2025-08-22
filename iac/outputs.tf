@@ -89,3 +89,32 @@ output "initialization_bucket_region" {
   description = "Region where the initialization bucket is located"
   value       = module.initialization_bucket.bucket_region
 }
+
+# SageMaker outputs
+output "sagemaker_notebook_name" {
+  description = "Name of the SageMaker notebook instance"
+  value       = var.enable_sagemaker_environment ? module.sagemaker[0].notebook_instance_name : null
+}
+
+output "sagemaker_notebook_url" {
+  description = "URL to access the SageMaker notebook instance"
+  value       = var.enable_sagemaker_environment ? module.sagemaker[0].notebook_instance_url : null
+}
+
+output "data_science_bucket" {
+  description = "S3 bucket for data science work"
+  value       = var.enable_sagemaker_environment ? module.data_science_bucket[0].bucket_id : null
+}
+
+output "data_science_db_endpoint" {
+  description = "Database endpoint for data science (read replica if available)"
+  value = var.enable_sagemaker_environment ? coalesce(
+    module.vectordb.data_science_replica_endpoint,
+    module.vectordb.reader_endpoint
+  ) : null
+}
+
+output "sagemaker_connection_instructions" {
+  description = "Instructions for accessing SageMaker and connecting to the database"
+  value       = var.enable_sagemaker_environment ? module.sagemaker[0].connection_instructions : "SageMaker environment not enabled"
+}

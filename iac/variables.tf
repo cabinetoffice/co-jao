@@ -302,3 +302,26 @@ variable "admin_allowed_cidrs" {
   type        = list(string)
   default     = null
 }
+
+# variables_sagemaker.tf - Variables for SageMaker data science environment
+
+# Feature Flag
+variable "enable_sagemaker_environment" {
+  description = "Enable the SageMaker data science environment with Aurora read replica"
+  type        = bool
+  default     = false
+}
+
+# Database Configuration for SageMaker
+variable "sagemaker_db_username" {
+  description = "Database username for SageMaker read-only access"
+  type        = string
+  default     = "sagemaker_readonly"
+}
+
+variable "sagemaker_db_password" {
+  description = "Database password for SageMaker read-only access"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
