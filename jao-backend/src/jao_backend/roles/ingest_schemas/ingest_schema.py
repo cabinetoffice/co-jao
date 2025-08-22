@@ -3,12 +3,12 @@ from typing import Union
 from pydantic import Field
 from pydantic import field_validator
 
-from jao_backend.ingest.ingester.schema_registry import register_upstream_mapping
+from jao_backend.ingest.ingester.schema_registry import register_model_transform
 from jao_backend.roles.ingest_schemas.django_schema import GradeSchema
 from jao_backend.roles.ingest_schemas.django_schema import RoleTypeSchema
 
 
-@register_upstream_mapping
+@register_model_transform
 class IngestRoleTypeSchema(RoleTypeSchema):
     """RoleType schema for ingestion purposes.
 
@@ -28,7 +28,7 @@ class IngestRoleTypeSchema(RoleTypeSchema):
         return value[0] if value else None
 
 
-@register_upstream_mapping
+@register_model_transform
 class IngestGradeSchema(GradeSchema):
     """Grade schema for ingestion purposes."""
 

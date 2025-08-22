@@ -1,3 +1,4 @@
+from contextlib import suppress
 from functools import lru_cache
 from typing import Type
 from typing import Union
@@ -5,6 +6,8 @@ from typing import Union
 from django.apps import apps
 from django.db import models
 
+from jao_backend.common.db.models.models import ListModel
+from jao_backend.oleeo.errors import NoDestinationModel
 from jao_backend.oleeo.querysets import UpstreamModelQuerySet
 
 
@@ -79,7 +82,7 @@ class UpstreamModelMixin:
             return model_path
 
         if model_path is None:
-            raise ValueError(
+            raise NoDestinationModel(
                 f"{cls.__name__}.destination_model must have a destination_model set in"
                 " the format: app_name.model_name"
             )
@@ -91,7 +94,7 @@ class UpstreamModelMixin:
         try:
             model_class = apps.get_model(app_label=app_label, model_name=model_name)
         except LookupError:
-            raise ValueError(
+            raise DestinationModelNotFound(
                 f"{cls.__name__}.destination_model '{model_path}' does not exist. "
             )
         return model_class
