@@ -29,10 +29,10 @@ class Command(TaskCommandMixin, BaseCommand):
         is usefully locally when we run LLMs that use a lot of memory.
         """
         if not settings.JAO_BACKEND_ENABLE_OLEEO:
-            logger.error("OLEEO ingest is disabled")
-            raise ValueError("OLEEO ingest is not enabled")
+            logger.error("OLEEO integration is disabled")
+            raise ValueError("OLEEO integration is not enabled")
 
         max_batch_size = (
             options["batch_size"] or settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE
         )
-        super().run_task(options, ingest_vacancies, max_batch_size=max_batch_size)
+        self.run_task(options, ingest_vacancies, max_batch_size=max_batch_size)

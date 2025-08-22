@@ -246,7 +246,7 @@ class EmbeddingTag(models.Model):
         Also, synchronizes the tags in the database with the tags configured in settings.
 
         Tags are setup in settings, this allows us to have different models on AWS vs local,
-        for the different named tags speciried there.
+        for the different named tags specified there.
         """
         tags = {}
         for tag_data in settings.EMBEDDING_TAGS.values():
