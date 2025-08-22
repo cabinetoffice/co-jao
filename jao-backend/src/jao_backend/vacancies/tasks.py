@@ -1,3 +1,6 @@
+"""
+The Celery tasks here wrap the functions that do the actual work.
+"""
 from celery.canvas import chain
 from celery_singleton import Singleton
 from celery.utils.log import get_task_logger
@@ -13,7 +16,8 @@ from jao_backend.vacancies.models import Vacancy
 
 
 from jao_backend.common.celery import app as celery
-from jao_backend.ingest.ingester.oleeo_ingest import OleeoIngest
+from jao_backend.ingest.ingester.ingest_vacancies import OleeoVacanciesIngest
+from jao_backend.ingest.ingester.ingest_aggregated_applicants import OleeoApplicantStatisticsAggregator
 
 
 logger = get_task_logger(__name__)
@@ -67,7 +71,24 @@ def ingest_vacancies(max_batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SI
         raise ImproperlyConfigured("Oleeo ingest is not enabled")
 
     logger.info(f"Starting Oleeo ingest with max_batch_size={max_batch_size}")
-    ingester = OleeoIngest(max_batch_size=max_batch_size)
+    ingester = OleeoVacanciesIngest(max_batch_size=max_batch_size)
+    ingester.do_ingest()
+
+@celery.task(base=Singleton, lock_expires=60 * 60)
+def aggregate_applicant_statistics(max_batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE, initial_vacancy_id=None):
+    """
+    Ingest data from OLEEO / R2D2.
+
+    Once the vacancy data is ingested, further work is required, e.g. embedding,
+    see `jao_backend.common.tasks` for orchestration tasks.
+    """
+
+    if not settings.JAO_BACKEND_ENABLE_OLEEO:
+        logger.error("Oleeo ingest is disabled")
+        raise ImproperlyConfigured("Oleeo ingest is not enabled")
+
+    logger.info(f"Starting Oleeo ingest with max_batch_size={max_batch_size}")
+    ingester = OleeoApplicantStatisticsAggregator(batch_size=max_batch_size, initial_vacancy_id=initial_vacancy_id)
     ingester.do_ingest()
 
 
@@ -79,7 +100,9 @@ def reset_ingest_lock():
     pass
 
 
-update_vacancies = chain(ingest_vacancies.s(), embed_vacancies.s())
+update_vacancies = chain(ingest_vacancies.s(),
+                         aggregate_applicant_statistics.s(),
+                         embed_vacancies.s())
 """
 Ingest vacancies, and then start embedding.
 """

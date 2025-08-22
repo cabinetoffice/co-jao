@@ -20,7 +20,7 @@ from django.db.transaction import atomic
 from django.utils import timezone
 from djantic import ModelSchema
 
-from jao_backend.ingest.ingester.schema_registry import get_upstream_schema_for_model
+from jao_backend.ingest.ingester.schema_registry import get_model_transform_schema
 
 
 def sliding_window_range(
@@ -106,7 +106,7 @@ class UpstreamModelQuerySet(models.QuerySet):
         """
         destination_model = self._get_destination_model()
 
-        transform = get_upstream_schema_for_model(destination_model)
+        transform = get_model_transform_schema(destination_model)
         destination_field = self._get_alias_or_field(transform, source_field)
 
         return destination_field
@@ -154,7 +154,7 @@ class UpstreamModelQuerySet(models.QuerySet):
             source_fields = {}
 
         destination_model = self._get_destination_model()
-        transform: Type[ModelSchema] = get_upstream_schema_for_model(destination_model)
+        transform: Type[ModelSchema] = get_model_transform_schema(destination_model)
 
         include = self._resolve_pk_fields(destination_model, args) if args else None
 

@@ -34,7 +34,7 @@ class Grade(ProtectedCharacteristicList):
 class OleeoGradeGroup(ListModel, UpstreamModelMixin):
     """Oleeo groups grades together in comma seperated lists.
 
-    JAO syncs the to here before exploding the data into individual grades.
+    JAO syncs them to here before exploding the data into individual grades.
 
     Only used during ingest, JAO django apps should not link to this model.
     """

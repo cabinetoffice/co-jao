@@ -1,9 +1,12 @@
 import logging
 from functools import lru_cache
+from typing import Dict
+from typing import Set
 from typing import Type
 
-from plum import dispatch
+from plum import Dispatcher
 
+from jao_backend.ingest.ingester.helpers import readable_pk_range
 from jao_backend.oleeo.models import ListAgeGroup
 from jao_backend.oleeo.models import ListDisability
 from jao_backend.oleeo.models import ListEthnicGroup
@@ -14,65 +17,14 @@ from jao_backend.oleeo.models import ListReligion
 from jao_backend.oleeo.models import ListSexualOrientation
 from jao_backend.oleeo.models import ListTypeOfRole
 from jao_backend.oleeo.models import Vacancies
-from jao_backend.roles.models import OleeoGradeGroup
+from jao_backend.roles.models import OleeoGradeGroup, Grade, RoleType
 from jao_backend.roles.models import OleeoRoleTypeGroup
 from jao_backend.vacancies.models import Vacancy
 
 logger = logging.getLogger(__name__)
 
-# Models to ingest these are in order.  Dependencies of other models should come first.
-LIST_MODELS = [
-    ListAgeGroup,
-    # ListApplicantType,
-    # ListApplicationStatus,
-    # ListBusinessArea,
-    # ListCityTown,
-    # ListDepartment,
-    ListDisability,
-    ListEthnicGroup,
-    ListEthnicity,
-    ListGender,
-    # ListLocationType,
-    # ListPostcode,
-    # ListProfession,
-    # ListRegion,
-    ListReligion,
-    ListSexualOrientation,
-    ListTypeOfRole,
-    ListJobGrade,
-    # ListVacancyApproach,
-    # ListVacancyPostcode,
-    # ListVacancyStatus,
-]
 
-DERIVED_MODELS = [
-    OleeoGradeGroup,
-    OleeoRoleTypeGroup,
-]
-
-VACANCY_MODELS = [Vacancies]
-
-MODELS = [
-    *LIST_MODELS,
-    *DERIVED_MODELS,
-    *VACANCY_MODELS,
-]
-
-
-def readable_pk_range(instances):
-    """
-    Return a readable string of the primary keys of the instances.
-    """
-    if not instances:
-        return "[none]"
-
-    if len(instances) == 1:
-        return f"[{instances[0].pk}]"
-
-    return f"[{instances[0].pk}-{instances[len(instances) - 1].pk}]"
-
-
-class OleeoIngest:
+class OleeoVacanciesIngest:
     """
     Ingest OLEEO data stored in the R2D2 database.
 
@@ -81,11 +33,53 @@ class OleeoIngest:
     INSTALLED_APPS must include "oleeo"
     """
 
+    # Models to ingest these are in order.  Dependencies of other models should come first.
+    LIST_MODELS = [
+        ListAgeGroup,
+        # ListApplicantType,
+        # ListApplicationStatus,
+        # ListBusinessArea,
+        # ListCityTown,
+        # ListDepartment,
+        ListDisability,
+        ListEthnicGroup,
+        ListEthnicity,
+        ListGender,
+        # ListLocationType,
+        # ListPostcode,
+        # ListProfession,
+        # ListRegion,
+        ListReligion,
+        ListSexualOrientation,
+        ListTypeOfRole,
+        ListJobGrade,
+        # ListVacancyApproach,
+        # ListVacancyPostcode,
+        # ListVacancyStatus,
+    ]
+
+    DERIVED_MODELS = [
+        OleeoGradeGroup,
+        OleeoRoleTypeGroup,
+    ]
+
+    VACANCY_MODELS = [Vacancies]
+
+    MODELS = [
+        *LIST_MODELS,
+        *DERIVED_MODELS,
+        *VACANCY_MODELS,
+    ]
+
     models = MODELS
-    bulk_ingest = [(Vacancies, Vacancy)]
+    bulk_ingest = [
+        (Vacancies, Vacancy),
+    ]
     """
     Model pairs listed here will use bulk ingest.
     """
+
+    dispatch = Dispatcher()
 
     def __init__(self, max_batch_size=5000, progress_callback=None):
         self.max_batch_size = max_batch_size
@@ -173,7 +167,7 @@ class OleeoIngest:
             )
 
     @lru_cache(maxsize=1)
-    def get_grade_groups(self):
+    def get_grade_groups(self) -> Dict[int, Set[Grade]]:
         grade_groups = {
             grade_group.pk: set(grade_group.get_grades().values_list("pk", flat=True))
             for grade_group in OleeoGradeGroup.objects.all()
@@ -181,7 +175,7 @@ class OleeoIngest:
         return grade_groups
 
     @lru_cache(maxsize=1)
-    def get_role_types(self):
+    def get_role_types(self) -> Dict[int, Set[RoleType]]:
         role_types = {
             role_type.pk: set(role_type.get_role_types().values_list("pk", flat=True))
             for role_type in OleeoRoleTypeGroup.objects.all()
