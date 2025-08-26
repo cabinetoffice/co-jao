@@ -72,7 +72,6 @@ class VacancyQuerySet(PolymorphicEmbeddingQuerySetMixin, models.QuerySet):
         )
         return result
 
-
 class VacancyEmbeddingQuerySet(PolymorphicEmbeddingQuerySetMixin, models.QuerySet):
     """
     QuerySet for VacancyEmbedding model.
