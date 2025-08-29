@@ -42,6 +42,7 @@ def embed_vacancies(limit=settings.JAO_BACKEND_VACANCY_EMBED_LIMIT):
     # Grab the vacancies that are not fully embedded yet, in reverse order so the newest are embedded first.
     vacancies = Vacancy.objects.filter(is_deleted=False).order_by("-id").requires_embedding(limit=limit)
 
+    total_embedded = 0
     logger.info(
         "Embed vacancies.  JAO_BACKEND_EMBEDDING_GENERATION_LIMIT=%s, vacancies to embed: %s",
         settings.JAO_BACKEND_VACANCY_EMBED_LIMIT,
@@ -57,10 +58,11 @@ def embed_vacancies(limit=settings.JAO_BACKEND_VACANCY_EMBED_LIMIT):
                 logger.info("Vacancy %s already embedded, skipping.", vacancy.id)
                 continue
             embed_vacancy(vacancy)
+            total_embedded += 1
     except Exception as e:
         raise e
     finally:
-        logger.info("Embedded %s vacancies", len(vacancies))
+        logger.info("Embedded %s/%s vacancies", total_embedded, len(vacancies))
 
     return len(vacancies)
 
