@@ -38,3 +38,18 @@ def is_task_running(task_name):
         bool: True if task is running, False otherwise
     """
     return are_tasks_running(task_name)[0]
+
+
+def get_running_task_id(task_name):
+    """
+    Find the task ID of a currently running singleton task.
+    Returns the task_id if found, otherwise None.
+    """
+    inspector = celery.control.inspect()
+    active_tasks = inspector.active() or {}
+
+    for worker, tasks in active_tasks.items():
+        for task in tasks:
+            if task.get("name") == task_name:
+                return task.get("id")
+    return None
