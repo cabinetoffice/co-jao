@@ -38,7 +38,7 @@ class VacancyQuerySet(PolymorphicEmbeddingQuerySetMixin, models.QuerySet):
             limit = settings.JAO_BACKEND_VACANCY_EMBED_LIMIT
             # limit can still be None at this point.
         else:
-            limit = max(limit, settings.JAO_BACKEND_VACANCY_EMBED_LIMIT)
+            limit = min(limit, settings.JAO_BACKEND_VACANCY_EMBED_LIMIT)
 
         qs = self.order_by("live_date")
         if limit is None:
