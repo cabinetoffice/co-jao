@@ -40,6 +40,7 @@ if LITELLM_CUSTOM_PROVIDER not in ["ollama", "bedrock"]:
         "Current value: {}".format(LITELLM_CUSTOM_PROVIDER)
     )
 
+# Note: On bedrock this isn't usually set.
 LITELLM_API_BASE = os.environ.get("JAO_BACKEND_LITELLM_API_BASE")
 
 # SECURITY WARNING: keep the secret key used in production secret!
