@@ -115,6 +115,12 @@ INSTALLED_APPS = [
 # Users should usually run pytest directly, e.g: `$ pytest`
 TEST_RUNNER = "jao_backend.settings.tests.runner.PytestTestRunner"
 
+# Chat models, for lookup by LITELLM_CUSTOM_PROVIDER.
+CHAT_MODEL_OPTIONS = {
+    "ollama": "mistral:7b",
+    "bedrock": "bedrock/anthropic.claude-3-sonnet-20240229-v1:0",
+}
+
 # Text embedding models, for lookup by LITELLM_CUSTOM_PROVIDER.
 TEXT_EMBEDDING_MODEL_OPTIONS = {
     "ollama": "nomic-embed-text:latest",

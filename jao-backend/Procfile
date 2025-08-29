@@ -14,5 +14,6 @@
 #
 api: hypercorn src.asgi:application --bind localhost:8001 --reload
 celerybeat: celery -A jao_backend.common.celery beat
-celeryworker: celery -A jao_backend.common.celery worker --loglevel=INFO
+celeryworker: celery -A jao_backend.common.celery worker --loglevel=INFO --max-memory-per-child=2097152
+#celeryworker: celery -A jao_backend.common.celery worker --loglevel=INFO
 celeryflower: celery -A jao_backend.common.celery flower --address=localhost
