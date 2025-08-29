@@ -1,7 +1,4 @@
-from time import sleep
-
 from django.conf import settings
-from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils.log import logging
 from django.db.models import Count, F, DecimalField, Max, Q
@@ -10,7 +7,6 @@ from django.contrib.contenttypes.models import ContentType
 from contextlib import suppress
 from django.db.models import Model
 
-from jao_backend.common.management.helpers import TaskCommandMixin
 from jao_backend.vacancies.models import Vacancy
 from jao_backend.common.models import ListModel
 from jao_backend.application_statistics.models import AggregatedApplicationStatistic

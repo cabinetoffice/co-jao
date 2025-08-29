@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db import models
 
-from jao_backend.embeddings.models import TaggedEmbedding
+from jao_backend.embeddings.models import TaggedEmbedding, EmbeddingTag
 from jao_backend.roles.models import Grade
 from jao_backend.roles.models import RoleType
 from jao_backend.vacancies.querysets import VacancyQuerySet
@@ -49,6 +49,20 @@ class Vacancy(models.Model):
     )
 
     objects = VacancyQuerySet.as_manager()
+
+    def get_requires_embedding(self):
+        """
+        For queries on whether the vacancy requires embedding use .requires_embedding()
+        `VacancyQuerySet`.
+
+        For a single Vacancy, if it's required to recalculate when embedding is required
+        then this method can be used (e.g. in task, to guard against concurrency).
+        """
+        expected_embed_tag_uuids = list(EmbeddingTag.get_configured_tags().keys())
+        expected_tags_count = len(expected_embed_tag_uuids)
+        return self.vacancyembedding_set.filter(
+            tag__uuid__in=expected_embed_tag_uuids
+        ).count() < expected_tags_count
 
     def __str__(self):
         return f"{self.id, self.title}"
