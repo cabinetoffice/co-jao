@@ -54,8 +54,8 @@ EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # WEBPACK_LOADER['DEFAULT']['STATS_FILE'] = BASE_DIR / 'static/webpack-bundles/webpack-stats-dev.json'
 
-# In dev environments default to ollama:
-LITELLM_API_BASE = LITELLM_API_BASE or "http://127.0.0.1:11434/api/embed"
+if DEPLOYMENT_TYPE == "local" and LITELLM_CUSTOM_PROVIDER == "ollama":
+    LITELLM_API_BASE = LITELLM_API_BASE or "http://127.0.0.1:11434/api/embed"
 
 try:
     import debug_toolbar
