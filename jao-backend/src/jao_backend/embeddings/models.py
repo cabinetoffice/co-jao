@@ -193,6 +193,15 @@ class EmbeddingTag(models.Model):
         """
         # Request embedding using litellm, model is a litellm model name.
         # Note: api_base must not end with a slash '/'.
+
+        # Temporarily log all the params
+        from textwrap import dedent
+        logger.info(dedent(f"""response = embedding(
+            model={self.model.name},
+            input=text,
+            api_base={LITELLM_API_BASE},
+            custom_llm_provider={LITELLM_CUSTOM_PROVIDER},
+        )"""))
         try:
             response = embedding(
                 model=self.model.name,
