@@ -5,6 +5,7 @@ from celery.canvas import chain
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+from django.db import transaction
 from litellm.exceptions import APIConnectionError
 from litellm.exceptions import RateLimitError
 from litellm.exceptions import ServiceUnavailableError
@@ -57,7 +58,9 @@ def embed_vacancies(limit=settings.JAO_BACKEND_VACANCY_EMBED_LIMIT):
                 # The embedding takes longer than hitting the database with a query.
                 logger.info("Vacancy %s already embedded, skipping.", vacancy.id)
                 continue
-            embed_vacancy(vacancy)
+
+            with transaction.atomic():
+                embed_vacancy(vacancy)
             total_embedded += 1
     except Exception as e:
         raise e
