@@ -1,0 +1,16 @@
+{% extends "admin/app_index.html" %}
+{% load i18n %}
+
+{% block content %}
+  {{ block.super }}
+
+  <div class="module">
+    <h2>{% translate "Embedding Tools" %}</h2>
+    <div class="form-row">
+      <div>
+        <h3><a href="{% url 'admin:embeddings_embeddingtag_litellm_test' %}">{% translate "Test LiteLLM" %}</a></h3>
+        <p class="help">{% translate "Send a test request to the configured LiteLLM embedding service to verify its connection and functionality." %}</p>
+      </div>
+    </div>
+  </div>
+{% endblock %}
