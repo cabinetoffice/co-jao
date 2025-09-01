@@ -212,6 +212,23 @@ resource "aws_ecs_cluster" "main" {
   )
 }
 
+resource "aws_vpc_endpoint" "bedrock" {
+  vpc_id            = var.vpc_id
+  service_name      = "com.amazonaws.eu-west-2.bedrock"
+  vpc_endpoint_type = "Interface"
+  subnet_ids        = var.private_subnet_ids
+
+  security_group_ids = [aws_security_group.ecs_tasks.id]
+
+  private_dns_enabled = true
+
+  tags = {
+    Name        = "bedrock-endpoint"
+    Environment = var.environment
+  }
+}
+
+
 
 # Security group for ECS tasks
 resource "aws_security_group" "ecs_tasks" {
@@ -252,16 +269,7 @@ resource "aws_security_group" "ecs_tasks" {
     description = "HTTPS to VPC endpoints"
   }
 
-  # HTTPS for external APIs (if needed)
-  egress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "HTTPS to external APIs"
-  }
-
-  # DNS resolution
+   # DNS resolution
   egress {
     from_port   = 53
     to_port     = 53
@@ -285,6 +293,15 @@ resource "aws_security_group" "ecs_tasks" {
     protocol    = "tcp"
     cidr_blocks = [data.aws_vpc.main.cidr_block]
     description = "PostgreSQL database access"
+  }
+
+  # Redis access
+  egress {
+    from_port   = 6379
+    to_port     = 6379
+    protocol    = "tcp"
+    cidr_blocks = [data.aws_vpc.main.cidr_block]
+    description = "Redis database access"
   }
 
   tags = merge(
