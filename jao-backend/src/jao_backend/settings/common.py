@@ -43,6 +43,8 @@ if LITELLM_CUSTOM_PROVIDER not in ["ollama", "bedrock"]:
 # Note: On bedrock this isn't usually set.
 LITELLM_API_BASE = os.environ.get("JAO_BACKEND_LITELLM_API_BASE")
 
+JAO_BEDROCK_REGION = "eu-west-2"
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get(
     "JAO_BACKEND_SECRET_KEY",
@@ -149,7 +151,7 @@ EMBEDDING_TAGS = {
         # UUID is in UUID7 format, see
         "uuid": EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID,
         "name": "job-title-responsibilities",
-        "description": "Description for Vacancy Tag 1",
+        "description": "Job title and responsibilities concatenated",
         "model": EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_MODEL,
         "version": 1,
     },

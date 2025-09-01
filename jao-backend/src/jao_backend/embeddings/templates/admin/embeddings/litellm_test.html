@@ -1,0 +1,64 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" type="text/css" href="{% static 'admin/css/forms.css' %}">{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label='embeddings' %}">Embeddings</a>
+&rsaquo; {% translate 'LiteLLM Embedding Test' %}
+</div>
+{% endblock %}
+
+
+{% block content %}
+<div id="content-main">
+    <form method="post" novalidate>{% csrf_token %}
+        <fieldset class="module aligned">
+            <h2>Test LiteLLM Configuration</h2>
+            {% if model_list_url %}
+            <div class="form-row">
+                <p>
+                    Need to find a model name?
+                    <a href="{{ model_list_url }}">View a list of available models.</a>
+                </p>
+            </div>
+            {% endif %}
+            <div class="form-row field-model">
+                {{ form.model.errors }}
+                <div>
+                    <label for="{{ form.model.id_for_label }}" class="required">{{ form.model.label }}:</label>
+                    {{ form.model }}
+                    <div class="help">{{ form.model.help_text|safe }}</div>
+                </div>
+            </div>
+            <div class="form-row field-text">
+                {{ form.text.errors }}
+                <div>
+                    <label for="{{ form.text.id_for_label }}" class="required">{{ form.text.label }}:</label>
+                    {{ form.text }}
+                </div>
+            </div>
+        </fieldset>
+        <div class="submit-row">
+            <input type="submit" value="Embed Text" class="default">
+        </div>
+    </form>
+
+    {% if result or error %}
+    <div class="results module">
+        <h2>Result</h2>
+        {% if error %}
+            <div class="messagelist">
+                <p class="error">{{ error }}</p>
+            </div>
+        {% endif %}
+        {% if result %}
+             <p>The embedding was generated successfully. See the raw API response below.</p>
+            <pre><code>{{ result }}</code></pre>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
