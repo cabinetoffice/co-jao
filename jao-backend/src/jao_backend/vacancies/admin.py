@@ -12,7 +12,6 @@ from jao_backend.vacancies.models import Vacancy, VacancyGrade, VacancyRoleType
 from jao_backend.vacancies.tasks import embed_vacancies
 
 
-# A simple form for the start task button
 class StartEmbeddingsTaskForm(forms.Form):
     pass
 
@@ -22,7 +21,6 @@ class StatusFilter(admin.SimpleListFilter):
     parameter_name = "status"
 
     def choices(self, changelist):
-        # Remove default "All" choice
         for lookup, title in self.lookup_choices:
             yield {
                 "selected": self.value() == lookup,
@@ -48,7 +46,7 @@ class StatusFilter(admin.SimpleListFilter):
 
     def value(self):
         value = super().value()
-        return value if value is not None else "active"
+        return "active" if value is None else value
 
 
 class VacancyGradeInline(admin.TabularInline):
@@ -104,9 +102,6 @@ class VacancyAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
         return custom_urls + urls
 
     def embeddings_view(self, request):
-        """
-        Admin view to show the status of vacancy embeddings and control the embedding task.
-        """
         task_name = "jao_backend.vacancies.tasks.embed_vacancies"
 
         if request.method == "POST":
@@ -119,21 +114,44 @@ class VacancyAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
                     messages.success(request, "Embedding task has been started.")
             return redirect(request.path_info)
 
-        # GET request logic
         task_is_running = is_task_running(task_name)
-        total_vacancies = Vacancy.objects.filter(is_deleted=False).count()
-        embed_limit = settings.JAO_BACKEND_VACANCY_EMBED_LIMIT
+        embed_limit = getattr(settings, 'JAO_BACKEND_VACANCY_EMBED_LIMIT', None)
 
-        # Get the queryset for vacancies that are actually configured for embedding
-        configured_vacancies_qs = Vacancy.objects.filter(
-            is_deleted=False
-        ).configured_for_embed(limit=embed_limit)
+        total_vacancies = Vacancy.objects.filter(is_deleted=False).count()
+
+        configured_vacancies_qs = Vacancy.objects.configured_for_embed(limit=embed_limit)
         progress_max = configured_vacancies_qs.count()
 
-        tags_with_counts = (
+        vacancies_needing_embedding = Vacancy.objects.requires_embedding(limit=embed_limit)
+        remaining_work_count = vacancies_needing_embedding.count()
+
+        embedding_stats = self._get_embedding_statistics(configured_vacancies_qs, progress_max)
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Embeddings Status",
+            "total_vacancies": total_vacancies,
+            "progress_max": progress_max,
+            "remaining_work_count": remaining_work_count,
+            "embedding_stats": embedding_stats,
+            "embed_limit": embed_limit,
+            "task_is_running": task_is_running,
+            "form": StartEmbeddingsTaskForm(),
+        }
+        return render(request, "admin/vacancies/embedding_status.html", context)
+
+    def _get_embedding_statistics(self, configured_vacancies_qs, progress_max):
+        """
+        Helper method to calculate embedding statistics for each valid tag.
+        Uses the existing valid_tags() queryset method.
+        """
+        if progress_max == 0:
+            return []
+
+        # Use the existing valid_tags queryset method
+        valid_tags = (
             EmbeddingTag.objects.valid_tags()
             .annotate(
-                # Only count vacancies that are within the configured set
                 embedded_count=Count(
                     "vacancyembedding__vacancy",
                     filter=Q(vacancyembedding__vacancy__in=configured_vacancies_qs),
@@ -145,26 +163,13 @@ class VacancyAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
         )
 
         embedding_stats = []
-        for tag in tags_with_counts:
-            percentage = (
-                (tag.embedded_count / progress_max * 100) if progress_max > 0 else 0
-            )
-            embedding_stats.append(
-                {
-                    "tag": tag,
-                    "embedded_count": tag.embedded_count,
-                    "percentage": f"{percentage:.2f}",
-                }
-            )
+        for tag in valid_tags:
+            percentage = (tag.embedded_count / progress_max * 100) if progress_max > 0 else 0
 
-        context = {
-            **self.admin_site.each_context(request),
-            "title": "Embeddings Status",
-            "total_vacancies": total_vacancies,
-            "embedding_stats": embedding_stats,
-            "embed_limit": embed_limit,
-            "progress_max": progress_max,
-            "task_is_running": task_is_running,
-            "form": StartEmbeddingsTaskForm(),
-        }
-        return render(request, "admin/vacancies/embedding_status.html", context)
+            embedding_stats.append({
+                "tag": tag,
+                "embedded_count": tag.embedded_count,  # Keep original template variable name
+                "percentage": f"{percentage:.1f}",
+            })
+
+        return embedding_stats

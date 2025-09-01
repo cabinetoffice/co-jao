@@ -148,7 +148,7 @@ EMBEDDING_TAGS = {
         # UUID is in UUID7 format, see
         "uuid": EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID,
         "name": "job-title-responsibilities",
-        "description": "Description for Vacancy Tag 1",
+        "description": "Job title and responsibilities concatenated",
         "model": EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_MODEL,
         "version": 1,
     },
