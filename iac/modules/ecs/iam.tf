@@ -47,6 +47,24 @@ resource "aws_iam_role" "ecs_task_role" {
   )
 }
 
+resource "aws_iam_role_policy" "bedrock_access_policy" {
+  name = "${local.name}-bedrock-access-policy"
+  role = aws_iam_role.ecs_task_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream"
+        ]
+        Resource = "arn:aws:bedrock:eu-west-2::foundation-model/amazon.titan-embed-text-v2:0"
+      }
+    ]
+  })
+}
+
 resource "aws_iam_role_policy" "ecs_exec_policy" {
   name = "${local.name}-ecs-exec-policy"
   role = aws_iam_role.ecs_task_role.id

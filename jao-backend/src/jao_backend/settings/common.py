@@ -72,7 +72,8 @@ JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE = int(
 
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = os.getenv(
+    "CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
 
 INSTALLED_APPS = [
     "django_extensions",
@@ -125,7 +126,7 @@ CHAT_MODEL_OPTIONS = {
 # Text embedding models, for lookup by LITELLM_CUSTOM_PROVIDER.
 TEXT_EMBEDDING_MODEL_OPTIONS = {
     "ollama": "nomic-embed-text:latest",
-    "bedrock": "bedrock/amazon.titan-embed-text-v1",
+    "bedrock": "bedrock/amazon.titan-embed-text-v2:0",
 }
 
 AWS_TAGS_FOR_EMBEDDING = {"project": "jao", "environment": ENV}
@@ -199,7 +200,8 @@ JAO_BACKEND_ENABLE_OLEEO = is_truthy(
     os.environ.get("JAO_BACKEND_ENABLE_OLEEO", "false")
 )
 if JAO_BACKEND_ENABLE_OLEEO:
-    DATABASES["oleeo"] = dj_database_url.config(env="JAO_BACKEND_OLEEO_DATABASE_URL")
+    DATABASES["oleeo"] = dj_database_url.config(
+        env="JAO_BACKEND_OLEEO_DATABASE_URL")
     DATABASE_ROUTERS = ["jao_backend.common.routers.router.OleeoRouter"]
 
 # Session engine, use the default database backed sessions

@@ -174,7 +174,7 @@ module "ecs" {
     DB_PASSWORD = "secrettpassword"
 
     # Django environment variables
-    ENV                    = "dev" # Required for settings module selection
+    ENV                    = "dev"
     DJANGO_SETTINGS_MODULE = "jao_backend.settings.dev"
     JAO_BACKEND_SECRET_KEY = "8e5c0e0f457aeec89329be09" # Will be overridden in production
     DJANGO_DEBUG           = local.current_env.django_debug
@@ -190,10 +190,12 @@ module "ecs" {
     JAO_BACKEND_SUPERUSER_PASSWORD = var.jao_backend_superuser_password
     JAO_BACKEND_SUPERUSER_EMAIL    = var.jao_backend_superuser_email
     # Celery configuration
-    CELERY_BROKER_URL     = module.celery_redis.celery_broker_url
-    CELERY_RESULT_BACKEND = module.celery_redis.celery_result_backend
+    CELERY_BROKER_URL                     = module.celery_redis.celery_broker_url
+    CELERY_RESULT_BACKEND                 = module.celery_redis.celery_result_backend
+    JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE = 200
 
     # LiteLLM integration
+    JAO_BACKEND_VACANCY_EMBED_LIMIT       = 500
     JAO_BACKEND_LITELLM_API_BASE          = "http://127.0.0.1:11434/api/embed" # Default for dev environment
     JAO_BACKEND_LITELLM_CUSTOM_PROVIDER   = "ollama"                           # Default for dev environment
     JAO_EMBEDDER_SUMMARY_RESPONSIBILITIES = "ollama/nomic-embed-text:latest"
@@ -375,8 +377,6 @@ module "vectordb" {
   tags = local.common_tags
 }
 
-# Security group rule to allow SageMaker to connect to Aurora
-# Created here to avoid circular dependency
 resource "aws_security_group_rule" "sagemaker_to_aurora" {
   count = var.enable_sagemaker_environment ? 1 : 0
 
@@ -429,14 +429,16 @@ resource "aws_security_group" "db_access" {
   depends_on = [module.vpc]
 }
 
+
+
 module "celery_redis" {
-  source = "./modules/elasticache"
-
-  replication_group_id = "jao-celery-cache"
-  node_type            = "cache.t3.small"
-  subnet_group_name    = aws_elasticache_subnet_group.main.name
-  security_group_ids   = [aws_security_group.redis_client.id]
-
+  source                     = "./modules/elasticache"
+  replication_group_id       = "jao-celery-cache"
+  node_type                  = "cache.t3.small"
+  subnet_group_name          = aws_elasticache_subnet_group.main.name
+  security_group_ids         = [aws_security_group.redis.id] # Uses redis security group to receive connections
+  transit_encryption_enabled = var.redis_transit_encryption_enabled
+  auth_token                 = var.redis_auth_token
   tags = {
     Environment = "production"
     Application = "celery"
@@ -448,52 +450,107 @@ resource "aws_security_group" "redis_client" {
   vpc_id      = module.vpc.vpc_id
   description = "Security group for services that need Redis access"
 
-  egress {
-    from_port       = 6380
-    to_port         = 6380
-    protocol        = "tcp"
-    security_groups = [aws_security_group.redis.id]
-    description     = "Allow Redis connections"
-  }
-
   tags = merge(local.common_tags, {
     Name = "${var.app_name}-${var.environment}-redis-client-sg"
   })
 }
-
 
 # Security group for Redis
 resource "aws_security_group" "redis" {
   name_prefix = "redis-celery-"
   vpc_id      = module.vpc.vpc_id
 
-  ingress {
-    from_port   = 6380
-    to_port     = 6380
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
-  }
-
   tags = {
     Name = "redis-celery-sg"
   }
 }
 
+# Egress rule for Redis security group
+resource "aws_security_group_rule" "redis_egress_all" {
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.redis.id
+  description       = "Allow all outbound traffic from Redis"
+}
+
+
 resource "aws_security_group" "celery_workers" {
   name_prefix = "celery-workers-"
   vpc_id      = module.vpc.vpc_id
 
-  egress {
-    from_port       = 6380
-    to_port         = 6380
-    protocol        = "tcp"
-    security_groups = [aws_security_group.redis.id]
-    description     = "Allow outbound Redis connections"
-  }
-
   tags = {
     Name = "celery-workers-sg"
   }
+}
+
+# Security group rules - defined separately to avoid circular dependencies
+#
+# IMPORTANT: Security groups and rules are managed separately to prevent circular dependencies
+# If you encounter duplicate rule errors during apply, it means rules already exist in AWS.
+#
+# To resolve duplicate rule errors:
+# 1. Import existing rules into Terraform state using the security group IDs from the error messages
+# 2. Or manually delete the rules from AWS Console before applying
+#
+# Example import commands (replace sg-xxxxx with actual IDs from error messages):
+# terraform import aws_security_group_rule.redis_client_egress_6379 sg-xxxxx_egress_tcp_6379_6379_sg-yyyyy
+
+# Ingress rules for Redis security group - allows connections from client security groups
+# Port 6379: Standard Redis port used for all read/write operations
+resource "aws_security_group_rule" "redis_ingress_6379_redis_client" {
+  type                     = "ingress"
+  from_port                = 6379
+  to_port                  = 6379
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.redis_client.id
+  security_group_id        = aws_security_group.redis.id
+  description              = "Allow Redis write connections from redis_client"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_security_group_rule" "redis_ingress_6379_celery" {
+  type                     = "ingress"
+  from_port                = 6379
+  to_port                  = 6379
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.celery_workers.id
+  security_group_id        = aws_security_group.redis.id
+  description              = "Allow Redis write connections from celery_workers"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Egress rules for redis_client security group - allows connections to Redis
+# Port 6379: Standard Redis port for both primary and replica endpoints
+
+resource "aws_security_group_rule" "redis_client_egress_6379" {
+  type                     = "egress"
+  from_port                = 6379
+  to_port                  = 6379
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.redis.id
+  security_group_id        = aws_security_group.redis_client.id
+  description              = "Allow Redis connections to redis"
+}
+
+# Egress rules for celery_workers security group - allows Celery workers to connect to Redis
+
+resource "aws_security_group_rule" "celery_workers_egress_6379" {
+  type                     = "egress"
+  from_port                = 6379
+  to_port                  = 6379
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.redis.id
+  security_group_id        = aws_security_group.celery_workers.id
+  description              = "Allow Redis connections to redis"
 }
 
 # Subnet group

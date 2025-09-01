@@ -113,9 +113,9 @@ variable "root_access" {
 }
 
 variable "platform_identifier" {
-  description = "Platform identifier for the notebook instance"
+  description = "Platform identifier for the notebook instance (null to let AWS choose)"
   type        = string
-  default     = "notebook-al2-v2"
+  default     = null
 }
 
 # Code Repository Configuration

@@ -55,7 +55,7 @@ variable "task_cpu" {
 variable "task_memory" {
   description = "Memory for the ECS task"
   type        = number
-  default     = 256
+  default     = 4096
 }
 
 variable "desired_count" {
@@ -286,9 +286,23 @@ variable "jao_backend_superuser_email" {
 }
 
 variable "oleeo_url" {
-  description = "URL for the OLEEO database"
+  description = "oleeo url"
   type        = string
   default     = ""
+}
+
+# Redis/ElastiCache Configuration
+variable "redis_auth_token" {
+  description = "AUTH token for Redis/ElastiCache authentication (required when transit encryption is enabled)"
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
+variable "redis_transit_encryption_enabled" {
+  description = "Whether to enable transit encryption (TLS) for Redis/ElastiCache"
+  type        = bool
+  default     = false # Set to false for development, true for production
 }
 
 variable "enable_celery_services" {

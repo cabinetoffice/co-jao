@@ -2,7 +2,8 @@ resource "aws_elasticache_replication_group" "this" {
   description                = "Celery Redis Backend Replication Group"
   replication_group_id       = var.replication_group_id
   at_rest_encryption_enabled = true
-  transit_encryption_enabled = true
+  transit_encryption_enabled = var.transit_encryption_enabled
+  auth_token                 = var.auth_token
 
   num_cache_clusters         = 2
   automatic_failover_enabled = true
