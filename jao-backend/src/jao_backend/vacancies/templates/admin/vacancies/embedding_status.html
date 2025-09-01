@@ -45,6 +45,27 @@
     <h1>{{ title }}</h1>
 
     <div class="module">
+        <h2>Embedding Task Control</h2>
+        <p><strong>Task Status:</strong>
+            {% if task_is_running %}
+                <img src="{% static 'admin/img/icon-yes.svg' %}" alt="Yes"> Running
+            {% else %}
+                <img src="{% static 'admin/img/icon-no.svg' %}" alt="No"> Not running
+            {% endif %}
+        </p>
+        <form method="post" novalidate>
+            {% csrf_token %}
+            {{ form }}
+            <div class="submit-row">
+                <input type="submit" value="Start Embedding Task" class="default" {% if task_is_running %}disabled{% endif %}>
+            </div>
+        </form>
+        {% if task_is_running %}
+        <p style="padding-left: 10px;">The page will need to be manually refreshed to see when the task has completed.</p>
+        {% endif %}
+    </div>
+
+    <div class="module">
         <h2>Overall Status</h2>
         <p><strong>Total Active Vacancies:</strong> {{ total_vacancies }}</p>
         <p><strong>Configured for embedding:</strong> {% if embed_limit %}{{ embed_limit|default:"0" }} of {{ total_vacancies }} most recent vacancies.{% else %}All vacancies.{% endif %}</p>
