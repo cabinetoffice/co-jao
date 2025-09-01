@@ -17,6 +17,14 @@
     <form method="post" novalidate>{% csrf_token %}
         <fieldset class="module aligned">
             <h2>Test LiteLLM Configuration</h2>
+            {% if model_list_url %}
+            <div class="form-row">
+                <p>
+                    Need to find a model name?
+                    <a href="{{ model_list_url }}">View a list of available models.</a>
+                </p>
+            </div>
+            {% endif %}
             <div class="form-row field-model">
                 {{ form.model.errors }}
                 <div>
