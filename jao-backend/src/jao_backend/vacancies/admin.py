@@ -129,7 +129,8 @@ class VacancyAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
 
         context = {
             **self.admin_site.each_context(request),
-            "title": "Embeddings Status",
+            "title": "Vacancy Embeddings",
+            "litellm_custom_provider": settings.LITELLM_CUSTOM_PROVIDER,
             "total_vacancies": total_vacancies,
             "progress_max": progress_max,
             "remaining_work_count": remaining_work_count,

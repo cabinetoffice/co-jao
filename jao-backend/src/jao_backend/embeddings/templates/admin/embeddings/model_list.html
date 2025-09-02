@@ -33,14 +33,18 @@
                     <thead>
                         <tr>
                             <th scope="col">
-                                <div class="text"><span>Model ID</span></div>
+                                <div class="text"><span>Model</span></div>
+                            </th>
+                            <th scope="col">
+                                <div class="text"><span>LiteLLM ID</span></div>
                             </th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for model in models %}
+                        {% for model, litellm_id in models %}
                             <tr class="{% cycle 'row1' 'row2' %}">
                                 <td>{{ model }}</td>
+                                <td>{{ litellm_id }}</td>
                             </tr>
                         {% endfor %}
                     </tbody>
