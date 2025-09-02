@@ -127,7 +127,7 @@ CHAT_MODEL_OPTIONS = {
 # Text embedding models, for lookup by LITELLM_CUSTOM_PROVIDER.
 TEXT_EMBEDDING_MODEL_OPTIONS = {
     "ollama": "nomic-embed-text:latest",
-    "bedrock": "bedrock/amazon.titan-embed-text-v1",
+    "bedrock": "bedrock/amazon.titan-embed-text-v2:0",
 }
 
 AWS_TAGS_FOR_EMBEDDING = {"project": "jao", "environment": ENV}
