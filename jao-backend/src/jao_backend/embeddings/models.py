@@ -265,8 +265,11 @@ class EmbeddingTag(models.Model):
             )
 
             tag_data["model"] = model
-            tag, _ = cls.objects.get_or_create(
-                defaults=tag_data, uuid=tag_data["uuid"], version=tag_data["version"]
+            # update_or_create is be used here to pick up changes from the settings.
+            tag, _ = cls.objects.update_or_create(
+                uuid=tag_data["uuid"],
+                version=tag_data["version"],
+                defaults=tag_data
             )
 
             tags[tag.uuid] = tag

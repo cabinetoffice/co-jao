@@ -134,6 +134,7 @@ AWS_TAGS_FOR_EMBEDDING = {"project": "jao", "environment": ENV}
 
 
 # Concatenated job title and responsibilities embedding tag
+# Do not change uuids once assigned!
 EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID = uuidv7(
     hex="0196a2a0-61b9-79e2-9ef7-9988b475dda3"
 )
