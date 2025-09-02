@@ -66,6 +66,7 @@ class BedrockModelList(ModelListBase):
     @classmethod
     def get_model_list(cls) -> List[str]:
         try:
+            logger.info("Fetch bedrock model list for region %s", BEDROCK_REGION)
             client = boto3.client('bedrock', region_name=BEDROCK_REGION)
             response = client.list_foundation_models()
             return [model['modelId'] for model in response.get('modelSummaries', [])]
@@ -77,9 +78,11 @@ class BedrockModelList(ModelListBase):
     @classmethod
     def is_available(cls) -> bool:
         try:
-            boto3.client('sts').get_caller_identity()
+            client = boto3.client('bedrock', region_name=BEDROCK_REGION)
+            client.list_foundation_models(maxResults=1)
             return True
-        except (ClientError, NoCredentialsError):
+        except (ClientError, NoCredentialsError) as e:
+            logger.error(f"Bedrock not available: {e}")
             return False
 
 
