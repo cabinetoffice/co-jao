@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Type
+from typing import List, Dict, Type, Tuple
 
 from django.conf import settings, ImproperlyConfigured
 import requests
@@ -21,6 +21,8 @@ class ModelListProviderError(Exception):
 
 
 class ModelListBase(ABC):
+    LITELLM_MODEL_PREFIX = ""
+
     @classmethod
     @abstractmethod
     def get_model_list(cls) -> List[str]:
@@ -32,10 +34,25 @@ class ModelListBase(ABC):
     def is_available(cls) -> bool:
         pass
 
+    @classmethod
+    def get_litellm_model_name(cls, model_name: str) -> str:
+        """:return: The model name formatted for use with LiteLLM."""
+        if cls.LITELLM_MODEL_PREFIX:
+            return f"{cls.LITELLM_MODEL_PREFIX}/{model_name}"
+        return model_name
+
+    @classmethod
+    def get_litellm_model_list(cls) -> List[Tuple[str, str]]:
+        """:return: A list of available model IDs, formatted for LiteLLM."""
+        return [
+            (model, cls.get_litellm_model_name(model)) for model in cls.get_model_list()
+        ]
+
 
 class OllamaModelList(ModelListBase):
     """Provides a list of models from a local Ollama server."""
     BASE_URL = "http://localhost:11434"
+    LITELLM_MODEL_PREFIX = "ollama"
 
     @classmethod
     def get_model_list(cls) -> List[str]:
@@ -62,6 +79,8 @@ class OllamaModelList(ModelListBase):
 
 class BedrockModelList(ModelListBase):
     """Provides a list of models from AWS Bedrock."""
+    # Bedrock uses the model ID directly, so the prefix is empty.
+    LITELLM_MODEL_PREFIX = ""
 
     @classmethod
     def get_model_list(cls) -> List[str]:
@@ -86,10 +105,40 @@ class BedrockModelList(ModelListBase):
             return False
 
 
+class LlamaCPPModelList(ModelListBase):
+    """Provides a list of models from a local Llama.cpp server."""
+    BASE_URL = "http://localhost:8080"  # Default for llama-cpp-python
+    LITELLM_MODEL_PREFIX = "llama-cpp"
+
+    @classmethod
+    def get_model_list(cls) -> List[str]:
+        """Fetches model IDs from the Llama.cpp OpenAI-compatible API."""
+        url = f"{cls.BASE_URL}/v1/models"
+        try:
+            response = requests.get(url, timeout=5)
+            response.raise_for_status()
+            models_data = response.json().get("data", [])
+            return [model["id"] for model in models_data]
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to connect to Llama.cpp server: {e}")
+            raise ModelListProviderError(f"Llama.cpp server is not reachable at {url}") from e
+
+    @classmethod
+    def is_available(cls) -> bool:
+        """Checks if the Llama.cpp server is running and responsive."""
+        try:
+            # A request to the models endpoint is a reliable check
+            return requests.get(f"{cls.BASE_URL}/v1/models", timeout=2).status_code == 200
+        except requests.exceptions.RequestException:
+            logger.error(f"Llama.cpp server is not available at {cls.BASE_URL}")
+            return False
+
+
 def get_model_lister() -> Type[ModelListBase]:
     model_listers: Dict[str, Type[ModelListBase]] = {
         "ollama": OllamaModelList,
         "bedrock": BedrockModelList,
+        "llama-cpp": LlamaCPPModelList,
     }
     try:
         return model_listers[LITELLM_CUSTOM_PROVIDER]
@@ -108,7 +157,7 @@ def get_available_models() -> List[str]:
     :return: A list of model ID strings.
     """
     try:
-        return ModelLister.get_model_list()
+        return ModelLister.get_litellm_model_list()
     except ModelListProviderError as e:
         return []
 
