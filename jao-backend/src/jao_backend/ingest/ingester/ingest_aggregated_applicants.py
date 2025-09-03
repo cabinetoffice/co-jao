@@ -1,7 +1,12 @@
 from django.conf import settings
 from django.db import transaction
 from django.utils.log import logging
-from django.db.models import Count, F, DecimalField, Max, Q
+from django.db.models import Count
+from django.db.models import DecimalField
+from django.db.models import F
+from django.db.models import Max
+from django.db.models import OuterRef
+from django.db.models import Subquery
 from django.db.models.functions import Cast
 from django.contrib.contenttypes.models import ContentType
 from contextlib import suppress
@@ -39,8 +44,6 @@ class OleeoApplicantStatisticsAggregator:
     def _get_vacancy_statistics_per_characteristic(
         self, vacancy_id_start, vacancy_id_end, characteristic_field
     ):
-        from django.db.models import Subquery, OuterRef
-
         field_path = f"applications__dandi__{characteristic_field}"
         total_apps_subquery = (
             Vacancies.objects.valid_for_ingest()

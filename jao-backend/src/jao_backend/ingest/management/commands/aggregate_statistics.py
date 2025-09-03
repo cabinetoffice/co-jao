@@ -1,4 +1,5 @@
-from time import sleep
+import sys
+
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils.log import logging
@@ -33,7 +34,10 @@ class Command(TaskCommandMixin, BaseCommand):
         batch_size = options['batch_size']
         initial_vacancy_id = options['initial_vacancy_id']
 
-        max_vacancy_id = Vacancy.objects.order_by("pk").last().pk
+        max_vacancy_id = getattr(Vacancy.objects.order_by("pk").last(), "pk", 0)
+        if not max_vacancy_id:
+            sys.exit("No vacancies to aggregate.")
+
         max_vacancies_id = Vacancies.objects.order_by("pk").last().pk
         if max_vacancy_id != max_vacancies_id:
             # Warn that there are newer vacancies on OLEEO that won't be aggregated
