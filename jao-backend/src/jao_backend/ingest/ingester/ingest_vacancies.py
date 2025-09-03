@@ -166,16 +166,18 @@ class OleeoVacanciesIngest:
                 source_model.objects.valid_for_ingest().update_deletion_marks()
             )
 
+    @staticmethod
     @lru_cache(maxsize=1)
-    def get_grade_groups(self) -> Dict[int, Set[Grade]]:
+    def get_grade_groups() -> Dict[int, Set[Grade]]:
         grade_groups = {
             grade_group.pk: set(grade_group.get_grades().values_list("pk", flat=True))
             for grade_group in OleeoGradeGroup.objects.all()
         }
         return grade_groups
 
+    @staticmethod
     @lru_cache(maxsize=1)
-    def get_role_types(self) -> Dict[int, Set[RoleType]]:
+    def get_role_types() -> Dict[int, Set[RoleType]]:
         role_types = {
             role_type.pk: set(role_type.get_role_types().values_list("pk", flat=True))
             for role_type in OleeoRoleTypeGroup.objects.all()

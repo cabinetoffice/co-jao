@@ -49,6 +49,8 @@ nest-asyncio = "^1.6.0"
 mssql-django = "^1.6"
 plum-dispatch = "^2.5.7"
 bbcode = "^1.1.0"
+cachedmethod = "^0.1.0"
+cachemethod = "^1.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.7.0"
