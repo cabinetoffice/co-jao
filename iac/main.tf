@@ -195,10 +195,10 @@ module "ecs" {
     JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE = 200
 
     # LiteLLM integration
-    JAO_BACKEND_VACANCY_EMBED_LIMIT       = 500
-    JAO_BACKEND_LITELLM_API_BASE          = "http://127.0.0.1:11434/api/embed" # Default for dev environment
-    JAO_BACKEND_LITELLM_CUSTOM_PROVIDER   = "ollama"                           # Default for dev environment
-    JAO_EMBEDDER_SUMMARY_RESPONSIBILITIES = "ollama/nomic-embed-text:latest"
+    JAO_BACKEND_VACANCY_EMBED_LIMIT       = 70000
+    #JAO_BACKEND_LITELLM_API_BASE          = "http://127.0.0.1:11434/api/embed" # Default for dev environment
+    #JAO_BACKEND_LITELLM_CUSTOM_PROVIDER   = "ollama"                           # Default for dev environment
+    #JAO_EMBEDDER_SUMMARY_RESPONSIBILITIES = "ollama/nomic-embed-text:latest"
 
     # API rate limiting and monitoring config
     ENABLE_RATE_LIMITING = "true"
@@ -486,20 +486,7 @@ resource "aws_security_group" "celery_workers" {
   }
 }
 
-# Security group rules - defined separately to avoid circular dependencies
-#
-# IMPORTANT: Security groups and rules are managed separately to prevent circular dependencies
-# If you encounter duplicate rule errors during apply, it means rules already exist in AWS.
-#
-# To resolve duplicate rule errors:
-# 1. Import existing rules into Terraform state using the security group IDs from the error messages
-# 2. Or manually delete the rules from AWS Console before applying
-#
-# Example import commands (replace sg-xxxxx with actual IDs from error messages):
-# terraform import aws_security_group_rule.redis_client_egress_6379 sg-xxxxx_egress_tcp_6379_6379_sg-yyyyy
-
-# Ingress rules for Redis security group - allows connections from client security groups
-# Port 6379: Standard Redis port used for all read/write operations
+# Security group rules
 resource "aws_security_group_rule" "redis_ingress_6379_redis_client" {
   type                     = "ingress"
   from_port                = 6379
