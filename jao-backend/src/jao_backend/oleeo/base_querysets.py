@@ -2,7 +2,6 @@
 QuerySets generically based around syncing data from an upstream data source.
 """
 
-from functools import lru_cache
 from typing import Any
 from typing import Dict
 from typing import Generator
@@ -14,6 +13,7 @@ from typing import Tuple
 from typing import Type
 from typing import Union
 
+from cachemethod import lru_cachemethod
 from django.db import models
 from django.db.models import QuerySet
 from django.db.transaction import atomic
@@ -67,11 +67,11 @@ class UpstreamModelQuerySet(models.QuerySet):
         pk_name = model._meta.pk.name  # noqa
         return [pk_name if k == "pk" else k for k in keys]
 
-    @lru_cache(maxsize=1)
+    @lru_cachemethod(maxsize=1)
     def _get_destination_model(self):
         return self.model.get_destination_model()
 
-    @lru_cache(maxsize=1)
+    @lru_cachemethod(maxsize=1)
     def _get_alias_or_field(self, transform, name):
         """
         Utility function to find a field or alias in the transform model fields.
@@ -111,7 +111,7 @@ class UpstreamModelQuerySet(models.QuerySet):
 
         return destination_field
 
-    @lru_cache(maxsize=1)
+    @lru_cachemethod(maxsize=1)
     def _get_id_fields(self):
         """
         :return : A tuple of the source and destination unique id fields.

@@ -30,7 +30,7 @@ LITELLM_API_BASE = settings.LITELLM_API_BASE
 LITELLM_CUSTOM_PROVIDER = settings.LITELLM_CUSTOM_PROVIDER
 
 
-def embed_vacancy(vacancy: "Vacancy"):
+def embed_vacancy(vacancy: "Vacancy") -> "TaggedEmbedding":
     """
     Generate and store embeddings for a Vacancy instance
 

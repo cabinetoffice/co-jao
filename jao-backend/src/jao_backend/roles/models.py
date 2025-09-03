@@ -1,5 +1,5 @@
-from functools import lru_cache
 
+from cachemethod import lru_cachemethod
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
@@ -53,7 +53,7 @@ class OleeoGradeGroup(ListModel, UpstreamModelMixin):
 
     shorthand = ArrayField(models.TextField(), size=None, default=list)
 
-    @lru_cache(maxsize=None)
+    @lru_cachemethod(maxsize=1)
     def get_grades(self):
         """Return the grades in the shorthand list."""
         return Grade.objects.filter(shorthand_name__in=self.shorthand)
@@ -81,7 +81,7 @@ class OleeoRoleTypeGroup(ListModel, UpstreamModelMixin):
 
     description = ArrayField(models.TextField(), size=None, default=list)
 
-    @lru_cache(maxsize=None)
+    @lru_cachemethod(maxsize=1)
     def get_role_types(self):
         """Return the grades in the shorthand list."""
         return RoleType.objects.filter(description__in=self.description)

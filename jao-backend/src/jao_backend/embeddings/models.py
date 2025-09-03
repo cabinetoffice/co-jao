@@ -1,6 +1,7 @@
 import logging
 
-from functools import lru_cache
+from cachemethod import lru_cachemethod
+from functools import cache
 from typing import List
 
 import numpy as np
@@ -56,7 +57,7 @@ class Embedding(PolymorphicModel):
     """This is the output of `litellm.completion_cost` for the embedding model used."""
 
     @classmethod
-    @lru_cache(maxsize=None)
+    @cache
     def get_subclasses_by_dimensions(cls):
         """
         Note: not recursive, though hasn't been needed yet.
@@ -183,7 +184,7 @@ class EmbeddingTag(models.Model):
             ),
         ]
 
-    @lru_cache(maxsize=None)
+    @lru_cachemethod(maxsize=1)
     def embed(self, text: str):
         """
         Call LITELLM to embed the text using this tag's model.
@@ -194,14 +195,6 @@ class EmbeddingTag(models.Model):
         # Request embedding using litellm, model is a litellm model name.
         # Note: api_base must not end with a slash '/'.
 
-        # Temporarily log all the params
-        from textwrap import dedent
-        logger.info(dedent(f"""response = embedding(
-            model={self.model.name},
-            input=text,
-            api_base={LITELLM_API_BASE},
-            custom_llm_provider={LITELLM_CUSTOM_PROVIDER},
-        )"""))
         try:
             response = embedding(
                 model=self.model.name,
@@ -247,7 +240,7 @@ class EmbeddingTag(models.Model):
         ]
 
     @classmethod
-    @lru_cache(maxsize=None)
+    @cache
     def get_configured_tags(cls):
         """
         :return: dict[str, EmbeddingTag]
