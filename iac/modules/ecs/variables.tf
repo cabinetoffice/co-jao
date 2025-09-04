@@ -215,13 +215,13 @@ variable "api_command" {
 variable "api_cpu" {
   description = "CPU units for web service (1024 = 1 vCPU)"
   type        = number
-  default     = 512
+  default     = 1024
 }
 
 variable "api_memory" {
   description = "Memory in MB for web service"
   type        = number
-  default     = 1024
+  default     = 2048
 }
 
 variable "api_desired_count" {
@@ -265,13 +265,13 @@ variable "celery_worker_concurrency" {
 variable "worker_cpu" {
   description = "CPU units for worker service (1024 = 1 vCPU)"
   type        = number
-  default     = 1024
+  default     = 2048
 }
 
 variable "worker_memory" {
   description = "Memory in MB for worker service"
   type        = number
-  default     = 2048
+  default     = 16384
 }
 
 variable "worker_desired_count" {
@@ -302,7 +302,7 @@ variable "beat_cpu" {
 variable "beat_memory" {
   description = "Memory in MB for beat service"
   type        = number
-  default     = 512
+  default     = 2048
 }
 
 variable "enable_worker_autoscaling" {
