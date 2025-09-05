@@ -30,9 +30,9 @@ class Command(TaskCommandMixin, BaseCommand):
         )
 
     def handle(self, *args, **options):
-        no_wait = options['no_wait']
-        batch_size = options['batch_size']
-        initial_vacancy_id = options['initial_vacancy_id']
+        no_wait = options["no_wait"]
+        batch_size = options["batch_size"]
+        initial_vacancy_id = options["initial_vacancy_id"]
 
         max_vacancy_id = getattr(Vacancy.objects.order_by("pk").last(), "pk", 0)
         if not max_vacancy_id:
@@ -46,12 +46,8 @@ class Command(TaskCommandMixin, BaseCommand):
             )
 
         # Build kwargs for the task
-        task_kwargs = {'max_batch_size': batch_size}
+        task_kwargs = {"max_batch_size": batch_size}
         if initial_vacancy_id is not None:
-            task_kwargs['initial_vacancy_id'] = initial_vacancy_id
+            task_kwargs["initial_vacancy_id"] = initial_vacancy_id
 
-        self.run_task(
-            options,
-            aggregate_applicant_statistics,
-            **task_kwargs
-        )
+        self.run_task(options, aggregate_applicant_statistics, **task_kwargs)

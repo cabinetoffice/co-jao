@@ -1,6 +1,7 @@
 """
 The Celery tasks here wrap the functions that do the actual work.
 """
+
 from celery.canvas import chain
 from celery.utils.log import get_task_logger
 from django.conf import settings
@@ -18,7 +19,9 @@ from jao_backend.vacancies.models import Vacancy
 
 from jao_backend.common.celery import app as celery
 from jao_backend.ingest.ingester.ingest_vacancies import OleeoVacanciesIngest
-from jao_backend.ingest.ingester.ingest_aggregated_applicants import OleeoApplicantStatisticsAggregator
+from jao_backend.ingest.ingester.ingest_aggregated_applicants import (
+    OleeoApplicantStatisticsAggregator,
+)
 
 
 logger = get_task_logger(__name__)
@@ -31,7 +34,9 @@ RETRYABLE_EXCEPTIONS = (
 )
 
 
-@celery.task(base=ActiveSingleton, autoretry_for=RETRYABLE_EXCEPTIONS, retry_backoff=True)
+@celery.task(
+    base=ActiveSingleton, autoretry_for=RETRYABLE_EXCEPTIONS, retry_backoff=True
+)
 def embed_vacancies(limit=settings.JAO_BACKEND_VACANCY_EMBED_LIMIT):
     """
     Run embedding, on vacancies (limited by the setting `JAO_BACKEND_VACANCY_EMBED_LIMIT`).
@@ -41,7 +46,11 @@ def embed_vacancies(limit=settings.JAO_BACKEND_VACANCY_EMBED_LIMIT):
     :return: Number of vacancies embedded.
     """
     # Grab the vacancies that are not fully embedded yet, in reverse order so the newest are embedded first.
-    vacancies = Vacancy.objects.filter(is_deleted=False).order_by("-id").requires_embedding(limit=limit)
+    vacancies = (
+        Vacancy.objects.filter(is_deleted=False)
+        .order_by("-id")
+        .requires_embedding(limit=limit)
+    )
 
     total_embedded = 0
     logger.info(
@@ -71,7 +80,7 @@ def embed_vacancies(limit=settings.JAO_BACKEND_VACANCY_EMBED_LIMIT):
 
 
 @celery.task(base=ActiveSingleton, lock_expires=60 * 60)
-def ingest_vacancies(max_batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE):
+def ingest_vacancies(batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE):
     """
     Ingest data from OLEEO / R2D2.
 
@@ -83,12 +92,15 @@ def ingest_vacancies(max_batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SI
         logger.error("Oleeo ingest is disabled")
         raise ImproperlyConfigured("Oleeo ingest is not enabled")
 
-    logger.info(f"Starting Oleeo ingest with max_batch_size={max_batch_size}")
-    ingester = OleeoVacanciesIngest(max_batch_size=max_batch_size)
+    logger.info(f"Starting Oleeo ingest with max_batch_size={batch_size}")
+    ingester = OleeoVacanciesIngest(batch_size=batch_size)
     ingester.do_ingest()
+
 
 @celery.task(base=ActiveSingleton, lock_expires=60 * 60)
-def aggregate_applicant_statistics(max_batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE, initial_vacancy_id=None):
+def aggregate_applicant_statistics(
+    batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE, initial_vacancy_id=None
+):
     """
     Ingest data from OLEEO / R2D2.
 
@@ -100,14 +112,16 @@ def aggregate_applicant_statistics(max_batch_size=settings.JAO_BACKEND_INGEST_DE
         logger.error("Oleeo ingest is disabled")
         raise ImproperlyConfigured("Oleeo ingest is not enabled")
 
-    logger.info(f"Starting Oleeo ingest with max_batch_size={max_batch_size}")
-    ingester = OleeoApplicantStatisticsAggregator(batch_size=max_batch_size, initial_vacancy_id=initial_vacancy_id)
+    logger.info(f"Starting Oleeo ingest with max_batch_size={batch_size}")
+    ingester = OleeoApplicantStatisticsAggregator(
+        batch_size=batch_size, initial_vacancy_id=initial_vacancy_id
+    )
     ingester.do_ingest()
 
 
-update_vacancies = chain(ingest_vacancies.s(),
-                         aggregate_applicant_statistics.s(),
-                         embed_vacancies.s())
+update_vacancies = chain(
+    ingest_vacancies.s(), aggregate_applicant_statistics.s(), embed_vacancies.s()
+)
 """
 Ingest vacancies, and then start embedding.
 """
