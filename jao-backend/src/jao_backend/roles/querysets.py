@@ -15,6 +15,7 @@ class OleeoGradeGroupQuerySet(UpstreamModelQuerySet):
 
 
 class OleeoRoleTypeGroupQuerySet(UpstreamModelQuerySet):
+
     def valid_for_ingest(self):
         """Get only the valid OleeoRoleTypeGroup objects that have a single grade within the shorthand list."""
         return self.extra(

@@ -78,13 +78,13 @@ CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
 
 CELERY_BEAT_SCHEDULE = {
-    'update-vacancies-daily': {
-        'task': 'jao_backend.vacancies.tasks.update_vacancies',
-        'schedule': crontab(hour=4, minute=0),  # Run every day at 4:00 AM
+    "update-vacancies-daily": {
+        "task": "jao_backend.vacancies.tasks.update_vacancies",
+        "schedule": crontab(hour=4, minute=0),  # Run every day at 4:00 AM
     },
 }
 
-CELERY_TIMEZONE = 'Europe/London'
+CELERY_TIMEZONE = "Europe/London"
 
 INSTALLED_APPS = [
     "django_extensions",

@@ -16,6 +16,7 @@ BEDROCK_REGION = settings.JAO_BEDROCK_REGION
 # List available models by querying the model provider.
 # LiteLLM doesn't currently provide this.
 
+
 class ModelListProviderError(Exception):
     pass
 
@@ -51,6 +52,7 @@ class ModelListBase(ABC):
 
 class OllamaModelList(ModelListBase):
     """Provides a list of models from a local Ollama server."""
+
     BASE_URL = "http://localhost:11434"
     LITELLM_MODEL_PREFIX = "ollama"
 
@@ -65,7 +67,9 @@ class OllamaModelList(ModelListBase):
             return [model["name"] for model in models_data]
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to connect to Ollama server: {e}")
-            raise ModelListProviderError(f"Ollama server is not reachable at {url}") from e
+            raise ModelListProviderError(
+                f"Ollama server is not reachable at {url}"
+            ) from e
 
     @classmethod
     def is_available(cls) -> bool:
@@ -79,6 +83,7 @@ class OllamaModelList(ModelListBase):
 
 class BedrockModelList(ModelListBase):
     """Provides a list of models from AWS Bedrock."""
+
     # Bedrock uses the model ID directly, so the prefix is empty.
     LITELLM_MODEL_PREFIX = ""
 
@@ -86,18 +91,19 @@ class BedrockModelList(ModelListBase):
     def get_model_list(cls) -> List[str]:
         try:
             logger.info("Fetch bedrock model list for region %s", BEDROCK_REGION)
-            client = boto3.client('bedrock', region_name=BEDROCK_REGION)
+            client = boto3.client("bedrock", region_name=BEDROCK_REGION)
             response = client.list_foundation_models()
-            return [model['modelId'] for model in response.get('modelSummaries', [])]
+            return [model["modelId"] for model in response.get("modelSummaries", [])]
         except (ClientError, NoCredentialsError) as e:
             logger.error(f"Failed to fetch Bedrock models due to AWS error: {e}")
             raise ModelListProviderError(
-                f"AWS Bedrock is not reachable in region: {BEDROCK_REGION} or credentials are invalid.") from e
+                f"AWS Bedrock is not reachable in region: {BEDROCK_REGION} or credentials are invalid."
+            ) from e
 
     @classmethod
     def is_available(cls) -> bool:
         try:
-            client = boto3.client('bedrock', region_name=BEDROCK_REGION)
+            client = boto3.client("bedrock", region_name=BEDROCK_REGION)
             client.list_foundation_models(maxResults=1)
             return True
         except (ClientError, NoCredentialsError) as e:
@@ -107,6 +113,7 @@ class BedrockModelList(ModelListBase):
 
 class LlamaCPPModelList(ModelListBase):
     """Provides a list of models from a local Llama.cpp server."""
+
     BASE_URL = "http://localhost:8080"  # Default for llama-cpp-python
     LITELLM_MODEL_PREFIX = "llama-cpp"
 
@@ -121,14 +128,18 @@ class LlamaCPPModelList(ModelListBase):
             return [model["id"] for model in models_data]
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to connect to Llama.cpp server: {e}")
-            raise ModelListProviderError(f"Llama.cpp server is not reachable at {url}") from e
+            raise ModelListProviderError(
+                f"Llama.cpp server is not reachable at {url}"
+            ) from e
 
     @classmethod
     def is_available(cls) -> bool:
         """Checks if the Llama.cpp server is running and responsive."""
         try:
             # A request to the models endpoint is a reliable check
-            return requests.get(f"{cls.BASE_URL}/v1/models", timeout=2).status_code == 200
+            return (
+                requests.get(f"{cls.BASE_URL}/v1/models", timeout=2).status_code == 200
+            )
         except requests.exceptions.RequestException:
             logger.error(f"Llama.cpp server is not available at {cls.BASE_URL}")
             return False
@@ -143,8 +154,10 @@ def get_model_lister() -> Type[ModelListBase]:
     try:
         return model_listers[LITELLM_CUSTOM_PROVIDER]
     except KeyError:
-        raise ImproperlyConfigured(f"Unsupported LITELLM_CUSTOM_PROVIDER: '{LITELLM_CUSTOM_PROVIDER}'. "
-                                   f"Currently only {list(model_listers.keys())} are supported.")
+        raise ImproperlyConfigured(
+            f"Unsupported LITELLM_CUSTOM_PROVIDER: '{LITELLM_CUSTOM_PROVIDER}'. "
+            f"Currently only {list(model_listers.keys())} are supported."
+        )
 
 
 ModelLister = get_model_lister()
@@ -168,7 +181,9 @@ def get_errors() -> List[str]:
     :return: A list of error messages, or an empty list if no errors are found.
     """
     if not ModelLister.is_available():
-        return [f"The '{LITELLM_CUSTOM_PROVIDER}' provider is not configured or reachable."]
+        return [
+            f"The '{LITELLM_CUSTOM_PROVIDER}' provider is not configured or reachable."
+        ]
 
     try:
         ModelLister.get_model_list()

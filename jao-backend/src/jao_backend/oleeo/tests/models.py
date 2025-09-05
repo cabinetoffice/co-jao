@@ -47,7 +47,7 @@ class TestVacancies(OleeoUpstreamModel):
     salary_minimum = models.TextField(blank=True, null=True)
     salary_maximum_optional = models.TextField(blank=True, null=True)
 
-    objects = VacanciesQuerySet.as_manager()
+    objects_for_ingest = VacanciesQuerySet.as_manager()
 
     class Meta:
         """
