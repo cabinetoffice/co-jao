@@ -38,7 +38,7 @@ class Command(TaskCommandMixin, BaseCommand):
         if not max_vacancy_id:
             sys.exit("No vacancies to aggregate.")
 
-        max_vacancies_id = Vacancies.objects.order_by("pk").last().pk
+        max_vacancies_id = Vacancies.objects_for_ingest.order_by("pk").last().pk
         if max_vacancy_id != max_vacancies_id:
             # Warn that there are newer vacancies on OLEEO that won't be aggregated
             logger.warning(
@@ -46,7 +46,7 @@ class Command(TaskCommandMixin, BaseCommand):
             )
 
         # Build kwargs for the task
-        task_kwargs = {"max_batch_size": batch_size}
+        task_kwargs = {"batch_size": batch_size}
         if initial_vacancy_id is not None:
             task_kwargs["initial_vacancy_id"] = initial_vacancy_id
 

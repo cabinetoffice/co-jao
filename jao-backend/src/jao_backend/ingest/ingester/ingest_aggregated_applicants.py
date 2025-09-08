@@ -46,7 +46,7 @@ class OleeoApplicantStatisticsAggregator:
     ):
         field_path = f"applications__dandi__{characteristic_field}"
         total_apps_subquery = (
-            Vacancies.objects.valid_for_ingest()
+            Vacancies.objects_for_ingest.valid_for_ingest()
             .filter(
                 vacancy_id=OuterRef("vacancy_id"),
                 applications__isnull=False,
@@ -57,7 +57,7 @@ class OleeoApplicantStatisticsAggregator:
         )
 
         return (
-            Vacancies.objects.valid_for_ingest()
+            Vacancies.objects_for_ingest.valid_for_ingest()
             .filter(
                 applications__isnull=False,
                 applications__dandi__isnull=False,
