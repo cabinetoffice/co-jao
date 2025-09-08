@@ -1,8 +1,11 @@
 from enum import Enum
 from typing import Optional
 
+from django.db.models import F
 from django.db.models import Max
 from django.db.models import Min
+from django.db.models import Value
+from django.db.models.functions import Floor
 
 """
 Base functions to perform diffs of records in OLEEO vs comparable JAO records.
@@ -30,50 +33,43 @@ class SyncStatus(Enum):
 
 def get_buckets_modulo(qs, granularity_size=5000):
     """
-    :param qs: A Django model class or a QuerySet with numeric primary keys.
-    :param granularity_size: The minimum number of items in each bucket.
-
-    Split queryset into buckets of minimum items of granularity size.
-
-    Boundaries are a modulo of the granularity size, for repeatability.
+    Splits a queryset into buckets using a single, efficient GROUP BY query.
     """
-
-    pk_range = qs.aggregate(min_pk=Min("pk"), max_pk=Max("pk"))
-
-    if pk_range["min_pk"] is None:
+    # An initial check to avoid hitting the DB if the queryset is empty.
+    if not qs.exists():
         return []
 
+    # This single query does all the work on the database side.
+    # 1. Annotate each row with a 'bucket_id' using integer division.
+    # 2. Group the rows by that 'bucket_id'.
+    # 3. For each group, calculate the MIN and MAX pk.
+    buckets_query = (
+        qs.annotate(
+            bucket_id=Floor(F("pk") / Value(granularity_size))
+        )
+        .values("bucket_id")  # This acts as the GROUP BY clause
+        .annotate(
+            actual_min=Min("pk"),
+            actual_max=Max("pk"),
+        )
+        .order_by("bucket_id") # Ensures results are in a predictable order
+    )
+
+    # The database returns a list of dictionaries; we reformat it to match the original.
     buckets = []
-
-    min_pk = pk_range["min_pk"]
-    max_pk = pk_range["max_pk"]
-
-    # Buckets on modulo boundaries
-    start_boundary = (min_pk // granularity_size) * granularity_size
-    end_boundary = ((max_pk // granularity_size) + 1) * granularity_size
-
-    current = start_boundary
-    while current < end_boundary:
-        next_boundary = current + granularity_size
-
-        actual_range = qs.filter(pk__gte=current, pk__lt=next_boundary).aggregate(
-            actual_min=Min("pk"), actual_max=Max("pk")
+    for group in buckets_query:
+        start_boundary = group["bucket_id"] * granularity_size
+        end_boundary = start_boundary + granularity_size - 1
+        buckets.append(
+            (
+                start_boundary,
+                end_boundary,
+                group["actual_min"],
+                group["actual_max"],
+            )
         )
 
-        if actual_range["actual_min"] is not None:
-            buckets.append(
-                (
-                    current,
-                    next_boundary - 1,
-                    actual_range["actual_min"],
-                    actual_range["actual_max"],
-                )
-            )
-
-        current = next_boundary
-
     return buckets
-
 
 def _build_pk_range_filter(
     pk_start: Optional[int] = None, pk_end: Optional[int] = None
@@ -114,9 +110,9 @@ def iter_instances_diff(
     source_qs,
     destination_qs,
     include_create=True,
-    include_delete=True,
     include_read=True,
-    include_changed=True,
+    include_update=True,
+    include_delete=True,
 ):
     """
     Iterate through merged instances from two querysets, yielding tuples based on PK comparison.
@@ -139,7 +135,7 @@ def iter_instances_diff(
 
     :param include_create: Include source-only instances (source_instance, None)
     :param include_delete: Include dest-only instances (None, dest_instance)
-    :param include_changed: Include changed matching instances (source_instance, dest_instance)
+    :param include_update: Include changed matching instances (source_instance, dest_instance)
     :param include_read: Include unchanged matching instances (source_instance, dest_instance)
 
     :yield: (SyncStatus, source_instance or None, dest_instance or None)
@@ -149,9 +145,10 @@ def iter_instances_diff(
     ), "self must be an upstream queryset of dest_qs"
 
     source_by_pk = source_qs.in_bulk()  # key=pk, value=instance
+    del source_qs
 
     # Create an iterator over the pks of source.
-    source_iter = iter(source_by_pk.keys())
+    source_iter = iter([*source_by_pk.keys()])
     source_pk = next(source_iter, None)
 
     for dest_instance in destination_qs:
@@ -159,7 +156,7 @@ def iter_instances_diff(
         # there are no destinations yet for these sources.
         while source_pk is not None and source_pk < dest_instance.pk:
             if include_create:
-                yield SyncStatus.CREATE, source_by_pk[source_pk], None
+                yield SyncStatus.CREATE, source_by_pk.pop(source_pk), None
             source_pk = next(source_iter, None)
 
         if source_pk is None or source_pk > dest_instance.pk:
@@ -168,10 +165,10 @@ def iter_instances_diff(
                 yield SyncStatus.DELETE, None, dest_instance
         elif source_pk == dest_instance.pk:
             # Matching items, have they changed ?
-            source_instance = source_by_pk[source_pk]
-            if include_changed or include_read:
+            source_instance = source_by_pk.pop(source_pk)
+            if include_update or include_read:
                 if source_instance.destination_requires_update(dest_instance):
-                    if include_changed:
+                    if include_update:
                         yield SyncStatus.UPDATE, source_instance, dest_instance
                 else:
                     if include_read:
@@ -181,7 +178,7 @@ def iter_instances_diff(
     # CREATE: Remaining source instances
     while source_pk is not None:
         if include_create:
-            yield SyncStatus.CREATE, source_by_pk[source_pk], None
+            yield SyncStatus.CREATE, source_by_pk.pop(source_pk), None
         source_pk = next(source_iter, None)
 
 

@@ -175,7 +175,7 @@ class OleeoVacanciesIngest:
         :param create_only:  Set to True only create new records; this is useful during deployment (especially during the initial deployment)
         """
 
-        logger.info("Ingest: %s -> %s", source_model, destination_model)
+        logger.info("Ingest: %s -> %s", source_model.__name__, destination_model.__name__)
         (source_instances, create_instances, update_instances, delete_qs) = (
             source_model.destination_pending_sync(
                 pk_start=pk_start,
@@ -189,8 +189,7 @@ class OleeoVacanciesIngest:
         updated_count = 0
 
         if not any((create_instances, update_instances, delete_qs)):
-            logger.info("Nothing to do for: %s", source_model)
-            logger.info(source_instances)
+            logger.info("No %s changed.", source_model)
 
         logger.info(
             "%s Create %s instances", source_model.__name__, len(create_instances)
@@ -226,8 +225,7 @@ class OleeoVacanciesIngest:
 
         deleted_count = 0
         if not create_only:
-            delete_count = delete_qs.count()
-            delete_qs.update(is_deleted=False)
+            deleted_count = delete_qs.update(is_deleted=False)
 
         return created_count, updated_count, deleted_count
 
@@ -251,15 +249,16 @@ class OleeoVacanciesIngest:
 
     def update_vacancy_grades(self, source_instances=None, destination_instances=None):
         logger.info(
-            "Updating vacancy grades for %d/%d",
+            "Updating vacancy grades for %d",
             len(destination_instances),
-            len(source_instances),
         )
 
         # in_bulk isn't used as source_instances may have been limited, preventing it's use.
         source_vacancies = {
             source_instance.pk: source_instance for source_instance in source_instances
         }
+
+        del source_instances
 
         # Cache vacancy grades - note: ingestion has enough records that it's possible
         # for new combinations to appear during ingestion.
@@ -285,15 +284,16 @@ class OleeoVacanciesIngest:
         self, source_instances=None, destination_instances=None
     ):
         logger.info(
-            "Updating vacancy role types for %d/%d",
+            "Updating vacancy role types for %d",
             len(destination_instances),
-            len(source_instances),
         )
 
         # in_bulk isn't used as source_instances may have been limited, preventing it's use.
         source_vacancies = {
             source_instance.pk: source_instance for source_instance in source_instances
         }
+
+        del source_instances
 
         # Cache vacancy role type - note: ingestion has enough records that it's possible
         # for new combinations to appear during ingestion.
@@ -371,17 +371,15 @@ class OleeoVacanciesIngest:
         """
         if not destination_instances:
             logger.info(
-                "No destination instances to update relationships for %s %s %s",
+                "No destination instances to update relationships for %s %s",
                 destination_model.__name__,
-                readable_pk_range(source_instances),
                 readable_pk_range(destination_instances),
             )
             return
 
         logger.info(
-            "Updating relationships for %s %s %s",
+            "Updating relationships for %s %s",
             destination_model.__name__,
-            readable_pk_range(source_instances),
             readable_pk_range(destination_instances),
         )
         self.update_vacancy_grades(source_instances, destination_instances)
