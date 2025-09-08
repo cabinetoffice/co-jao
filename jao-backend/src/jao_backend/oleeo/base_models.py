@@ -220,7 +220,7 @@ class UpstreamModelMixin:
             pk_start,
             pk_end,
             include_create=include_create,
-            include_changed=include_update,
+            include_update=include_update,
             include_delete=include_delete,
         )
 
