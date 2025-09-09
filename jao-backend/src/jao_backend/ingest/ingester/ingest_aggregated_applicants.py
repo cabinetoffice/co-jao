@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils.log import logging
 from django.db.models import Count
+from django.db.models import Q
 from django.db.models import DecimalField
 from django.db.models import F
 from django.db.models import Max
@@ -44,6 +45,12 @@ class OleeoApplicantStatisticsAggregator:
     def _get_vacancy_statistics_per_characteristic(
         self, vacancy_id_start, vacancy_id_end, characteristic_field
     ):
+        # Important to limit this to vacancies that have been ingested locally,
+        # otherwise me may violate foreign key constraints when creating statistics.
+        local_vacancies = [*Vacancy.objects.order_by("pk").filter(
+                                                    pk__gte=vacancy_id_start,
+                                                    pk__lte=vacancy_id_end).values_list("pk", flat=True)
+                           ]
         field_path = f"applications__dandi__{characteristic_field}"
         total_apps_subquery = (
             Vacancies.objects_for_ingest.valid_for_ingest()
@@ -59,10 +66,9 @@ class OleeoApplicantStatisticsAggregator:
         return (
             Vacancies.objects_for_ingest.valid_for_ingest()
             .filter(
+                Q(vacancy_id__gte=vacancy_id_start, vacancy_id__lte=vacancy_id_end) & Q(vacancy_id__in=local_vacancies),
                 applications__isnull=False,
                 applications__dandi__isnull=False,
-                vacancy_id__gte=vacancy_id_start,
-                vacancy_id__lte=vacancy_id_end,
                 **{f"{field_path}__isnull": False},
             )
             .values("vacancy_id", field_path)
