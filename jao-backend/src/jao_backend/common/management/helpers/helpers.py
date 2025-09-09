@@ -41,6 +41,7 @@ class TaskCommandMixin:
 
             return task(*args, **kwargs)
         else:
+            # Run the task asynchronously
             result = task.delay(*args, **kwargs)
             # If RESULT_EXTENDED is not set there may not be a task name.
             name = getattr(task, "name", str(task))
@@ -48,3 +49,5 @@ class TaskCommandMixin:
 
             if not options["no_wait"]:
                 result.get()
+
+            return result

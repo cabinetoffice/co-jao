@@ -2,6 +2,7 @@ import sys
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.db import connections
 from django.utils.log import logging
 from jao_backend.common.management.helpers import TaskCommandMixin
 from jao_backend.vacancies.models import Vacancy
@@ -30,7 +31,6 @@ class Command(TaskCommandMixin, BaseCommand):
         )
 
     def handle(self, *args, **options):
-        no_wait = options["no_wait"]
         batch_size = options["batch_size"]
         initial_vacancy_id = options["initial_vacancy_id"]
 
@@ -50,4 +50,6 @@ class Command(TaskCommandMixin, BaseCommand):
         if initial_vacancy_id is not None:
             task_kwargs["initial_vacancy_id"] = initial_vacancy_id
 
+        connections.close_all()
         self.run_task(options, aggregate_applicant_statistics, **task_kwargs)
+

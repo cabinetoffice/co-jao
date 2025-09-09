@@ -6,13 +6,13 @@ from celery.canvas import chain
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.db import transaction
 from litellm.exceptions import APIConnectionError
 from litellm.exceptions import RateLimitError
 from litellm.exceptions import ServiceUnavailableError
 from litellm.exceptions import Timeout
 
 from jao_backend.common.celery.active_singleton import ActiveSingleton
+from jao_backend.common.db.connections import DatabaseConnectionLostError, on_db_disconnect_raise
 from jao_backend.vacancies.embed import embed_vacancy
 from jao_backend.vacancies.models import Vacancy
 
@@ -23,20 +23,25 @@ from jao_backend.ingest.ingester.ingest_aggregated_applicants import (
     OleeoApplicantStatisticsAggregator,
 )
 
-
 logger = get_task_logger(__name__)
+
 
 RETRYABLE_EXCEPTIONS = (
     APIConnectionError,
     RateLimitError,
     ServiceUnavailableError,
     Timeout,
+    DatabaseConnectionLostError,
 )
 
+TASK_KWARGS = {
+    "base": ActiveSingleton,
+    "autoretry_for": RETRYABLE_EXCEPTIONS,
+    "retry_backoff": True,
+}
 
-@celery.task(
-    base=ActiveSingleton, autoretry_for=RETRYABLE_EXCEPTIONS, retry_backoff=True
-)
+@celery.task(**TASK_KWARGS)
+@on_db_disconnect_raise(using="oleeo")
 def embed_vacancies(limit=settings.JAO_BACKEND_VACANCY_EMBED_LIMIT):
     """
     Run embedding, on vacancies (limited by the setting `JAO_BACKEND_VACANCY_EMBED_LIMIT`).
@@ -68,8 +73,7 @@ def embed_vacancies(limit=settings.JAO_BACKEND_VACANCY_EMBED_LIMIT):
                 logger.info("Vacancy %s already embedded, skipping.", vacancy.id)
                 continue
 
-            with transaction.atomic():
-                embed_vacancy(vacancy)
+            embed_vacancy(vacancy)
             total_embedded += 1
     except Exception as e:
         raise e
@@ -79,7 +83,8 @@ def embed_vacancies(limit=settings.JAO_BACKEND_VACANCY_EMBED_LIMIT):
     return len(vacancies)
 
 
-@celery.task(base=ActiveSingleton, lock_expires=60 * 60)
+@celery.task(**TASK_KWARGS)
+@on_db_disconnect_raise(using="oleeo")
 def ingest_vacancies(batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE):
     """
     Ingest data from OLEEO / R2D2.
@@ -97,7 +102,8 @@ def ingest_vacancies(batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE):
     ingester.do_ingest()
 
 
-@celery.task(base=ActiveSingleton, lock_expires=60 * 60)
+@celery.task(**TASK_KWARGS)
+@on_db_disconnect_raise(using="oleeo")
 def aggregate_applicant_statistics(
     batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE, initial_vacancy_id=None
 ):

@@ -1,5 +1,9 @@
+import logging
+
 from celery_singleton import Singleton
 
+
+logger = logging.getLogger(__name__)
 
 class ActiveSingleton(Singleton):
     """
@@ -9,7 +13,7 @@ class ActiveSingleton(Singleton):
 
     abstract = True
 
-    TERMINAL_STATES = {"FAILURE", "SUCCESS", "REVOKED", "RETRY"}
+    TERMINAL_STATES = {"FAILURE", "SUCCESS", "REVOKED"}
 
     def get_existing_task_id(self, lock):
         """
@@ -26,3 +30,9 @@ class ActiveSingleton(Singleton):
             return None
 
         return existing_task_id
+
+    def retry(self, *args, **kwargs):
+        # See https://github.com/steinitzu/celery-singleton/pull/26
+        self.release_lock(task_args=self.request.args, task_kwargs=self.request.kwargs)
+        return super().retry(*args, **kwargs)
+
