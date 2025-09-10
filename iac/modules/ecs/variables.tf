@@ -271,7 +271,7 @@ variable "worker_cpu" {
 variable "worker_memory" {
   description = "Memory in MB for worker service"
   type        = number
-  default     = 16384
+  default     = 8192
 }
 
 variable "worker_desired_count" {
