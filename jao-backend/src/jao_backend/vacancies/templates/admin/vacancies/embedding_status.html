@@ -66,9 +66,14 @@
     </div>
 
     <div class="module">
+        <h2>Embedding Settings</h2>
+        <p><strong>LiteLLM Custom Provider:</strong>{{ litellm_custom_provider }}</p>
+    </div>
+
+    <div class="module">
         <h2>Overall Status</h2>
         <p><strong>Total Active Vacancies:</strong> {{ total_vacancies }}</p>
-        <p><strong>Configured for embedding:</strong> {% if embed_limit %}{{ embed_limit|default:"0" }} of {{ total_vacancies }} most recent vacancies.{% else %}All vacancies.{% endif %}</p>
+        <p><strong>Configured for embedding:</strong> {% if embed_limit %}{{ embed_limit|default:"0" }}.{% else %}All vacancies.{% endif %}</p>
     </div>
 
     {% for stat in embedding_stats %}

@@ -5,8 +5,6 @@ from crispy_forms_gds.layout import Submit as GovSubmit
 from django import forms
 from django.conf import settings
 
-from .fields import S3URLField
-
 
 class IngestForm(forms.Form):
     batch_size = forms.IntegerField(

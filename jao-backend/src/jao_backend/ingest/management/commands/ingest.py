@@ -19,6 +19,11 @@ class Command(TaskCommandMixin, BaseCommand):
             default=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE,
             help="Maximum batch size for processing records in chunks",
         )
+        parser.add_argument(
+            "--create-only",
+            action="store_true",
+            help="Only create new records, do not update existing ones: used during initial deployment.",
+        )
 
     def handle(self, *args, **options):
         """
@@ -32,7 +37,7 @@ class Command(TaskCommandMixin, BaseCommand):
             logger.error("OLEEO integration is disabled")
             raise ValueError("OLEEO integration is not enabled")
 
-        max_batch_size = (
+        batch_size = (
             options["batch_size"] or settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE
         )
-        self.run_task(options, ingest_vacancies, max_batch_size=max_batch_size)
+        self.run_task(options, ingest_vacancies, batch_size=batch_size)

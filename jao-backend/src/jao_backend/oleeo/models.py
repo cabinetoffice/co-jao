@@ -141,7 +141,7 @@ class Vacancies(OleeoUpstreamModel):
     person_specification = models.TextField(blank=True, null=True)
     row_last_updated = models.DateTimeField()
 
-    objects = VacanciesQuerySet.as_manager()
+    objects_for_ingest = models.Manager.from_queryset(VacanciesQuerySet)()
     """
     Use a custom query manager as vacancy data needs to exclude non-numeric salary values.
     """
