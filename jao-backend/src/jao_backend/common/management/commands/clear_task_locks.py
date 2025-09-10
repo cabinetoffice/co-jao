@@ -5,13 +5,14 @@ from jao_backend.common.celery import app as celery_app
 
 
 class Command(BaseCommand):
-    help = 'Clear all singleton task locks held in Redis/Elasticache.'
+    help = "Clear all singleton task locks held in Redis/Elasticache."
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '-y', '--yes',
-            action='store_true',
-            help='Skip confirmation prompt and proceed directly',
+            "-y",
+            "--yes",
+            action="store_true",
+            help="Skip confirmation prompt and proceed directly",
         )
 
     def handle(self, *args, **options):
@@ -24,9 +25,9 @@ class Command(BaseCommand):
 
         See: https://github.com/steinitzu/celery-singleton?tab=readme-ov-file#handling-deadlocks
         """
-        if not options['yes']:
+        if not options["yes"]:
             confirm = input("Clear all task locks? [y/N]: ")
-            if confirm.lower() not in ['y', 'yes']:
+            if confirm.lower() not in ["y", "yes"]:
                 return "Cancelled."
 
         clear_locks(celery_app)

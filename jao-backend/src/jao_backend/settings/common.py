@@ -15,6 +15,7 @@ from pathlib import Path
 
 import dj_database_url
 
+from celery.schedules import crontab
 from django.core.exceptions import ImproperlyConfigured
 
 from jao_backend.common.db.fields import uuidv7
@@ -77,6 +78,15 @@ CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = os.getenv(
     "CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
 
+CELERY_BEAT_SCHEDULE = {
+    "update-vacancies-daily": {
+        "task": "jao_backend.vacancies.tasks.update_vacancies",
+        "schedule": crontab(hour=4, minute=0),  # Run every day at 4:00 AM
+    },
+}
+
+CELERY_TIMEZONE = "Europe/London"
+
 INSTALLED_APPS = [
     "django_extensions",
     # "django_redis",
@@ -135,6 +145,7 @@ AWS_TAGS_FOR_EMBEDDING = {"project": "jao", "environment": ENV}
 
 
 # Concatenated job title and responsibilities embedding tag
+# Do not change uuids once assigned!
 EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID = uuidv7(
     hex="0196a2a0-61b9-79e2-9ef7-9988b475dda3"
 )
