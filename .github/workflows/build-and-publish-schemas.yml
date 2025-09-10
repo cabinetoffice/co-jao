@@ -2,11 +2,11 @@ name: Build and Publish Wheel
 
 on:
   push:
-    branches: [feat/csj-integration]
+    branches: [merge-sagemaker]
     tags:
       - "v*"
   pull_request:
-    branches: [feat/csj-integration]
+    branches: [merge-sagemaker]
   release:
     types: [published]
 
