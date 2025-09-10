@@ -1,5 +1,5 @@
 import json
-from functools import lru_cache
+from functools import cache
 
 from django.conf import settings
 from django.contrib import admin, messages
@@ -91,7 +91,7 @@ class EmbeddingModelAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = ("name", "is_active")
 
 
-@lru_cache(maxsize=None)
+@cache
 def add_admin_urls():
     """
     Django admin doesn't provide a way of adding extra urls, so patch it here.

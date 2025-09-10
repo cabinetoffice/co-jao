@@ -1,5 +1,4 @@
-from functools import lru_cache
-
+from cachemethod import lru_cachemethod
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
@@ -47,13 +46,17 @@ class OleeoGradeGroup(ListModel, UpstreamModelMixin):
     this is split up by finding the combinations that are only a single grade.
     """
 
-    objects = OleeoGradeGroupQuerySet.as_manager()
+    objects = models.Manager()
+    """default manager"""
+
+    objects_for_ingest = OleeoGradeGroupQuerySet.as_manager()
+    """manager when this is being upstream to roles.Grade"""
 
     description = ArrayField(models.TextField(), size=None, default=list)
 
     shorthand = ArrayField(models.TextField(), size=None, default=list)
 
-    @lru_cache(maxsize=None)
+    @lru_cachemethod(maxsize=1)
     def get_grades(self):
         """Return the grades in the shorthand list."""
         return Grade.objects.filter(shorthand_name__in=self.shorthand)
@@ -74,14 +77,18 @@ class OleeoRoleTypeGroup(ListModel, UpstreamModelMixin):
     Only used during ingest, JAO django apps should not link to this model.
     """
 
-    objects = OleeoRoleTypeGroupQuerySet.as_manager()
+    objects = models.Manager()
+    """default manager"""
+
+    objects_for_ingest = OleeoRoleTypeGroupQuerySet.as_manager()
+    """manager when this is being upstream to roles.RoleType"""
 
     destination_model = "roles.RoleType"
     ingest_last_updated_field = "last_updated"
 
     description = ArrayField(models.TextField(), size=None, default=list)
 
-    @lru_cache(maxsize=None)
+    @lru_cachemethod(maxsize=1)
     def get_role_types(self):
         """Return the grades in the shorthand list."""
         return RoleType.objects.filter(description__in=self.description)

@@ -11,6 +11,9 @@ from jao_backend.vacancies.querysets import VacancyEmbeddingQuerySet
 class Vacancy(models.Model):
     class Meta:
         verbose_name_plural = "Vacancies"
+        indexes = [
+            models.Index(fields=["is_deleted"]),
+        ]
 
     id = models.IntegerField(
         primary_key=True, help_text="CS Jobs vacancy ID [5-6 characters]"
@@ -60,9 +63,12 @@ class Vacancy(models.Model):
         """
         expected_embed_tag_uuids = list(EmbeddingTag.get_configured_tags().keys())
         expected_tags_count = len(expected_embed_tag_uuids)
-        return self.vacancyembedding_set.filter(
-            tag__uuid__in=expected_embed_tag_uuids
-        ).count() < expected_tags_count
+        return (
+            self.vacancyembedding_set.filter(
+                tag__uuid__in=expected_embed_tag_uuids
+            ).count()
+            < expected_tags_count
+        )
 
     def __str__(self):
         return f"{self.id, self.title}"
