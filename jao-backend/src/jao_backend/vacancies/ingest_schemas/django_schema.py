@@ -21,10 +21,11 @@ class VacancySchema(ModelSchema):
         ],
     )
 
+
 class AggregatedStatisticSchema(ModelSchema):
     model_config = ConfigDict(
         model=AggregatedApplicationStatistic,  # type: ignore
-        include=[ # type: ignore
+        include=[  # type: ignore
             "vacancy_id",
             "total_applications",
             "updated_at",

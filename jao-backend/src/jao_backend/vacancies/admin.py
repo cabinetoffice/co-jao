@@ -115,21 +115,28 @@ class VacancyAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
             return redirect(request.path_info)
 
         task_is_running = is_task_running(task_name)
-        embed_limit = getattr(settings, 'JAO_BACKEND_VACANCY_EMBED_LIMIT', None)
+        embed_limit = getattr(settings, "JAO_BACKEND_VACANCY_EMBED_LIMIT", None)
 
         total_vacancies = Vacancy.objects.filter(is_deleted=False).count()
 
-        configured_vacancies_qs = Vacancy.objects.configured_for_embed(limit=embed_limit)
+        configured_vacancies_qs = Vacancy.objects.configured_for_embed(
+            limit=embed_limit
+        )
         progress_max = configured_vacancies_qs.count()
 
-        vacancies_needing_embedding = Vacancy.objects.requires_embedding(limit=embed_limit)
+        vacancies_needing_embedding = Vacancy.objects.requires_embedding(
+            limit=embed_limit
+        )
         remaining_work_count = vacancies_needing_embedding.count()
 
-        embedding_stats = self._get_embedding_statistics(configured_vacancies_qs, progress_max)
+        embedding_stats = self._get_embedding_statistics(
+            configured_vacancies_qs, progress_max
+        )
 
         context = {
             **self.admin_site.each_context(request),
-            "title": "Embeddings Status",
+            "title": "Vacancy Embeddings",
+            "litellm_custom_provider": settings.LITELLM_CUSTOM_PROVIDER,
             "total_vacancies": total_vacancies,
             "progress_max": progress_max,
             "remaining_work_count": remaining_work_count,
@@ -164,12 +171,16 @@ class VacancyAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
 
         embedding_stats = []
         for tag in valid_tags:
-            percentage = (tag.embedded_count / progress_max * 100) if progress_max > 0 else 0
+            percentage = (
+                (tag.embedded_count / progress_max * 100) if progress_max > 0 else 0
+            )
 
-            embedding_stats.append({
-                "tag": tag,
-                "embedded_count": tag.embedded_count,  # Keep original template variable name
-                "percentage": f"{percentage:.1f}",
-            })
+            embedding_stats.append(
+                {
+                    "tag": tag,
+                    "embedded_count": tag.embedded_count,  # Keep original template variable name
+                    "percentage": f"{percentage:.1f}",
+                }
+            )
 
         return embedding_stats
