@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 
+from jao_backend.embeddings.chunking import MeanStrategy
 from jao_backend.embeddings.models import TaggedEmbedding, EmbeddingTag
 from jao_backend.roles.models import Grade
 from jao_backend.roles.models import RoleType
@@ -41,6 +42,7 @@ class Vacancy(models.Model):
     title = models.TextField(null=True, blank=True, help_text="Job title.")
     description = models.TextField(null=True, blank=True, help_text="Job description.")
     summary = models.TextField(null=True, blank=True, help_text="Blerb about teams.")
+    person_specification = models.TextField(null=True, blank=True, help_text="Text about the person specification")
 
     grades = models.ManyToManyField(
         through="VacancyGrade", to=Grade, help_text="The grades of the vacancy."
@@ -114,14 +116,11 @@ class VacancyRoleType(models.Model):
         return f"{self.vacancy.title} - {self.role_type.description}"
 
 
-
-
-
 class VacancyEmbeddingManager(models.Manager):
     def get_queryset(self):
         return VacancyEmbeddingQuerySet(self.model, using=self._db)
 
-    def similar_vacancies(text, tag: EmbeddingTag, top_n=10):
+    def similar_vacancies(self, text, tag: EmbeddingTag, top_n=10):
         """
         Get vacancies similar to the provided text.
 
