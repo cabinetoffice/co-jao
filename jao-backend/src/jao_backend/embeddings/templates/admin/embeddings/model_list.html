@@ -1,0 +1,58 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+&rsaquo; {% translate 'Available Models' %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <h1>Available Models from {{ provider }}</h1>
+    <p>This page lists the models available from the currently configured <strong>{{ provider }}</strong> provider.</p>
+
+    {% if errors %}
+    <div class="module">
+        <h2>Errors</h2>
+        <div class="messagelist">
+            {% for error in errors %}
+                <div class="error">{{ error }}</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if models %}
+        <div class="module" id="changelist">
+            <h2>Available Models ({{ models|length }})</h2>
+            <div class="results">
+                <table id="result_list">
+                    <thead>
+                        <tr>
+                            <th scope="col">
+                                <div class="text"><span>Model</span></div>
+                            </th>
+                            <th scope="col">
+                                <div class="text"><span>LiteLLM ID</span></div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for model, litellm_id in models %}
+                            <tr class="{% cycle 'row1' 'row2' %}">
+                                <td>{{ model }}</td>
+                                <td>{{ litellm_id }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% elif not errors %}
+        <p>No models were found for the '{{ provider }}' provider.</p>
+    {% endif %}
+</div>
+{% endblock %}

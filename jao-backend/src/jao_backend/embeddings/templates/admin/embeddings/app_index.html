@@ -1,0 +1,21 @@
+{% extends "admin/app_index.html" %}
+{% load i18n %}
+
+{% block content %}
+  {{ block.super }}
+  <div class="module module-separator">
+    <h2>{% translate "Tools" %}</h2>
+    <div class="form-row">
+      <div>
+        <h3><a href="{% url 'admin:embeddings_litellm_test' %}">{% translate "Test Embedding" %}</a></h3>
+        <p class="help">{% translate "Send a test request to the configured LiteLLM embedding service to verify its connection and functionality." %}</p>
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <h3><a href="{% url 'admin:embeddings_model_list' %}">{% translate "View Available Models" %}</a></h3>
+        <p>This page lists the models available from the currently configured <strong>{{ provider }}</strong> provider.</p>
+      </div>
+    </div>
+  </div>
+{% endblock %}

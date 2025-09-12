@@ -1,0 +1,133 @@
+/* Block for map container */
+.applicant-map-container {
+  width: 500px;
+  height: 1200px;
+}
+
+/*!* Block for choropleth layer *!*/
+.applicant-map-choropleth-layer {
+  stroke: #000000;
+  stroke-width: 2px;
+  stroke-dasharray: 5, 5;
+  fill: "YlGn";
+}
+
+/* Block for no data regions */
+.applicant-map-no-data-layer {
+  fill-pattern: var(--applicant-map-no-data-pattern, repeating-linear-gradient(
+    45deg,
+    grey,
+    grey 10px,
+    white 10px,
+    white 20px
+  ));
+  /*fill-color: var(--applicant-map-no-data-fill-color, #ffff00);*/
+  fill: #ffff00;
+  /*stroke: var(--applicant-map-no-data-border-color, #000000);*/
+  stroke: #000000;
+  stroke-width: 1px;
+}
+
+/* Block for tooltip */
+.applicant-map-tooltip-layer {
+  background-color: white;
+  color: #333333;
+  font-family: Helvetica, arial, sans-serif;
+  font-size: 16px;
+  padding: 10px;
+}
+
+/* Add this to your CSS file or in a <style> block */
+.applicant-map-no-data-layer {
+    background-image: repeating-linear-gradient(
+        45deg,
+        grey,
+        grey 10px,
+        white 10px,
+        white 20px
+    );
+    background-size: 20px 20px;
+    stroke-width: 1px;
+}
+
+/* Styling for the legend container */
+.applicant-map-legend-container {
+    background: white;
+    padding: 10px;
+    font: 14px Arial, sans-serif;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+    border-radius: 2px;
+    margin-bottom: 10px;
+    max-width: 800px;
+    margin-right: 10px;
+    margin-top: 40px; /* Adjust to push it below the zoom controls */
+}
+
+/* Flexbox container for the bars */
+.applicant-map-legend-bar-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px; /* Space between the bars and the title */
+}
+
+/* Each legend bar */
+.applicant-map-legend-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    position: relative;
+}
+
+/* Labels above the color bars aligned to the left */
+.applicant-map-legend-bar-label-left {
+    color: black;
+    font-size: 12px;
+    margin-bottom: 4px;
+    text-align: left;
+}
+
+/* Label on the far right above the last color bar */
+.applicant-map-legend-bar-label-right {
+    color: black;
+    font-size: 12px;
+    margin-bottom: 4px;
+    text-align: right;
+    align-self: flex-end;
+    position: absolute;  /* Cheat to put this into the previous cell */
+}
+
+/* Color squares - increased width */
+.applicant-map-legend-color {
+    width: 100px; /* Twice the previous width */
+    height: 20px;
+}
+
+/* No space between the bars */
+.applicant-map-legend-bar + .applicant-map-legend-bar .applicant-map-legend-color {
+    margin-left: -2px;  /* Adjust this if needed to ensure no gap between colors */
+}
+
+/* Hide the last color bar using last-child */
+.applicant-map-legend-bar:last-child .applicant-map-legend-color {
+    display: none;
+}
+
+/* Styling for the title */
+.applicant-map-legend-title {
+    font-weight: bold;
+    color: black;
+    text-align: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 800px) {
+    .applicant-map-legend-container {
+        max-width: 100%;
+    }
+
+    .applicant-map-legend-bar-label-left,
+    .applicant-map-legend-bar-label-right {
+        font-size: 10px;
+    }
+}

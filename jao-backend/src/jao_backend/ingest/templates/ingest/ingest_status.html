@@ -1,0 +1,80 @@
+{% extends "common/base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}Ingest Status{% endblock %}
+
+{% block content %}
+<div class="govuk-width-container">
+    <main class="govuk-main-wrapper">
+        <div class="govuk-grid-row">
+            <div class="govuk-grid-column-two-thirds">
+                <h1 class="govuk-heading-xl">Ingest Status</h1>
+
+                {% if messages %}
+                    {% for message in messages %}
+                    <div class="govuk-notification-banner {% if message.tags == 'success' %}govuk-notification-banner--success{% endif %}" role="alert">
+                        <div class="govuk-notification-banner__content">
+                            <p class="govuk-notification-banner__heading">{{ message }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+
+                {% if task_running %}
+                    <div class="govuk-panel govuk-panel--confirmation">
+                        <h2 class="govuk-panel__title">Ingest Task Is Running</h2>
+                        <div class="govuk-panel__body">
+                            Task ID: <strong>{{ task_id }}</strong>
+                        </div>
+                    </div>
+
+                    <p class="govuk-body">The ingest task is currently processing data. This page will automatically refresh to show updates.</p>
+
+                    <div class="govuk-inset-text">
+                        <p>Please wait for the current task to complete before starting a new one.</p>
+                    </div>
+
+                    <script>
+                        // Auto-refresh the page every 10 seconds
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 10000);
+                    </script>
+                {% else %}
+                    {% if task_result %}
+                        <div class="govuk-panel govuk-panel--confirmation">
+                            <h2 class="govuk-panel__title">Ingest Task Completed</h2>
+                            <div class="govuk-panel__body">
+                                Result: <strong>{{ task_result }}</strong>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <h2 class="govuk-heading-m">Start New Ingest</h2>
+                    <p class="govuk-body">Use the form below to start a new ingest task:</p>
+
+                    {% crispy form %}
+                {% endif %}
+            </div>
+
+            <div class="govuk-grid-column-one-third">
+                <div class="govuk-panel govuk-panel--sidebar">
+                    <h2 class="govuk-heading-m">Task Information</h2>
+                    <dl class="govuk-summary-list">
+                        <div class="govuk-summary-list__row">
+                            <dt class="govuk-summary-list__key">Status</dt>
+                            <dd class="govuk-summary-list__value">{{ task_status|default:"Not running" }}</dd>
+                        </div>
+                        {% if task_id %}
+                        <div class="govuk-summary-list__row">
+                            <dt class="govuk-summary-list__key">Task ID</dt>
+                            <dd class="govuk-summary-list__value">{{ task_id }}</dd>
+                        </div>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}

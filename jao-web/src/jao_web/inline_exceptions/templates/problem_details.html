@@ -1,0 +1,72 @@
+<style>
+.technical-details {
+    font-family: sans-serif;
+    margin: 20px;
+}
+
+.exception_value {
+    background: #f7f7f9;
+    padding: 10px;
+    border: 1px solid #e1e1e8;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.traceback {
+    background: #f7f7f9;
+    padding: 10px;
+    border: 1px solid #e1e1e8;
+    border-radius: 4px;
+}
+
+.traceback ul {
+    list-style: none;
+    padding: 0;
+}
+
+.traceback li {
+    margin-bottom: 10px;
+}
+
+.traceback code {
+    display: block;
+    background: #f7f7f9;
+    padding: 5px;
+    border-radius: 4px;
+}
+</style>
+
+{% if problem_details %}
+    <div class="technical-details">
+        <div class="exception_value">
+            <h2>{{ problem_details.title }}</h2>
+            <p><strong>Type:</strong> {{ problem_details.type }}</p>
+            <p><strong>Status:</strong> {{ problem_details.status }}</p>
+            <p><strong>Detail:</strong> {{ problem_details.detail }}</p>
+            <p><strong>Instance:</strong> {{ problem_details.instance }}</p>
+            <p><strong>Code:</strong> {{ problem_details.code }}</p>
+        </div>
+        {% if problem_details.traceback %}
+            <h3>Traceback:</h3>
+            <div class="traceback">
+                <ul>
+                    {% for frame in problem_details.traceback.stack %}
+                        <li>
+                            <code>
+                                File "{{ frame.filename }}", line {{ frame.lineno }}, in {{ frame.name }}
+                                <br>
+                                {{ frame.line }}
+                            </code>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <div class="exception_value">
+                    <p><strong>Exception Type:</strong> {{ problem_details.traceback.exc_type }}</p>
+                    <p><strong>Exception Message:</strong> {{ problem_details.traceback.exc_message }}</p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% else %}
+    <p>No problem details available.</p>
+{% endif %}

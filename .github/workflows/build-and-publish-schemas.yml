@@ -1,0 +1,58 @@
+name: Build and Publish Wheel
+
+on:
+  push:
+    branches: [feat/csj-integration]
+    tags:
+      - "v*"
+  pull_request:
+    branches: [feat/csj-integration]
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install dependencies
+        run: cd ./jao-backend-schemas && poetry install
+
+      - name: Build wheel
+        run: cd ./jao-backend-schemas && poetry build
+
+      - name: Upload wheel as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-wheel
+          path: ./jao-backend-schemas/dist/*.whl
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./jao-backend-schemas/dist/*.whl
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload wheel to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./jao-backend-schemas/dist/*.whl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
