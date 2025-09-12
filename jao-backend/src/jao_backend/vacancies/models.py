@@ -114,6 +114,46 @@ class VacancyRoleType(models.Model):
         return f"{self.vacancy.title} - {self.role_type.description}"
 
 
+
+
+
+class VacancyEmbeddingManager(models.Manager):
+    def get_queryset(self):
+        return VacancyEmbeddingQuerySet(self.model, using=self._db)
+
+    def similar_vacancies(text, tag: EmbeddingTag, top_n=10):
+        """
+        Get vacancies similar to the provided text.
+
+        :param text: The text to compare against vacancy responsibilities.
+        :param tag: The EmbeddingTag to use for similarity comparison.
+        :param top_n: The number of similar vacancies to return (default is 10).
+
+        EmbeddingTag stores tag uuid and embedding model to use.
+
+        >>> tag = EmbeddingTag.get_tag(settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID)
+        ... similar_vacancies = VacancyEmbedding.objects.similar_vacancies("Sample job description", tag)
+        ... print(similar_vacancies.values_list("id", "title", flat=True))
+        """
+        response = tag.embed(text)
+        chunks = tag.response_chunks(response)
+
+        # If there are many chunks we sue the mean.
+        if len(chunks) > 1:
+            chunking_strategy = MeanStrategy()
+            query_vector = chunking_strategy.chunk(chunks)
+        else:
+            query_vector = chunks[0]  # for now take the first chunk
+
+        vacancy_embeddings = (
+            VacancyEmbedding.objects.filter(tag=tag)
+            .distance(query_vector)
+            .select_related("vacancy", "embedding")
+            .order_by("distance")[:top_n]
+        )
+
+        return vacancy_embeddings
+
 class VacancyEmbedding(TaggedEmbedding):
     """
     A Vacancy can have many embeddings.
@@ -129,7 +169,8 @@ class VacancyEmbedding(TaggedEmbedding):
 
     deprecated_tags = []
 
-    objects = VacancyEmbeddingQuerySet.as_manager()
+    objects = VacancyEmbeddingManager.from_queryset(VacancyEmbeddingQuerySet)()
+
 
     class Meta:
         unique_together = ("vacancy", "tag", "embedding")
@@ -141,6 +182,7 @@ class VacancyEmbedding(TaggedEmbedding):
                 name="unique_vacancy_embedding_chunk",
             ),
         ]
+
 
     def __str__(self):
         return f"{self.vacancy.title} - {self.tag.name}"

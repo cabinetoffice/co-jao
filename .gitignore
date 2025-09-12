@@ -185,3 +185,31 @@ terraform.tfstate
 terraform.tfstate.backup
 
 db_dumps/*
+
+# Sphinx documentation (handles docs at any level)
+**/docs/build/
+**/docs/source/_autosummary/
+**/docs/source/generated/
+
+# Sphinx cache
+**/docs/source/.doctrees/
+*.doctree
+
+# Auto-generated API docs
+**/docs/source/modules.rst
+**/docs/source/jao_backend*.rst
+**/docs/source/jao_web*.rst
+
+# Sphinx build artifacts
+.buildinfo
+.doctrees/
+_build/
+
+# Documentation coverage reports
+**/docs/coverage/
+
+# IDE/Editor files for docs
+.vscode/settings.json
+*.swp
+*.swo
+*~

@@ -28,22 +28,7 @@ api = NinjaAPI(
 
 def get_similar_vacancies(text, top_n=10):
     tag = EmbeddingTag.get_tag(settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID)
-    response = tag.embed(text)
-    chunks = tag.response_chunks(response)
-
-    if len(chunks) > 1:
-        # TODO: revisit this when we have chunks representing different parts of the text
-        query_vector = np.mean(chunks, axis=0)
-    else:
-        query_vector = chunks[0]  # for now take the first chunk
-
-    similar_vacancy_embeddings = (
-        VacancyEmbedding.objects.filter(tag=tag)
-        .distance(query_vector)
-        .select_related("vacancy", "embedding")
-        .order_by("distance")[:top_n]
-    )
-
+    similar_vacancy_embeddings = VacancyEmbedding.objects.similar_vacancies(text, tag, top_n)
     return [
         vacancy_embedding.vacancy for vacancy_embedding in similar_vacancy_embeddings
     ]
@@ -117,4 +102,6 @@ def applicant_locations(
         "STUB: applicant_locations endpoint called with description: %s",
         payload.description,
     )
-    return AreaFrequenciesResponse(area_frequencies=[])
+    area_frequencies: AreaFrequencyProperties = []
+    # TODO: populate area_frequencies with instances of AreaFrequencyProperties from the database.
+    return AreaFrequenciesResponse(area_frequencies=area_frequencies)

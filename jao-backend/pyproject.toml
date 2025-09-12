@@ -78,6 +78,8 @@ hypercorn = "hypercorn.__main__:main"
 docs-build = "jao_backend.scripts:build_docs"
 docs-clean = "jao_backend.scripts:clean_docs"
 docs-serve = "jao_backend.scripts:serve_docs"
+install-jupyter-kernel = "jao_backend.scripts:install_jao_jupyter_kernel"
+uninstall-jupyter-kernel = "jao_backend.scripts:uninstall_jao_jupyter_kernel"
 
 [tool.isort]
 profile = "black"
