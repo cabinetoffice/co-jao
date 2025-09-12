@@ -1,3 +1,9 @@
+from redis.exceptions import ConnectionError
+from redis.exceptions import TimeoutError
+from redis.exceptions import RedisError
+from kombu.exceptions import OperationalError
+from celery.exceptions import WorkerLostError
+
 from django.contrib import admin, messages
 from django.db.models import Count, Q
 from django.shortcuts import redirect, render
@@ -78,7 +84,6 @@ class VacancyRoleTypeInline(admin.TabularInline):
     def has_delete_permission(self, request, obj=None):
         return False
 
-
 @admin.register(Vacancy)
 class VacancyAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
     list_display = ("id", "title", "min_salary", "max_salary", "last_updated")
@@ -107,14 +112,36 @@ class VacancyAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
         if request.method == "POST":
             form = StartEmbeddingsTaskForm(request.POST)
             if form.is_valid():
-                if is_task_running(task_name):
-                    messages.warning(request, "An embedding task is already running.")
-                else:
-                    embed_vacancies.delay()
-                    messages.success(request, "Embedding task has been started.")
+                task_running = False
+                check_failed = False
+                try:
+                    task_running = is_task_running(task_name)
+                except (ConnectionError, TimeoutError, OperationalError, WorkerLostError) as e:
+                    logger.error(f"Task status check failed: {type(e).__name__}: {e}")
+                    messages.error(
+                        request,
+                        f"Could not check task status due to Redis/Celery error: {type(e).__name__}: {e}",
+                    )
+                    check_failed = True
+
+                if not check_failed:
+                    if running:
+                        messages.warning(request, "An embedding task is already running.")
+                    else:
+                        embed_vacancies.delay()
+                        messages.success(request, "Embedding task has been started.")
             return redirect(request.path_info)
 
-        task_is_running = is_task_running(task_name)
+        try:
+            task_is_running = is_task_running(task_name)
+        except (ConnectionError, TimeoutError, OperationalError, WorkerLostError) as e:
+            logger.error(f"Task status check failed: {type(e).__name__}: {e}")
+            messages.error(
+                request,
+                f"Could not check task status due to Redis/Celery error: {type(e).__name__}: {e}",
+            )
+            task_is_running = False
+
         embed_limit = getattr(settings, "JAO_BACKEND_VACANCY_EMBED_LIMIT", None)
 
         total_vacancies = Vacancy.objects.filter(is_deleted=False).count()

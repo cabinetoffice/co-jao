@@ -27,7 +27,7 @@ class VacancyQuerySet(PolymorphicEmbeddingQuerySetMixin, models.QuerySet):
 
     def configured_for_embed(self, limit=None):
         """
-        Filter vacancies that are configured for embedding.
+        Filter to vacancies that are configured for embedding.
 
         :param limit: Optional limit on the number of vacancies to return.
 
@@ -51,7 +51,7 @@ class VacancyQuerySet(PolymorphicEmbeddingQuerySetMixin, models.QuerySet):
 
     def requires_embedding(self, limit=None):
         """
-        Filter vacancies that require embedding.
+        Filter to vacancies that require embedding.
 
         This is used to filter vacancies that have not been embedded yet.
         """
