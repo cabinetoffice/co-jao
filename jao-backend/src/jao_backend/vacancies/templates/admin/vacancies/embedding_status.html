@@ -1,0 +1,115 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}{{ block.super }}
+<style>
+    .progress-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    progress {
+        width: 100%;
+        /* Basic styling for progress bar */
+        appearance: none;
+        border: 1px solid #b1b4b6;
+        border-radius: 4px;
+        height: 20px;
+    }
+    progress::-webkit-progress-bar {
+        background-color: #f0f0f0;
+        border-radius: 4px;
+    }
+    progress::-webkit-progress-value {
+        background-color: #00703c; /* GOV.UK green */
+        border-radius: 3px;
+    }
+    progress::-moz-progress-bar {
+        background-color: #00703c; /* GOV.UK green */
+        border-radius: 3px;
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' 'vacancies' %}">{% translate 'Vacancies' %}</a>
+&rsaquo; <a href="{% url 'admin:vacancies_vacancy_changelist' %}">{% translate 'Vacancies' %}</a>
+&rsaquo; Embeddings Status
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{{ title }}</h1>
+
+    <div class="module">
+        <h2>Embedding Task Control</h2>
+        <p><strong>Task Status:</strong>
+            {% if task_is_running %}
+                <img src="{% static 'admin/img/icon-yes.svg' %}" alt="Yes"> Running
+            {% else %}
+                <img src="{% static 'admin/img/icon-no.svg' %}" alt="No"> Not running
+            {% endif %}
+        </p>
+        <form method="post" novalidate>
+            {% csrf_token %}
+            {{ form }}
+            <div class="submit-row">
+                <input type="submit" value="Start Embedding Task" class="default" {% if task_is_running %}disabled{% endif %}>
+            </div>
+        </form>
+        {% if task_is_running %}
+        <p style="padding-left: 10px;">The page will need to be manually refreshed to see when the task has completed.</p>
+        {% endif %}
+    </div>
+
+    <div class="module">
+        <h2>Embedding Settings</h2>
+        <p><strong>LiteLLM Custom Provider:</strong>{{ litellm_custom_provider }}</p>
+    </div>
+
+    <div class="module">
+        <h2>Overall Status</h2>
+        <p><strong>Total Active Vacancies:</strong> {{ total_vacancies }}</p>
+        <p><strong>Configured for embedding:</strong> {% if embed_limit %}{{ embed_limit|default:"0" }}.{% else %}All vacancies.{% endif %}</p>
+    </div>
+
+    {% for stat in embedding_stats %}
+    <div class="module">
+        <h2>Embedding Tag: "{{ stat.tag.name }}"</h2>
+        <table>
+            <caption>Details for tag: {{ stat.tag.name }} (v{{ stat.tag.version }})</caption>
+            <tbody>
+                <tr>
+                    <th scope="row">Description</th>
+                    <td>{{ stat.tag.description }}</td>
+                </tr>
+                <tr>
+                    <th scope="row">Model</th>
+                    <td>{{ stat.tag.model.name }}</td>
+                </tr>
+                <tr>
+                    <th scope="row">Vacancies Embedded</th>
+                    <td>{{ stat.embedded_count }} of {{ progress_max }}</td>
+                </tr>
+                <tr>
+                    <th scope="row">Progress</th>
+                    <td>
+                        <div class="progress-container">
+                            <progress value="{{ stat.embedded_count }}" max="{{ progress_max }}"></progress>
+                            <span>{{ stat.percentage }}%</span>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    {% empty %}
+    <div class="module">
+        <p>No enabled embedding tags found in settings.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

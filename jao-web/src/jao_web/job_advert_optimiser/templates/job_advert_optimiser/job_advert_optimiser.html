@@ -1,0 +1,167 @@
+{% extends "common/base.html" %}
+
+{% load render_bundle from webpack_loader %}
+{% load crispy_forms_tags crispy_forms_gds %}
+{% load govuk_frontend_django %}
+{% load inline_exceptions_tags %}
+
+{% block extrahead %}
+    {% render_bundle 'JAO' 'css' %}
+{% endblock extrahead %}
+
+{% block content %}
+    <div class="govuk-width-container">
+        <h1 class="govuk-heading-xl">Optimise Job Advert</h1>
+        {% error_summary form %}
+        {% crispy form %}
+
+        {% if service_errors %}
+            <div class="govuk-error-summary" aria-labelledby="error-summary-title" role="alert" tabindex="-1" data-module="govuk-error-summary">
+                <h2 class="govuk-error-summary__title" id="error-summary-title">
+                    Error:
+                </h2>
+                <div class="govuk-error-summary__body">
+                    <ul class="govuk-list govuk-error-summary__list">
+                        {% for error in service_errors %}
+                            <li>
+                                {% render_inline_exception error %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if show_extra_widgets %}
+            {% gds_tabs id="tabs-1" title="Contents" %}
+                {% gds_tabs_tab id="advice" label="Advice" %}
+                    <h2 class="govuk-heading-l">Advice</h2>
+                    <div class="govuk-form-group">
+                        <p>
+                            <label class="govuk-label" for="sort">
+                                Type Of Advice
+                            </label>
+                            <select class="govuk-select" id="advice-category" name="advice-category">
+                                <option value="published" selected>General Advice</option>
+                                <option value="updated">Skills Advice</option>
+                            </select>
+                        </p>
+                        <p>
+                            <label class="govuk-label" for="sort">
+                                Type of General Advice
+                            </label>
+                            <select class="govuk-select" id="advice-option" name="advice-option">
+                                <option value="published" selected>I Want More Applicants</option>
+                                <option value="updated">I Want Better Quality Applicants</option>
+                                <option value="updated">I Want A Better Gender Balance</option>
+                                <option value="updated">I Want More External Applicants</option>
+                                <option value="updated">I Want A Better Disability Balance</option>
+                            </select>
+                        </p>
+
+                        <p>
+                            <button class="govuk-button" type="submit" disabled>Get Advice</button>
+                        </p>
+                    </div>
+                {% endgds_tabs_tab %}
+                {% gds_tabs_tab id="similar-adverts" label="Similar Adverts" %}
+                    <h2 class="govuk-heading-l">Similar Adverts</h2>
+                    {% gds_accordion id="accordion-1" %}
+                        {% for vacancy in similar_vacancies %}
+                            {% gds_accordion_item heading=vacancy.job_title summary="" %}
+                                <p id="{{ vacancy.vacancy_id }}">{{ vacancy.full_job_desc|safe }}</p>
+                            {% endgds_accordion_item %}
+                        {% endfor %}
+                    {% endgds_accordion %}
+                {% endgds_tabs_tab %}
+                {% gds_tabs_tab id="demographics" label="Demographics" %}
+                    <h2 class="govuk-heading-l">Demographics</h2>
+                    {% for figure in similar_vacancies_figures %}
+                        <p>{{ figure.to_html|safe }}</p>
+                    {% endfor %}
+                {% endgds_tabs_tab %}
+                {% gds_tabs_tab id="skills" label="Skills" %}
+                    <h2 class="govuk-heading-l">Skills</h2>
+                    {% for figure in skills_figures %}
+                        <p>{{ figure.to_html|safe }}</p>
+                    {% endfor %}
+                {% endgds_tabs_tab %}
+                {% gds_tabs_tab id="summary" label="Summary" %}
+                    <h2 class="govuk-heading-l">Summary</h2>
+                    <p>{{ summary_figure.to_html|safe }}</p>
+                {% endgds_tabs_tab %}
+                {% gds_tabs_tab id="locations" label="Locations" %}
+                    <h2 class="govuk-heading-l">Locations</h2>
+                    <div id="applicant-map-container" style="width: 100%; height: 600px;">
+                    </div>
+                {% endgds_tabs_tab %}
+            {% endgds_tabs %}
+        {% endif %}
+    </div>
+{% endblock content %}
+
+{% block extra_js %}
+    {% render_bundle 'JAO' 'js' %}
+    {{ applicant_map_data|json_script:"applicant-map-data" }}
+    <script>
+        const initMapContainer = (mapData) => {
+            // Attach map to the correct elements and set ensure it updates it's
+            // size when the tab is selected.
+            console.debug('Initialising map with data:', mapData);
+            Base.onDOMContentLoaded(() => {
+                const mapContainer = document.getElementById('applicant-map-container');
+                if (!mapContainer) {
+                    console.warn('No map container found.');
+                    return;
+                }
+
+                const locationsTab = document.getElementById('tab_locations');
+                let map = JAO.renderApplicantMap(mapContainer, mapData);
+
+                // Tabs in GDS frontend are hidden by default.
+                // Spawning the map into a hidden container results in incorrect size,
+                // breaking the map renderer.
+                //
+                // To fix this, invalidate the map size when the is selected by the user,
+                // ARIA events cover mouse keyboard + other interactions to select the tab.
+                Base.onAriaSelected(locationsTab, () => {
+                    map.invalidateSize();
+                });
+            });
+        };
+
+        function getMapMetaData() {
+            // Grab the initial map data
+            // Note: geodata is separate, static data - and can be found using
+            //       the geojson_url key.
+            const mapDataElement = document.getElementById('applicant-map-data');
+            if (mapDataElement?.textContent) {
+                return JSON.parse(mapDataElement.textContent);
+            } else {
+                console.debug('No map data found or empty content');
+                return null;
+            }
+        }
+        async function loadGeoData(url) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error loading geo data from ${url} ${response.status}`);
+                return await response.json();
+            } catch (error) {
+                console.error('GeoJSON loading failed:', error.message);
+                return null;
+            }
+        }
+
+        async function setupMap() {
+            // Entry point for setting up the map.
+            const mapMetaData = getMapMetaData();
+            if (!mapMetaData?.geojson_url) return;
+
+            const geoData = await loadGeoData(mapMetaData.geojson_url);
+            if (geoData) initMapContainer({...mapMetaData, geojson: geoData});
+        }
+
+        setupMap();
+    </script>
+{% endblock extra_js %}

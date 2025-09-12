@@ -1,0 +1,121 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: false
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      image_tag:
+        description: 'Docker image tag'
+        required: false
+        default: 'latest'
+        type: string
+      skip_backend:
+        description: 'Skip backend deployment'
+        required: false
+        default: false
+        type: boolean
+      skip_frontend:
+        description: 'Skip frontend deployment'
+        required: false
+        default: false
+        type: boolean
+      skip_terraform:
+        description: 'Skip Terraform deployment'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.6.0"
+
+      - name: Make deploy script executable
+        run: chmod +x ./deploy.sh
+
+      - name: Run deployment script
+        run: |
+          # Set deployment parameters based on trigger
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual trigger - use input parameters
+            ENV="${{ github.event.inputs.environment }}"
+            IMAGE_TAG="${{ github.event.inputs.image_tag }}"
+            SKIP_BACKEND="${{ github.event.inputs.skip_backend }}"
+            SKIP_FRONTEND="${{ github.event.inputs.skip_frontend }}"
+            SKIP_TERRAFORM="${{ github.event.inputs.skip_terraform }}"
+          else
+            # Push to main - use defaults
+            ENV="dev"
+            IMAGE_TAG="latest"
+            SKIP_BACKEND="false"
+            SKIP_FRONTEND="false"
+            SKIP_TERRAFORM="false"
+          fi
+
+          # Build deploy command
+          DEPLOY_CMD="./deploy.sh --env ${ENV} --tag ${IMAGE_TAG}"
+
+          if [ "${SKIP_BACKEND}" = "true" ]; then
+            DEPLOY_CMD="${DEPLOY_CMD} --skip-backend"
+          fi
+
+          if [ "${SKIP_FRONTEND}" = "true" ]; then
+            DEPLOY_CMD="${DEPLOY_CMD} --skip-frontend"
+          fi
+
+          if [ "${SKIP_TERRAFORM}" = "true" ]; then
+            DEPLOY_CMD="${DEPLOY_CMD} --skip-terraform"
+          fi
+
+          echo "Running: ${DEPLOY_CMD}"
+          eval ${DEPLOY_CMD}
+
+      - name: Upload deployment logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-logs-${{ github.run_number }}
+          path: |
+            iac/terraform.log
+            iac/.terraform/
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ Deployment completed successfully!"
+          else
+            echo "❌ Deployment failed!"
+            exit 1
+          fi

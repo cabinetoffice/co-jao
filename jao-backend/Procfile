@@ -1,0 +1,19 @@
+# When running locally you can use honcho to run this Procfile
+#
+# Run all services:
+# $ honcho start
+#
+# Run frontend
+# $ honcho start web
+#
+# Run backend services
+# $ honcho start api celerybeat celeryworker
+#
+# Run celery flower for monitoring
+# $ honcho start celeryflower
+#
+api: hypercorn src.asgi:application --bind localhost:8001 --reload
+celerybeat: celery -A jao_backend.common.celery beat
+celeryworker: celery -A jao_backend.common.celery worker --loglevel=INFO --max-memory-per-child=2097152
+#celeryworker: celery -A jao_backend.common.celery worker --loglevel=INFO
+celeryflower: celery -A jao_backend.common.celery flower --address=localhost
