@@ -24,7 +24,7 @@ variable "engine_version" {
 variable "port" {
   description = "The port number on which each cache node will accept connections"
   type        = number
-  default     = 6380
+  default     = 6379
 }
 
 variable "parameter_group_name" {
@@ -83,4 +83,17 @@ variable "preferred_availability_zones" {
   description = "List of the Availability Zones in which cache nodes are created"
   type        = list(string)
   default     = []
+}
+
+variable "auth_token" {
+  description = "AUTH token for Redis authentication (required when transit_encryption_enabled is true)"
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
+variable "transit_encryption_enabled" {
+  description = "Whether to enable transit encryption (TLS)"
+  type        = bool
+  default     = true
 }

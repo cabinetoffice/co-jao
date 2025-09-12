@@ -104,3 +104,24 @@ output "cloudwatch_alarm_arns" {
     aws_cloudwatch_metric_alarm.disk_queue_depth[0].arn
   ] : []
 }
+
+# Data Science Replica Outputs
+output "data_science_replica_id" {
+  description = "Instance identifier for the data science read replica"
+  value       = var.create_data_science_replica && !var.use_serverless ? aws_rds_cluster_instance.data_science_replica[0].id : null
+}
+
+output "data_science_replica_arn" {
+  description = "ARN of the data science read replica instance"
+  value       = var.create_data_science_replica && !var.use_serverless ? aws_rds_cluster_instance.data_science_replica[0].arn : null
+}
+
+output "data_science_replica_endpoint" {
+  description = "Endpoint for the data science read replica"
+  value       = var.create_data_science_replica && !var.use_serverless ? aws_rds_cluster_instance.data_science_replica[0].endpoint : null
+}
+
+output "data_science_connection_string" {
+  description = "PostgreSQL connection string for data science replica (without credentials)"
+  value       = var.create_data_science_replica && !var.use_serverless ? "postgresql://${aws_rds_cluster_instance.data_science_replica[0].endpoint}/${aws_rds_cluster.aurora.database_name}" : null
+}

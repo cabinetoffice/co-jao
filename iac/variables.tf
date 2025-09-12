@@ -55,7 +55,7 @@ variable "task_cpu" {
 variable "task_memory" {
   description = "Memory for the ECS task"
   type        = number
-  default     = 256
+  default     = 4096
 }
 
 variable "desired_count" {
@@ -286,9 +286,23 @@ variable "jao_backend_superuser_email" {
 }
 
 variable "oleeo_url" {
-  description = "URL for the OLEEO database"
+  description = "oleeo url"
   type        = string
   default     = ""
+}
+
+# Redis/ElastiCache Configuration
+variable "redis_auth_token" {
+  description = "AUTH token for Redis/ElastiCache authentication (required when transit encryption is enabled)"
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
+variable "redis_transit_encryption_enabled" {
+  description = "Whether to enable transit encryption (TLS) for Redis/ElastiCache"
+  type        = bool
+  default     = false # Set to false for development, true for production
 }
 
 variable "enable_celery_services" {
@@ -301,4 +315,27 @@ variable "admin_allowed_cidrs" {
   description = "List of CIDR blocks allowed to access admin interface"
   type        = list(string)
   default     = null
+}
+
+# variables_sagemaker.tf - Variables for SageMaker data science environment
+
+# Feature Flag
+variable "enable_sagemaker_environment" {
+  description = "Enable the SageMaker data science environment with Aurora read replica"
+  type        = bool
+  default     = false
+}
+
+# Database Configuration for SageMaker
+variable "sagemaker_db_username" {
+  description = "Database username for SageMaker read-only access"
+  type        = string
+  default     = "sagemaker_readonly"
+}
+
+variable "sagemaker_db_password" {
+  description = "Database password for SageMaker read-only access"
+  type        = string
+  sensitive   = true
+  default     = ""
 }
