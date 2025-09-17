@@ -1,3 +1,5 @@
+import hashlib
+from django.core.cache import cache
 import logging
 
 from django.conf import settings
@@ -16,6 +18,7 @@ from jao_backend_schemas.vacancies import VacancyListing
 from jao_backend.common.text_processing.clean_oleeo import parse_oleeo_bbcode
 from jao_backend.embeddings.models import EmbeddingTag
 from jao_backend.vacancies.models import VacancyEmbedding
+from jao_backend.advice.advice import get_advice
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +28,29 @@ api = NinjaAPI(
     description="Legacy API for Jao Backend",
 )
 
+'''
+    Turn these into 1 endpoint which uses a Django channel websocket to send
+    back each current POSTs
+'''
+
+
+def get_similar_vacancies_cached(text, top_n=10):
+    """Cached version of get_similar_vacancies"""
+    cache_key = f"similar_vacancies_{
+        hashlib.md5(text.encode()).hexdigest()}_{top_n}"
+
+    cached_result = cache.get(cache_key)
+    if cached_result is not None:
+        return cached_result
+
+    result = get_similar_vacancies(text, top_n)
+    cache.set(cache_key, result, timeout=300)
+    return result
+
 
 def get_similar_vacancies(text, top_n=10):
-    tag = EmbeddingTag.get_tag(settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID)
+    tag = EmbeddingTag.get_tag(
+        settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID)
     response = tag.embed(text)
     chunks = tag.response_chunks(response)
 
@@ -51,12 +74,19 @@ def get_similar_vacancies(text, top_n=10):
 
 @api.post("/advice")
 def advice(request: HttpRequest, payload: JobDescriptionRequest) -> AdviceResponse:
-    logger.info(
-        "STUB: advice endpoint called with description: %s", payload.description
-    )
-    text = """
-    This is a sample advice to help improve your job description."""
-    logger.info("STUB: advice sending example advice: %s", text)
+
+    similar_vacancies = get_similar_vacancies_cached(
+        payload.description, top_n=10)
+    formatted_vacancies = [
+        f"Job Title: {vacancy.title}\nDescription: {
+            parse_oleeo_bbcode(vacancy.description)}"
+        for vacancy in similar_vacancies
+    ]
+    logger.info("Advice endpoint called with description: %s",
+                payload.description)
+    logger.info("Formatted vacancies: %s", formatted_vacancies)
+    text = get_advice(payload.description, formatted_vacancies)
+    logger.info(f"ADVICE FROM LLM:{text}")
     return AdviceResponse(advice=text)
 
 
@@ -73,9 +103,12 @@ def similar_adverts(
                 "vacancy_id": vacancy.pk,
             }
         )
-        for vacancy in get_similar_vacancies(payload.description, top_n=10)
+        for vacancy in get_similar_vacancies_cached(payload.description, top_n=10)
     ]
     return SimilarVacanciesResponse(similar_vacancies=similar_vacancies_list)
+
+# Write a query using the similar vacancies data from application stastics -
+# aggregated application statistic model
 
 
 @api.post("/similar_advert_plots")
@@ -93,6 +126,8 @@ def similar_advert_plots(
     graphs = []
     return PlotlyFiguresResponse(plotly_figures=graphs)
 
+# ADD Skills Ingester to write skills to DB
+
 
 @api.post("/skills_plots")
 def skills_plots(request, payload: JobDescriptionRequest) -> PlotlyFiguresResponse:
@@ -106,6 +141,8 @@ def skills_plots(request, payload: JobDescriptionRequest) -> PlotlyFiguresRespon
     graphs = []
     result = PlotlyFiguresResponse(plotly_figures=graphs)
     return result
+
+# Maybe REMOVE the location response
 
 
 @api.post("/applicant_locations")

@@ -1,3 +1,4 @@
+from django.http import HttpResponse
 import asyncio
 import logging
 from typing import Tuple
@@ -25,7 +26,9 @@ from jao_web.job_advert_optimiser.forms import JobAdvertForm
 logger = logging.getLogger(__name__)
 
 APPLICANT_MAP_CSS_PREFIX = "applicant-"
-UK_GEOJSON_URL = settings.STATIC_URL + "job_advert_optimiser/geojson/rgn2023.geojson"
+UK_GEOJSON_URL = settings.STATIC_URL + \
+    "job_advert_optimiser/geojson/rgn2023.geojson"
+
 
 def format_error(error: Exception):
     if settings.DEBUG:
@@ -65,6 +68,10 @@ class JobAdvertOptimiserView(FormView):
         PlotlyFiguresResponse,
         AreaFrequenciesResponse,
     ]:
+
+        # Use django channels to reimplement with a websocket
+        # Once websocket is open, send one thing
+        #  The backend will hadle sending things back as they're ready
         session_key = self.get_or_create_session_key()
         async with get_async_client(session_key) as client:
             results = await asyncio.gather(
@@ -150,35 +157,41 @@ class JobAdvertOptimiserView(FormView):
         # Handle possible exceptions from asyncio.gather
         service_errors = []
         if isinstance(advice_response, Exception):
-            logger.error("Error fetching advice: %s", format_error(advice_response))
+            logger.error("Error fetching advice: %s",
+                         format_error(advice_response))
             service_errors.append(advice_response)
             advice_response = None
 
         if isinstance(similar_vacancies_response, Exception):
             service_errors.append(similar_vacancies_response)
-            logger.error("Error fetching similar vacancies: %s", format_error(similar_vacancies_response))
+            logger.error("Error fetching similar vacancies: %s",
+                         format_error(similar_vacancies_response))
             similar_vacancies_response = None
 
         if isinstance(demographics_plots, Exception):
             service_errors.append(demographics_plots)
-            logger.error("Error fetching demographics plots: %s", format_error(demographics_plots))
+            logger.error("Error fetching demographics plots: %s",
+                         format_error(demographics_plots))
             demographic_figures = None
         else:
             demographic_figures = demographics_plots.get_figures()
 
         if isinstance(skills_plots, Exception):
             service_errors.append(skills_plots)
-            logger.error("Error fetching skills plots: %s", format_error(skills_plots))
+            logger.error("Error fetching skills plots: %s",
+                         format_error(skills_plots))
             skills_figures = None
         else:
             skills_figures = skills_plots.get_figures()
 
         if isinstance(applicant_locations, Exception):
-            logger.error("Error fetching applicant locations: %s", format_error(applicant_locations))
+            logger.error("Error fetching applicant locations: %s",
+                         format_error(applicant_locations))
             service_errors.append(applicant_locations)
             applicant_map_data = None
         else:
-            applicant_map_data = self.get_applicant_map_data(applicant_locations)
+            applicant_map_data = self.get_applicant_map_data(
+                applicant_locations)
 
         advice = advice_response.advice if advice_response else None
         similar_vacancies = (
@@ -216,8 +229,6 @@ class JobAdvertOptimiserView(FormView):
         )
         return self.render_to_response(context)
 
-
-from django.http import HttpResponse
 
 def show_client_ip(request):
     return HttpResponse(f"Your IP: {request.META.get('REMOTE_ADDR')}")
