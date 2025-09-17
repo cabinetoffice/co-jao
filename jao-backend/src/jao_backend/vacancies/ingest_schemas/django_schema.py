@@ -18,6 +18,7 @@ class VacancySchema(ModelSchema):
             "title",
             "description",
             "summary",
+            "person_spec"
         ],
     )
 
