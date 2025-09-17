@@ -82,7 +82,8 @@ class Embedding(PolymorphicModel):
 
     @property
     def embedding(self):
-        raise NotImplementedError("Subclasses implement the embedding property.")
+        raise NotImplementedError(
+            "Subclasses implement the embedding property.")
 
     @classproperty
     def dimensions(self):

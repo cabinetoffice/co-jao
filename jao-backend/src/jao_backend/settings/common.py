@@ -41,6 +41,13 @@ if LITELLM_CUSTOM_PROVIDER not in ["ollama", "bedrock"]:
         "Current value: {}".format(LITELLM_CUSTOM_PROVIDER)
     )
 
+LITELLM_COMPLETION_MODEL = "ollama" if DEPLOYMENT_TYPE == "local" else "bedrock/anthropic.claude-3-7-sonnet-20250219-v1:0"
+if LITELLM_COMPLETION_MODEL not in ["ollama", "bedrock/anthropic.claude-3-7-sonnet-20250219-v1:0"]:
+    raise ImproperlyConfigured(
+        "EMBEDDING_BACKEND must be either 'ollama' or 'bedrock'. "
+        "Current value: {}".format(LITELLM_COMPLETION_MODEL)
+    )
+
 # Note: On bedrock this isn't usually set.
 LITELLM_API_BASE = os.environ.get("JAO_BACKEND_LITELLM_API_BASE")
 

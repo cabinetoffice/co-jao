@@ -20,6 +20,7 @@ locals {
     ManagedBy   = "terraform"
   }
 
+
   # Environment-specific configurations
   env_config = {
     prod = {
@@ -66,6 +67,10 @@ locals {
   # ECR repository URLs
   backend_ecr_url  = "${aws_ecr_repository.app.repository_url}:${var.image_tag}"
   frontend_ecr_url = "${aws_ecr_repository.frontend.repository_url}:${var.image_tag}"
+}
+
+data "aws_lb" "backend" {
+  name = "jao-dev-nlb"
 }
 
 # Create S3 bucket for initialization scripts
@@ -248,7 +253,7 @@ module "frontend" {
     DJANGO_DEBUG             = local.current_env.django_debug
     DJANGO_SETTINGS_MODULE   = "jao_web.settings.dev"
     PORT                     = "8000"
-    JAO_BACKEND_URL          = module.api_gateway.api_gateway_url
+    JAO_BACKEND_URL          = "http://${data.aws_lb.backend.dns_name}/"
     JAO_BACKEND_TIMEOUT      = "15"
     JAO_BACKEND_ENABLE_HTTP2 = "true"
     SESSION_COOKIE_SECURE    = local.current_env.session_cookie_secure
@@ -632,3 +637,5 @@ module "sagemaker" {
 
   depends_on = [module.vectordb]
 }
+
+
