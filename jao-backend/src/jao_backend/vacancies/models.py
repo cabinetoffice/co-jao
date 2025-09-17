@@ -41,6 +41,7 @@ class Vacancy(models.Model):
     title = models.TextField(null=True, blank=True, help_text="Job title.")
     description = models.TextField(null=True, blank=True, help_text="Job description.")
     summary = models.TextField(null=True, blank=True, help_text="Blerb about teams.")
+    person_spec = models.TextField(null=True, blank=True, help_text="The person specification of a vacancy")
 
     grades = models.ManyToManyField(
         through="VacancyGrade", to=Grade, help_text="The grades of the vacancy."
