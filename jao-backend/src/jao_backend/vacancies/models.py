@@ -19,7 +19,8 @@ class Vacancy(models.Model):
         primary_key=True, help_text="CS Jobs vacancy ID [5-6 characters]"
     )
 
-    last_updated = models.DateTimeField(help_text="Last updated date and time.")
+    last_updated = models.DateTimeField(
+        help_text="Last updated date and time.")
 
     live_date = models.DateTimeField()
     closing_date = models.DateTimeField()
@@ -39,8 +40,10 @@ class Vacancy(models.Model):
     )
 
     title = models.TextField(null=True, blank=True, help_text="Job title.")
-    description = models.TextField(null=True, blank=True, help_text="Job description.")
-    summary = models.TextField(null=True, blank=True, help_text="Blerb about teams.")
+    description = models.TextField(
+        null=True, blank=True, help_text="Job description.")
+    summary = models.TextField(
+        null=True, blank=True, help_text="Blerb about teams.")
 
     grades = models.ManyToManyField(
         through="VacancyGrade", to=Grade, help_text="The grades of the vacancy."
@@ -61,7 +64,8 @@ class Vacancy(models.Model):
         For a single Vacancy, if it's required to recalculate when embedding is required
         then this method can be used (e.g. in task, to guard against concurrency).
         """
-        expected_embed_tag_uuids = list(EmbeddingTag.get_configured_tags().keys())
+        expected_embed_tag_uuids = list(
+            EmbeddingTag.get_configured_tags().keys())
         expected_tags_count = len(expected_embed_tag_uuids)
         return (
             self.vacancyembedding_set.filter(

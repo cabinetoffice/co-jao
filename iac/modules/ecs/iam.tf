@@ -59,7 +59,10 @@ resource "aws_iam_role_policy" "bedrock_access_policy" {
           "bedrock:InvokeModel",
           "bedrock:InvokeModelWithResponseStream"
         ]
-        Resource = "arn:aws:bedrock:eu-west-2::foundation-model/amazon.titan-embed-text-v2:0"
+        Resource = [
+          "arn:aws:bedrock:eu-west-2::foundation-model/amazon.titan-embed-text-v2:0",
+          "arn:aws:bedrock:eu-west-2::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0"
+        ]
       }
     ]
   })

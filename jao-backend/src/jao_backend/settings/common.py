@@ -41,13 +41,6 @@ if LITELLM_CUSTOM_PROVIDER not in ["ollama", "bedrock"]:
         "Current value: {}".format(LITELLM_CUSTOM_PROVIDER)
     )
 
-LITELLM_COMPLETION_MODEL = "ollama" if DEPLOYMENT_TYPE == "local" else "bedrock/anthropic.claude-3-7-sonnet-20250219-v1:0"
-if LITELLM_COMPLETION_MODEL not in ["ollama", "bedrock/anthropic.claude-3-7-sonnet-20250219-v1:0"]:
-    raise ImproperlyConfigured(
-        "EMBEDDING_BACKEND must be either 'ollama' or 'bedrock'. "
-        "Current value: {}".format(LITELLM_COMPLETION_MODEL)
-    )
-
 # Note: On bedrock this isn't usually set.
 LITELLM_API_BASE = os.environ.get("JAO_BACKEND_LITELLM_API_BASE")
 
@@ -141,6 +134,10 @@ CHAT_MODEL_OPTIONS = {
     "ollama": "mistral:7b",
     "bedrock": "bedrock/anthropic.claude-3-sonnet-20240229-v1:0",
 }
+
+LITELLM_COMPLETION_MODEL = "mistral:7b" if DEPLOYMENT_TYPE == "local" else "bedrock/anthropic.claude-3-sonnet-20250219-v1:0"
+
+LITELLM_COMPLETION_MODEL = CHAT_MODEL_OPTIONS[LITELLM_CUSTOM_PROVIDER]
 
 # Text embedding models, for lookup by LITELLM_CUSTOM_PROVIDER.
 TEXT_EMBEDDING_MODEL_OPTIONS = {
