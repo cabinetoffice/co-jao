@@ -45,7 +45,7 @@ def embed_vacancy(vacancy: "Vacancy") -> "TaggedEmbedding":
 
     # Data from OLEEO can contain bbcode, strip it before embedding.
     job_info_text = strip_oleeo_bbcode(
-        f"{vacancy.title}\n{vacancy.summary}\n{vacancy.description}"
+        f"{vacancy.title}\n{vacancy.person_spec}\n{vacancy.description}"
     )
 
     # Fix for ollama connection issue, remove if https://github.com/BerriAI/litellm/pull/7625 is merged:
