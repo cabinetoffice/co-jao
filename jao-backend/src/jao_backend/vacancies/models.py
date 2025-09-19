@@ -122,7 +122,7 @@ class VacancyEmbeddingManager(models.Manager):
     def get_queryset(self):
         return VacancyEmbeddingQuerySet(self.model, using=self._db)
 
-    def similar_vacancies(text, tag: EmbeddingTag, top_n=10):
+    def similar_vacancies(self, text, tag: EmbeddingTag, top_n=10):
         """
         Get vacancies similar to the provided text.
 
