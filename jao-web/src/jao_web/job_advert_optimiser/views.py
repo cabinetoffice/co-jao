@@ -154,6 +154,47 @@ class JobAdvertOptimiserView(FormView):
             applicant_locations,
         ) = await self.get_data(job_description)
 
+        logger.info(f"\n=== ADVICE RESPONSE ===")
+        logger.info(f"Type: {type(advice_response)}")
+        logger.info(f"Is Exception: {isinstance(advice_response, Exception)}")
+        if isinstance(advice_response, Exception):
+            logger.info(f"Exception: {advice_response}")
+            advice = None
+        else:
+            logger.info(f"Response object: {advice_response}")
+            logger.info(f"Has advice attr: {
+                        hasattr(advice_response, 'advice')}")
+            if hasattr(advice_response, 'advice'):
+                advice = advice_response.advice
+                logger.info(f"Advice content: {advice}")
+            else:
+                logger.info(f"Available attributes: {dir(advice_response)}")
+                advice = str(advice_response)
+
+        # Debug similar vacancies
+        logger.info(f"\n=== SIMILAR VACANCIES RESPONSE ===")
+        logger.info(f"Type: {type(similar_vacancies_response)}")
+        logger.info(f"Is Exception: {isinstance(
+            similar_vacancies_response, Exception)}")
+        if isinstance(similar_vacancies_response, Exception):
+            logger.info(f"Exception: {similar_vacancies_response}")
+            similar_vacancies = []
+        else:
+            logger.info(f"Response object: {similar_vacancies_response}")
+            logger.info(f"Has similar_vacancies attr: {
+                hasattr(similar_vacancies_response, 'similar_vacancies')}")
+            if hasattr(similar_vacancies_response, 'similar_vacancies'):
+                similar_vacancies = similar_vacancies_response.similar_vacancies
+                logger.info(f"Vacancies count: {len(similar_vacancies)}")
+                if similar_vacancies:
+                    logger.info(f"First vacancy: {similar_vacancies[0]}")
+                    logger.info(f"First vacancy type: {
+                                type(similar_vacancies[0])}")
+            else:
+                logger.info(f"Available attributes: {
+                    dir(similar_vacancies_response)}")
+                similar_vacancies = []
+
         # Handle possible exceptions from asyncio.gather
         service_errors = []
         if isinstance(advice_response, Exception):
