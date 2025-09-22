@@ -67,6 +67,8 @@ def get_similar_vacancies(text, top_n=10):
         .order_by("distance")[:top_n]
     )
 
+    tag = EmbeddingTag.get_tag(settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID)
+    similar_vacancy_embeddings = VacancyEmbedding.objects.similar_vacancies(text, tag, top_n)
     return [
         vacancy_embedding.vacancy for vacancy_embedding in similar_vacancy_embeddings
     ]
@@ -154,4 +156,6 @@ def applicant_locations(
         "STUB: applicant_locations endpoint called with description: %s",
         payload.description,
     )
-    return AreaFrequenciesResponse(area_frequencies=[])
+    area_frequencies: AreaFrequencyProperties = []
+    # TODO: populate area_frequencies with instances of AreaFrequencyProperties from the database.
+    return AreaFrequenciesResponse(area_frequencies=area_frequencies)

@@ -209,6 +209,7 @@ class IngestVacancy(VacancySchema):
     title: str = Field(alias="vacancy_title")
     description: Optional[str] = Field(alias="job_description")
     summary: Optional[str] = Field(alias="job_summary")
+    person_spec: Optional[str] = Field(alias="person_specification")
 
     validate_last_updated = field_validator("last_updated", mode="before")(
         parse_datetime
