@@ -16,7 +16,6 @@ def get_advice(user_input, similar_vacancies):
     context = "\n\n".join(
         [f"Job Ad {i+1}:\n{ad}" for i, ad in enumerate(similar_vacancies)])
 
-    # Create your prompt
     prompt = f"""You are an expert career advisor and recruiter. Based on these similar job postings, provide specific, actionable advice.
 
         SIMILAR JOB POSTINGS: {context}
@@ -29,11 +28,10 @@ def get_advice(user_input, similar_vacancies):
             2. Specific recommendations with examples from the postings
             3. Prioritized action items for improvement
 
-        Keep your advice practical and specific. Reference examples from the job postings to support your recommendations.
+        Keep your advice specific. Reference examples from the job postings to support your recommendations.
 
         Answer:"""
     try:
-        # Use the same configuration pattern as your embedding function
         response = completion(
             model=model_name,
             messages=[{"role": "user", "content": prompt}],

@@ -167,10 +167,11 @@ EMBEDDING_TAGS = {
         "uuid": EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID,
         "name": "job-title-responsibilities",
         "description": "Job title and responsibilities concatenated",
-        "model": EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_MODEL,
+        "model": TEXT_EMBEDDING_MODEL_OPTIONS[LITELLM_CUSTOM_PROVIDER],
         "version": 1,
     },
 }
+
 
 MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",

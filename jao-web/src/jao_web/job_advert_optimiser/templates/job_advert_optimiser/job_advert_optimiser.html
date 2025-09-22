@@ -63,9 +63,23 @@
                             <button class="govuk-button" type="submit">Get Advice</button>
                         </p>
                     </div>
+	    		{% if job_advert_advice %}
+	       	    	<div class="govuk-inset-text">
+          			<h3 class="govuk-heading-m">Generated Advice</h3>
+		        	<div class="advice-content">
+	       		    		{{ job_advert_advice|linebreaks }}
+	                	</div>
+	       	    	</div>
+	    		{% endif %}
                 {% endgds_tabs_tab %}
                 {% gds_tabs_tab id="similar-adverts" label="Similar Adverts" %}
                     <h2 class="govuk-heading-l">Similar Adverts</h2>
+
+	    	    <p><strong>Debug:</strong> similar_vacancies count = {{ similar_vacancies|length }}</p>
+                    {% if similar_vacancies %}
+                    <p><strong>First vacancy:</strong> {{ similar_vacancies.0 }}</p>
+                    {% endif %}
+
                     {% gds_accordion id="accordion-1" %}
                         {% for vacancy in similar_vacancies %}
                             {% gds_accordion_item heading=vacancy.job_title summary="" %}
