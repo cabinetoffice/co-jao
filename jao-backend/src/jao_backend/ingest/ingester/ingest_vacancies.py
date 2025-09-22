@@ -156,7 +156,7 @@ class OleeoVacanciesIngest:
             self._ingest_model(
                 source_model,
                 destination_model,
-                pk_start=modulo_start,
+                pk_start=modulo_start, #hard code pk_start and pk_end for dev
                 pk_end=modulo_end,
                 progress_bar=progress_bar,
                 create_only=create_only,
