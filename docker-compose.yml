@@ -1,0 +1,84 @@
+
+services:
+  jao-backend:
+    build:
+      context: .
+      dockerfile: ./jao-backend/Dockerfile.dev
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - ENV=dev
+      - PYTHONPATH=/app/src
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      # Add your database and other environment variables here
+      - JAO_BACKEND_SUPERUSER_USERNAME=${JAO_BACKEND_SUPERUSER_USERNAME:-admin}
+      - JAO_BACKEND_SUPERUSER_EMAIL=${JAO_BACKEND_SUPERUSER_EMAIL:-admin@example.com}
+      - JAO_BACKEND_SUPERUSER_PASSWORD=${JAO_BACKEND_SUPERUSER_PASSWORD:-admin123} 
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-eu-west-2}
+    volumes:
+      # Mount source code for hot reloading during development
+      - ./jao-backend/src:/app/src
+      - ./jao-backend:/app/backend-src
+    depends_on:
+      - db
+    networks:
+      - jao-network
+
+  jao-web:
+    build:
+      context: .
+      dockerfile: ./jao-web/Dockerfile.dev
+    ports:
+      - "8001:8000"  # Different port to avoid conflict
+    environment:
+      - ENV=dev
+      - PYTHONPATH=/app/src
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      # Add API endpoint for backend communication
+      - BACKEND_URL=http://jao-backend:8000
+    volumes:
+      # Mount source code for hot reloading during development
+      - ./jao-web/src:/app/src
+      - ./jao-web:/app/web-src
+    depends_on:
+      - jao-backend
+    networks:
+      - jao-network
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: jao_dev
+      POSTGRES_USER: jao_user
+      POSTGRES_PASSWORD: jao_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - jao-network
+
+  # Optional: Redis for caching/sessions
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - jao-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  jao-network:
+    driver: bridge

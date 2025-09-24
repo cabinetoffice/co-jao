@@ -1,0 +1,68 @@
+# Development Dockerfile for jao-backend
+FROM python:3.12-slim AS base
+
+# Install system dependencies including ODBC driver
+RUN apt-get update && \
+    apt-get install -y \
+    curl \
+    gnupg2 \
+    apt-transport-https \
+    ca-certificates \
+    build-essential \
+    && apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Node.js
+RUN curl -sL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+
+# Create the app directory
+WORKDIR /app
+
+# Set environment variables
+ENV ENV=dev
+ENV PYTHONPATH="/app/src"
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Install Poetry
+RUN curl -sSL https://install.python-poetry.org | python -
+ENV PATH="/root/.local/bin:$PATH"
+
+# Copy dependency files
+COPY ./jao-backend/pyproject.toml ./pyproject.toml
+COPY ./jao-backend/package.json ./package.json
+
+# Install dependencies
+RUN poetry install --no-root --no-cache
+RUN npm install
+
+# Copy source code (this will be overridden by volume mount in dev)
+COPY ./jao-backend/src/ ./src/
+COPY ./jao-backend/*.py ./
+COPY ./jao-backend/webpack.config.js ./webpack.config.js
+
+# Build frontend assets
+RUN npm run build
+
+# Create frontend module directory
+RUN mkdir -p /app/src/frontend && \
+    touch /app/src/frontend/__init__.py
+
+# Expose port
+EXPOSE 8000
+
+# Development command with auto-reload
+CMD sh -c "set -e && \
+    echo 'Running migrations...' && \
+    poetry run python src/manage.py migrate && \
+    echo 'Creating superuser...' && \
+    DJANGO_SUPERUSER_USERNAME=\${JAO_BACKEND_SUPERUSER_USERNAME:-admin} \
+    DJANGO_SUPERUSER_EMAIL=\${JAO_BACKEND_SUPERUSER_EMAIL:-admin@example.com} \
+    DJANGO_SUPERUSER_PASSWORD=\${JAO_BACKEND_SUPERUSER_PASSWORD:-admin123} \
+    poetry run python src/manage.py createsuperuser --noinput || echo 'Superuser creation failed or user already exists' && \
+    echo 'Starting development server with auto-reload...' && \
+    poetry run python src/manage.py runserver 0.0.0.0:8000"
