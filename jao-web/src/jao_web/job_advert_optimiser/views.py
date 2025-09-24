@@ -19,7 +19,7 @@ from jao_web.job_advert_optimiser.services.services import get_advice
 from jao_web.job_advert_optimiser.services.services import get_applicant_locations
 from jao_web.job_advert_optimiser.services.client import get_async_client
 # from jao_web.job_advert_optimiser.services.services import get_demographics_plots
-# from jao_web.job_advert_optimiser.services.services import get_similar_adverts
+from jao_web.job_advert_optimiser.services.services import get_similar_adverts
 # from jao_web.job_advert_optimiser.services.services import get_skills_plots
 from jao_web.job_advert_optimiser.forms import JobAdvertForm
 
