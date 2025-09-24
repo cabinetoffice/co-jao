@@ -88,94 +88,94 @@
                         {% endfor %}
                     {% endgds_accordion %}
                 {% endgds_tabs_tab %}
-                {% gds_tabs_tab id="demographics" label="Demographics" %}
-                    <h2 class="govuk-heading-l">Demographics</h2>
-                    {% for figure in similar_vacancies_figures %}
-                        <p>{{ figure.to_html|safe }}</p>
-                    {% endfor %}
-                {% endgds_tabs_tab %}
-                {% gds_tabs_tab id="skills" label="Skills" %}
-                    <h2 class="govuk-heading-l">Skills</h2>
-                    {% for figure in skills_figures %}
-                        <p>{{ figure.to_html|safe }}</p>
-                    {% endfor %}
-                {% endgds_tabs_tab %}
-                {% gds_tabs_tab id="summary" label="Summary" %}
-                    <h2 class="govuk-heading-l">Summary</h2>
-                    <p>{{ summary_figure.to_html|safe }}</p>
-                {% endgds_tabs_tab %}
-                {% gds_tabs_tab id="locations" label="Locations" %}
-                    <h2 class="govuk-heading-l">Locations</h2>
-                    <div id="applicant-map-container" style="width: 100%; height: 600px;">
-                    </div>
-                {% endgds_tabs_tab %}
+                <!-- {% gds_tabs_tab id="demographics" label="Demographics" %} -->
+                <!--     <h2 class="govuk-heading-l">Demographics</h2> -->
+                <!--     {% for figure in similar_vacancies_figures %} -->
+                <!--         <p>{{ figure.to_html|safe }}</p> -->
+                <!--     {% endfor %} -->
+                <!-- {% endgds_tabs_tab %} -->
+                <!-- {% gds_tabs_tab id="skills" label="Skills" %} -->
+                <!--     <h2 class="govuk-heading-l">Skills</h2> -->
+                <!--     {% for figure in skills_figures %} -->
+                <!--         <p>{{ figure.to_html|safe }}</p> -->
+                <!--     {% endfor %} -->
+                <!-- {% endgds_tabs_tab %} -->
+                <!-- {% gds_tabs_tab id="summary" label="Summary" %} -->
+                <!--     <h2 class="govuk-heading-l">Summary</h2> -->
+                <!--     <p>{{ summary_figure.to_html|safe }}</p> -->
+                <!-- {% endgds_tabs_tab %} -->
+                <!-- {% gds_tabs_tab id="locations" label="Locations" %} -->
+                <!--     <h2 class="govuk-heading-l">Locations</h2> -->
+                <!--     <div id="applicant-map-container" style="width: 100%; height: 600px;"> -->
+                <!--     </div> -->
+                <!-- {% endgds_tabs_tab %} -->
             {% endgds_tabs %}
         {% endif %}
     </div>
 {% endblock content %}
 
-{% block extra_js %}
-    {% render_bundle 'JAO' 'js' %}
-    {{ applicant_map_data|json_script:"applicant-map-data" }}
-    <script>
-        const initMapContainer = (mapData) => {
-            // Attach map to the correct elements and set ensure it updates it's
-            // size when the tab is selected.
-            console.debug('Initialising map with data:', mapData);
-            Base.onDOMContentLoaded(() => {
-                const mapContainer = document.getElementById('applicant-map-container');
-                if (!mapContainer) {
-                    console.warn('No map container found.');
-                    return;
-                }
-
-                const locationsTab = document.getElementById('tab_locations');
-                let map = JAO.renderApplicantMap(mapContainer, mapData);
-
-                // Tabs in GDS frontend are hidden by default.
-                // Spawning the map into a hidden container results in incorrect size,
-                // breaking the map renderer.
-                //
-                // To fix this, invalidate the map size when the is selected by the user,
-                // ARIA events cover mouse keyboard + other interactions to select the tab.
-                Base.onAriaSelected(locationsTab, () => {
-                    map.invalidateSize();
-                });
-            });
-        };
-
-        function getMapMetaData() {
-            // Grab the initial map data
-            // Note: geodata is separate, static data - and can be found using
-            //       the geojson_url key.
-            const mapDataElement = document.getElementById('applicant-map-data');
-            if (mapDataElement?.textContent) {
-                return JSON.parse(mapDataElement.textContent);
-            } else {
-                console.debug('No map data found or empty content');
-                return null;
-            }
-        }
-        async function loadGeoData(url) {
-            try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP error loading geo data from ${url} ${response.status}`);
-                return await response.json();
-            } catch (error) {
-                console.error('GeoJSON loading failed:', error.message);
-                return null;
-            }
-        }
-
-        async function setupMap() {
-            // Entry point for setting up the map.
-            const mapMetaData = getMapMetaData();
-            if (!mapMetaData?.geojson_url) return;
-
-            const geoData = await loadGeoData(mapMetaData.geojson_url);
-            if (geoData) initMapContainer({...mapMetaData, geojson: geoData});
-        }
-
-        setupMap();
-    </script>
-{% endblock extra_js %}
+<!-- {% block extra_js %} -->
+<!--     {% render_bundle 'JAO' 'js' %} -->
+<!--     {{ applicant_map_data|json_script:"applicant-map-data" }} -->
+<!--     <script> -->
+<!--         const initMapContainer = (mapData) => { -->
+<!--             // Attach map to the correct elements and set ensure it updates it's -->
+<!--             // size when the tab is selected. -->
+<!--             console.debug('Initialising map with data:', mapData); -->
+<!--             Base.onDOMContentLoaded(() => { -->
+<!--                 const mapContainer = document.getElementById('applicant-map-container'); -->
+<!--                 if (!mapContainer) { -->
+<!--                     console.warn('No map container found.'); -->
+<!--                     return; -->
+<!--                 } -->
+<!---->
+<!--                 const locationsTab = document.getElementById('tab_locations'); -->
+<!--                 let map = JAO.renderApplicantMap(mapContainer, mapData); -->
+<!---->
+<!--                 // Tabs in GDS frontend are hidden by default. -->
+<!--                 // Spawning the map into a hidden container results in incorrect size, -->
+<!--                 // breaking the map renderer. -->
+<!--                 // -->
+<!--                 // To fix this, invalidate the map size when the is selected by the user, -->
+<!--                 // ARIA events cover mouse keyboard + other interactions to select the tab. -->
+<!--                 Base.onAriaSelected(locationsTab, () => { -->
+<!--                     map.invalidateSize(); -->
+<!--                 }); -->
+<!--             }); -->
+<!--         }; -->
+<!---->
+<!--         function getMapMetaData() { -->
+<!--             // Grab the initial map data -->
+<!--             // Note: geodata is separate, static data - and can be found using -->
+<!--             //       the geojson_url key. -->
+<!--             const mapDataElement = document.getElementById('applicant-map-data'); -->
+<!--             if (mapDataElement?.textContent) { -->
+<!--                 return JSON.parse(mapDataElement.textContent); -->
+<!--             } else { -->
+<!--                 console.debug('No map data found or empty content'); -->
+<!--                 return null; -->
+<!--             } -->
+<!--         } -->
+<!--         async function loadGeoData(url) { -->
+<!--             try { -->
+<!--                 const response = await fetch(url); -->
+<!--                 if (!response.ok) throw new Error(`HTTP error loading geo data from ${url} ${response.status}`); -->
+<!--                 return await response.json(); -->
+<!--             } catch (error) { -->
+<!--                 console.error('GeoJSON loading failed:', error.message); -->
+<!--                 return null; -->
+<!--             } -->
+<!--         } -->
+<!---->
+<!--         async function setupMap() { -->
+<!--             // Entry point for setting up the map. -->
+<!--             const mapMetaData = getMapMetaData(); -->
+<!--             if (!mapMetaData?.geojson_url) return; -->
+<!---->
+<!--             const geoData = await loadGeoData(mapMetaData.geojson_url); -->
+<!--             if (geoData) initMapContainer({...mapMetaData, geojson: geoData}); -->
+<!--         } -->
+<!---->
+<!--         setupMap(); -->
+<!--     </script> -->
+<!-- {% endblock extra_js %} -->

@@ -167,7 +167,7 @@ EMBEDDING_TAGS = {
         "uuid": EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID,
         "name": "job-title-responsibilities",
         "description": "Job title and responsibilities concatenated",
-        "model": TEXT_EMBEDDING_MODEL_OPTIONS[LITELLM_CUSTOM_PROVIDER],
+        "model": EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_MODEL,
         "version": 1,
     },
 }

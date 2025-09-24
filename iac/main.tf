@@ -203,7 +203,7 @@ module "ecs" {
     JAO_BACKEND_VACANCY_EMBED_LIMIT       = 70000
     #JAO_BACKEND_LITELLM_API_BASE          = "http://127.0.0.1:11434/api/embed" # Default for dev environment
     #JAO_BACKEND_LITELLM_CUSTOM_PROVIDER   = "ollama"                           # Default for dev environment
-    JAO_EMBEDDER_SUMMARY_RESPONSIBILITIES = ""
+    JAO_EMBEDDER_SUMMARY_RESPONSIBILITIES = "bedrock/amazon.titan-embed-text-v2:0"
 
     # API rate limiting and monitoring config
     ENABLE_RATE_LIMITING = "true"

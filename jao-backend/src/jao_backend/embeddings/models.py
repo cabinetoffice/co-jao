@@ -253,6 +253,7 @@ class EmbeddingTag(models.Model):
         """
         tags = {}
         for tag_data in settings.EMBEDDING_TAGS.values():
+            logger.info(f"TAG DATA ++++++++\n{tag_data}\n++++++++HERE")
             model_name = tag_data.pop("model")
             model, _ = EmbeddingModel.objects.get_or_create(
                 name=model_name, defaults={"is_active": True}
