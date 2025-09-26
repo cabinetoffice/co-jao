@@ -10,6 +10,7 @@ from jao_backend.embeddings.models import EmbeddingTag
 from jao_backend.vacancies.models import VacancyEmbedding
 from jao_backend.application_statistics.models.lists import Gender, Disability
 from jao_backend.application_statistics.models.statistics import AggregatedApplicationStatistic
+from jao_backend_schemas.advice import AdviceResponse
 
 
 class Command(BaseCommand):
@@ -35,10 +36,21 @@ class Command(BaseCommand):
             help='Filter vacancies by minimum disability applicant ratio (e.g., 0.1 for 10%)'
         )
 
+        parser.add_argument(
+            '--json',
+            action='store_true',
+            help='Output response in JSON format (alongside terminal output)'
+        )
+
+        parser.add_argument(
+            '--grammar',
+            action='store_true',
+            help='Focus only on grammar, spelling, and usability improvements (ignores similar vacancies)'
+        )
+
     def build_filters(self, options):
         filters = Q()
 
-        # Female ratio filter
         if options['female_ratio'] is not None:
             gender_ct = ContentType.objects.get_for_model(Gender)
             female = Gender.objects.get(description__iexact="woman")
@@ -54,7 +66,6 @@ class Command(BaseCommand):
             )
             filters &= Q(vacancy_id__in=female_vacancy_ids)
 
-        # Disability ratio filter
         if options['disability_ratio'] is not None:
             disability_ct = ContentType.objects.get_for_model(Disability)
             yes = Disability.objects.get(description__iexact="yes")
@@ -105,49 +116,58 @@ class Command(BaseCommand):
         try:
             tag = EmbeddingTag.get_tag(EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID)
 
-            if filters.children:
-                similar_vacancies = VacancyEmbedding.objects.similar_vacancies(
-                    job_description,
-                    tag,
-                    top_n=limit,
-                    filters=filters
+            if options.get("grammar"):
+                similar_vacancies = []
+                self.stdout.write('Grammar mode enabled. Skipping similar vacancies lookup.\n')
+            else:
+                self.stdout.write(f'Using {limit} similar vacancies for comparison.\n')
+
+                if filters.children:
+                    similar_vacancies = VacancyEmbedding.objects.similar_vacancies(
+                        job_description, tag, top_n=limit, filters=filters
+                    )
+                else:
+                    similar_vacancies = VacancyEmbedding.objects.similar_vacancies(
+                        job_description, tag, top_n=limit
+                    )
+
+                vacancy_count = len(similar_vacancies)
+                self.stdout.write(f'Found {vacancy_count} similar vacancies, generating advice...\n')
+                if vacancy_count == 0:
+                    self.stdout.write(self.style.WARNING('No similar vacancies found with the applied filters.'))
+                    return
+
+            instructions = []
+
+            if options.get("grammar"):
+                instructions.append(
+                    "Provide feedback only on grammar, spelling, readability, and usability. "
+                    "Do not rewrite the advert — just give clear improvement advice."
                 )
             else:
-                similar_vacancies = VacancyEmbedding.objects.similar_vacancies(
-                    job_description,
-                    tag,
-                    top_n=limit
-                )
 
-            vacancy_count = len(similar_vacancies)
-            self.stdout.write(f'Found {vacancy_count} similar vacancies, generating advice...\n')
-            if vacancy_count == 0:
-                self.stdout.write(self.style.WARNING('No similar vacancies found with the applied filters.'))
-                return
+                if options.get("female_ratio"):
+                    instructions.append(
+                        f"Provide advice to attract more female applicants (≥{options['female_ratio']*100:.0f}%)."
+                    )
+                if options.get("disability_ratio"):
+                    instructions.append(
+                        f"Provide advice to attract more applicants with disabilities (≥{options['disability_ratio']*100:.0f}%)."
+                    )
+                if not instructions:
+                    instructions.append("Provide actionable advice to improve this job advert using the similar vacancies as context.")
 
-            # Instruction builder
-            instructions = []
-            if options.get("female_ratio"):
-                instructions.append(
-                    f"Provide advice to attract more female applicants (≥{options['female_ratio']*100:.0f}%)."
-                )
-            if options.get("disability_ratio"):
-                instructions.append(
-                    f"Provide advice to attract more applicants with disabilities (≥{options['disability_ratio']*100:.0f}%)."
-                )
-            if not instructions:
-                instructions.append("Provide actionable advice to improve this job advert using the similar vacancies as context.")
-
-            similar_vacancies_text = "\n".join([
-                f"- {v.vacancy.title} (ID {v.vacancy_id})" for v in similar_vacancies
-            ])
+            similar_vacancies_text = ""
+            if not options.get("grammar"):
+                similar_vacancies_text = "\n".join([
+                    f"- {v.vacancy.title} (ID {v.vacancy_id})" for v in similar_vacancies
+                ])
 
             prompt = f"""
             Job Description:
             {job_description}
 
-            Similar Vacancies:
-            {similar_vacancies_text}
+            {"Similar Vacancies:\n" + similar_vacancies_text if similar_vacancies_text else ""}
 
             Instruction:
             {' '.join(instructions)}
@@ -161,9 +181,15 @@ class Command(BaseCommand):
                 ],
             )
 
+            advice_text = response["choices"][0]["message"]["content"]
+
             self.stdout.write(self.style.SUCCESS('='*60))
             self.stdout.write(response["choices"][0]["message"]["content"])
             self.stdout.write(self.style.SUCCESS('='*60))
+
+            if options.get('json'):
+                advice_response = AdviceResponse(advice=advice_text)
+                return advice_response.model_dump_json(indent=2)
 
         except Exception as e:
             raise CommandError(f'Error generating advice: {str(e)}')
