@@ -1,6 +1,7 @@
 from litellm import APIConnectionError, completion
 from django.conf import settings
 import logging
+import json
 
 LITELLM_API_BASE = settings.LITELLM_API_BASE
 LITELLM_CUSTOM_PROVIDER = settings.LITELLM_CUSTOM_PROVIDER
@@ -31,17 +32,22 @@ def get_advice(user_input, similar_vacancies):
         Keep your advice specific. Reference examples from the job postings to support your recommendations.
 
         Answer:"""
+
     try:
+
         response = completion(
             model=model_name,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
+            stream=True,
             max_tokens=1500,
             api_base=LITELLM_API_BASE,
             custom_llm_provider=LITELLM_CUSTOM_PROVIDER,
         )
 
-        return response.choices[0].message.content
+        for chunk in response:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
 
     except APIConnectionError as e:
         logger.error(
@@ -52,4 +58,4 @@ def get_advice(user_input, similar_vacancies):
         raise
     except Exception as e:
         logger.error(f"Error generating advice with LiteLLM: {str(e)}")
-        return "Sorry, I'm unable to generate advice at the moment. Please try again later."
+        yield "Sorry, I'm unable to generate advice at the moment. Please try again later."

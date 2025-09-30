@@ -64,9 +64,6 @@ class JobAdvertOptimiserView(FormView):
     async def get_data(self, job_description) -> Tuple[
         AdviceResponse,
         SimilarVacanciesResponse,
-        # PlotlyFiguresResponse,
-        # PlotlyFiguresResponse,
-        # AreaFrequenciesResponse,
     ]:
 
         # Use django channels to reimplement with a websocket
@@ -77,61 +74,9 @@ class JobAdvertOptimiserView(FormView):
             results = await asyncio.gather(
                 get_advice(client, job_description),
                 get_similar_adverts(client, job_description),
-                # get_demographics_plots(client, job_description),
-                # get_skills_plots(client, job_description),
-                # get_applicant_locations(client, job_description),
                 return_exceptions=True,
             )
         return results
-
-    def get_base_map_data(self):
-        """
-        Map data before application data is added.
-        """
-        map_data = {
-            "geojson_url": UK_GEOJSON_URL,
-            "geojson_data": None,  # Placeholder populated by the frontend.
-            "map_options": {"center": [54, -3], "zoom": 5.2},
-            "layers": [
-                {
-                    "layer_type": "choropleth",
-                    "options": {
-                        "className": f"{APPLICANT_MAP_CSS_PREFIX}map-choropleth-layer"
-                    },
-                },
-                {
-                    "layer_type": "geojson",
-                    "options": {
-                        "className": f"{APPLICANT_MAP_CSS_PREFIX}map-no-data-layer"
-                    },
-                },
-            ],
-            "tooltip_options": {
-                "fields": ["areanm", "frequency"],
-                "aliases": ["Region", "Percentage of applications"],
-                "className": f"{APPLICANT_MAP_CSS_PREFIX}map-tooltip-layer",
-            },
-        }
-        return map_data
-
-    # def get_applicant_map_data(self, applicant_locations: AreaFrequenciesResponse):
-    #     """
-    #     Data for the applicant map.
-    #
-    #     Note:  The geojson data is served as static data, the frontend actually requests this and
-    #     combines it with this data.
-    #
-    #     applicant_locations is a GeoJSON object, where each feature contains an area_name and frequency.
-    #
-    #     :param applicant_locations: FeatureCollection
-    #     :return:
-    #     """
-    #     area_frequencies = applicant_locations.model_dump()["area_frequencies"]
-    #     map_data = {
-    #         "area_frequencies": area_frequencies,
-    #         **self.get_base_map_data()
-    #     }
-    #     return map_data
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -149,10 +94,9 @@ class JobAdvertOptimiserView(FormView):
         (
             advice_response,
             similar_vacancies_response,
-            # demographics_plots,
-            # skills_plots,
-            # applicant_locations,
         ) = await self.get_data(job_description)
+
+        print(f"HERE THEE HERON:__________\n{advice_response}\n_________")
 
         logger.info(f"\n=== ADVICE RESPONSE ===")
         logger.info(f"Type: {type(advice_response)}")
@@ -209,31 +153,6 @@ class JobAdvertOptimiserView(FormView):
                          format_error(similar_vacancies_response))
             similar_vacancies_response = None
 
-        # if isinstance(demographics_plots, Exception):
-        #     service_errors.append(demographics_plots)
-        #     logger.error("Error fetching demographics plots: %s",
-        #                  format_error(demographics_plots))
-        #     demographic_figures = None
-        # else:
-        #     demographic_figures = demographics_plots.get_figures()
-        #
-        # if isinstance(skills_plots, Exception):
-        #     service_errors.append(skills_plots)
-        #     logger.error("Error fetching skills plots: %s",
-        #                  format_error(skills_plots))
-        #     skills_figures = None
-        # else:
-        #     skills_figures = skills_plots.get_figures()
-        #
-        # if isinstance(applicant_locations, Exception):
-        #     logger.error("Error fetching applicant locations: %s",
-        #                  format_error(applicant_locations))
-        #     service_errors.append(applicant_locations)
-        #     applicant_map_data = None
-        # else:
-        #     applicant_map_data = self.get_applicant_map_data(
-        #         applicant_locations)
-        #
         advice = advice_response.advice if advice_response else None
         similar_vacancies = (
             similar_vacancies_response.similar_vacancies
@@ -241,15 +160,14 @@ class JobAdvertOptimiserView(FormView):
             else []
         )
 
+        print(service_errors)
+
         context = self.get_context_data(form=form)
         context.update(
             {
                 "show_extra_widgets": True,
                 "job_advert_advice": advice,
                 "similar_vacancies": similar_vacancies,
-                # "similar_vacancies_figures": demographic_figures,
-                # "skills_figures": skills_figures,
-                # "applicant_map_data": applicant_map_data,
                 "service_errors": service_errors,
             }
         )
