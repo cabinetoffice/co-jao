@@ -114,6 +114,7 @@ INSTALLED_APPS = [
     "jao_backend.ingest",
     "jao_backend.oleeo",
     "jao_backend.healthcheck",
+    "jao_backend.advice"
 ]
 
 
