@@ -1,9 +1,9 @@
 import hashlib
 from django.core.cache import cache
 import logging
-
+import json
 from django.conf import settings
-from django.http import HttpRequest
+from django.http import HttpRequest, StreamingHttpResponse
 
 import numpy as np
 from ninja import NinjaAPI
@@ -67,15 +67,17 @@ def get_similar_vacancies(text, top_n=10):
         .order_by("distance")[:top_n]
     )
 
-    tag = EmbeddingTag.get_tag(settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID)
-    similar_vacancy_embeddings = VacancyEmbedding.objects.similar_vacancies(text, tag, top_n)
+    tag = EmbeddingTag.get_tag(
+        settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID)
+    similar_vacancy_embeddings = VacancyEmbedding.objects.similar_vacancies(
+        text, tag, top_n)
     return [
         vacancy_embedding.vacancy for vacancy_embedding in similar_vacancy_embeddings
     ]
 
 
 @api.post("/advice")
-def advice(request: HttpRequest, payload: JobDescriptionRequest) -> AdviceResponse:
+def advice(request: HttpRequest, payload: JobDescriptionRequest) -> StreamingHttpResponse:
 
     similar_vacancies = get_similar_vacancies_cached(
         payload.description, top_n=10)
@@ -84,12 +86,19 @@ def advice(request: HttpRequest, payload: JobDescriptionRequest) -> AdviceRespon
             parse_oleeo_bbcode(vacancy.description)}"
         for vacancy in similar_vacancies
     ]
-    logger.info("Advice endpoint called with description: %s",
-                payload.description)
-    logger.info("Formatted vacancies: %s", formatted_vacancies)
-    text = get_advice(payload.description, formatted_vacancies)
-    logger.info(f"ADVICE FROM LLM:{text}")
-    return AdviceResponse(advice=text)
+
+    def generate():
+        """Generator for streaming response"""
+        for chunk in get_advice(payload.description, formatted_vacancies):
+            logger.debug(f"Streaming chunk: {chunk}")
+            yield f"data: {json.dumps({'content': chunk})}\n\n"
+
+        yield "data: [DONE]\n\n"
+
+    return StreamingHttpResponse(
+        generate(),
+        content_type='text/event-stream'
+    )
 
 
 @api.post("/similar_adverts", response=SimilarVacanciesResponse)

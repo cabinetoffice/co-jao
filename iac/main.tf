@@ -330,7 +330,7 @@ module "vectordb" {
   subnet_ids = module.vpc.private_subnet_ids
 
   allowed_security_groups = [aws_security_group.db_access.id]
-
+  allowed_cidr_blocks = var.allowed_cidr_blocks
   # Enable data science read replica if SageMaker is enabled
   create_data_science_replica = var.enable_sagemaker_environment
   data_science_instance_class = var.environment == "prod" ? "db.r6g.xlarge" : "db.serverless"
@@ -434,6 +434,33 @@ resource "aws_security_group" "db_access" {
   depends_on = [module.vpc]
 }
 
+# Bastion host for database access
+module "bastion" {
+  count  = var.enable_bastion_host ? 1 : 0
+  source = "./modules/bastion"
+
+  name_prefix         = var.app_name
+  vpc_id             = module.vpc.vpc_id
+  public_subnet_id   = module.vpc.public_subnet_ids[0]
+  allowed_cidr_blocks = var.allowed_cidr_blocks
+  ssh_public_key     = var.ssh_public_key
+  aurora_endpoint    = module.vectordb.cluster_endpoint
+
+  tags = local.common_tags
+}
+
+# Allow bastion to connect to Aurora
+resource "aws_security_group_rule" "bastion_to_aurora" {
+  count = var.enable_bastion_host ? 1 : 0
+  
+  type                     = "ingress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  source_security_group_id = module.bastion[0].bastion_security_group_id
+  security_group_id        = module.vectordb.security_group_id
+  description              = "Allow bastion host to connect to Aurora PostgreSQL"
+}
 
 
 module "celery_redis" {

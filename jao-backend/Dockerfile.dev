@@ -34,6 +34,7 @@ ENV PATH="/root/.local/bin:$PATH"
 
 # Copy dependency files
 COPY ./jao-backend/pyproject.toml ./pyproject.toml
+COPY ./jao-backend/poetry.lock ./poetry.lock
 COPY ./jao-backend/package.json ./package.json
 
 # Install dependencies
@@ -58,11 +59,5 @@ EXPOSE 8000
 # Development command with auto-reload
 CMD sh -c "set -e && \
     echo 'Running migrations...' && \
-    poetry run python src/manage.py migrate && \
-    echo 'Creating superuser...' && \
-    DJANGO_SUPERUSER_USERNAME=\${JAO_BACKEND_SUPERUSER_USERNAME:-admin} \
-    DJANGO_SUPERUSER_EMAIL=\${JAO_BACKEND_SUPERUSER_EMAIL:-admin@example.com} \
-    DJANGO_SUPERUSER_PASSWORD=\${JAO_BACKEND_SUPERUSER_PASSWORD:-admin123} \
-    poetry run python src/manage.py createsuperuser --noinput || echo 'Superuser creation failed or user already exists' && \
     echo 'Starting development server with auto-reload...' && \
     poetry run python src/manage.py runserver 0.0.0.0:8000"

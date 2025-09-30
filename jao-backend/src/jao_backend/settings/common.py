@@ -24,6 +24,8 @@ from jao_backend.common.util import is_truthy
 ENV = os.environ.get("ENV", "dev").lower()
 IS_DEV_ENVIRONMENT = ENV in ["dev", "ci", "local"]
 
+ALLOWED_HOSTS = ['*']
+
 # DEPLOYMENT_TYPE determines which models and embedding backend to use.
 # - local:  Ollama backend, public models.
 # - aws:    Bedrock backend, proprietary models.
@@ -114,6 +116,8 @@ INSTALLED_APPS = [
     "jao_backend.healthcheck",
 ]
 
+
+DEBUG = "true"
 
 # Embedding tags:
 #
@@ -210,6 +214,10 @@ WSGI_APPLICATION = "wsgi.application"
 #
 
 # Note, special characters like in the DATABASE URLs may need to be url escaped, e.g. %23 instead of #
+# DATABASES = {
+#     "default": os.getenv("JAO_BACKEND_DATABASE_URL"),
+# }
+
 DATABASES = {
     "default": dj_database_url.config(env="JAO_BACKEND_DATABASE_URL"),
 }

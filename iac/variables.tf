@@ -317,6 +317,18 @@ variable "admin_allowed_cidrs" {
   default     = null
 }
 
+variable "allowed_cidr_blocks" {
+  description = "List of CIDR blocks allowed to access the Aurora database"
+  type        = list(string)
+  default     = []
+}
+
+variable "allowed_security_groups" {
+  description = "List of security group IDs allowed to access the Aurora database"
+  type        = list(string)
+  default     = []
+}
+
 # variables_sagemaker.tf - Variables for SageMaker data science environment
 
 # Feature Flag
@@ -338,4 +350,16 @@ variable "sagemaker_db_password" {
   type        = string
   sensitive   = true
   default     = ""
+}
+
+variable "ssh_public_key" {
+  description = "SSH public key for bastion host access"
+  type        = string
+  default     = ""
+}
+
+variable "enable_bastion_host" {
+  description = "Enable bastion host for database access"
+  type        = bool
+  default     = false
 }
