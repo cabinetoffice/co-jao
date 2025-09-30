@@ -55,11 +55,9 @@
                                 Type of General Advice
                             </label>
                             <select class="govuk-select" id="advice-option" name="advice-option">
-                                <option value="published" selected>I Want More Applicants</option>
-                                <option value="updated">I Want Better Quality Applicants</option>
-                                <option value="updated">I Want A Better Gender Balance</option>
-                                <option value="updated">I Want More External Applicants</option>
-                                <option value="updated">I Want A Better Disability Balance</option>
+                                <option value="written-quality" selected>Improve grammar and language</option>
+                                <option value="gender-balance">I Want A Better Gender Balance</option>
+                                <option value="disability-balance">I Want A Better Disability Balance</option>
                             </select>
                         </p>
 
@@ -149,14 +147,6 @@
             document.getElementById('loading-status').style.display = 'none';
         }
         
-        function displayAdvice(advice) {
-            const adviceContent = document.querySelector('.advice-content');
-            if (adviceContent) {
-                adviceContent.innerHTML = advice.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>');
-            }
-            document.getElementById('tabs-1').style.display = 'block';
-        }
-        
     	function displaySimilarVacancies(vacancies) {
             const similarTab = document.getElementById('similar-adverts');
             if (!similarTab) {
@@ -228,38 +218,74 @@
         
         // Intercept form submission
         document.addEventListener('DOMContentLoaded', function() {
-            const form = document.querySelector('form');
-            if (form) {
-                form.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                    
-                    const jobDescription = document.querySelector('[name="job_description"]').value;
-                    const sessionKey = '{{ session_key }}';
-                    
-                    // Hide tabs initially
-                    const tabs = document.getElementById('tabs-1');
-                    if (tabs) tabs.style.display = 'none';
-                    
-                    if (!ws || ws.readyState !== WebSocket.OPEN) {
-                        initWebSocket();
-                        ws.addEventListener('open', function() {
-                            ws.send(JSON.stringify({
-                                job_description: jobDescription,
-                                session_key: sessionKey
-                            }));
-                            showStatus('Processing...');
-                        });
-                    } else {
-                        ws.send(JSON.stringify({
+    	    // Initialize WebSocket once on page load
+    	    initWebSocket();
+    
+    	    // Main form submission
+    	    const form = document.querySelector('form');
+    	    if (form) {
+        	form.addEventListener('submit', function(e) {
+            	    e.preventDefault();
+            
+            	    const jobDescription = document.querySelector('[name="job_description"]').value;
+            	    const sessionKey = '{{ session_key }}';
+            
+            	    // Hide tabs initially
+            	    const tabs = document.getElementById('tabs-1');
+            	    if (tabs) tabs.style.display = 'none';
+            
+            	    ensureWebSocketOpen().then(() => {
+               	        ws.send(JSON.stringify({
                             job_description: jobDescription,
                             session_key: sessionKey
-                        }));
+                    	}));
                         showStatus('Processing...');
+            	    });
+                });
+    	    }
+    
+    	    // Get Advice button
+            const adviceButton = document.querySelector('[data-action="get-advice"]');
+            if (adviceButton) {
+                adviceButton.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    const adviceCategory = document.getElementById('advice-category').value;
+                    const adviceOption = document.getElementById('advice-option').value;
+                    const sessionKey = '{{ session_key }}';
+                    
+                    // Clear previous advice
+                    const adviceContent = document.querySelector('.advice-content');
+                    if (adviceContent) {
+                        adviceContent.innerHTML = '';
                     }
+                    
+                    showStatus('Getting advice...');
+                    
+                    ensureWebSocketOpen().then(() => {
+                        ws.send(JSON.stringify({
+                            type: 'get_advice',
+                            advice_category: adviceCategory,
+                            advice_option: adviceOption,
+                            session_key: sessionKey
+                        }));
+                    });
                 });
             }
-            
-            initWebSocket();
         });
+
+        function ensureWebSocketOpen() {
+    	    return new Promise((resolve) => {
+        	if (ws && ws.readyState === WebSocket.OPEN) {
+            	    resolve();
+        	} else {
+            	    initWebSocket();
+                    ws.addEventListener('open', function() {
+                        resolve();
+            	    }, { once: true });
+        	}
+    });
+}
+
     </script>
 {% endblock extra_js %}
