@@ -124,19 +124,41 @@ class VacancyEmbeddingManager(models.Manager):
     def get_queryset(self):
         return VacancyEmbeddingQuerySet(self.model, using=self._db)
 
-    def similar_vacancies(self, text, tag: EmbeddingTag, top_n=10):
+    def similar_vacancies(self, text, tag: EmbeddingTag, top_n=10, filters=None, **filter_kwargs):
         """
         Get vacancies similar to the provided text.
 
         :param text: The text to compare against vacancy responsibilities.
         :param tag: The EmbeddingTag to use for similarity comparison.
         :param top_n: The number of similar vacancies to return (default is 10).
+        :param filters: Django Q object for complex filtering
+        :param filter_kwargs: Additional filter parameters for the vacancy
 
         EmbeddingTag stores tag uuid and embedding model to use.
 
+        Examples:
         >>> tag = EmbeddingTag.get_tag(settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID)
-        ... similar_vacancies = VacancyEmbedding.objects.similar_vacancies("Sample job description", tag)
-        ... print(similar_vacancies.values_list("id", "title", flat=True))
+
+        Basic usage (backwards compatible)
+        >>> similar_vacancies = VacancyEmbedding.objects.similar_vacancies("Sample job description", tag)
+        >>> print(similar_vacancies.values_list("id", "title", flat=True))
+
+        # With filtering
+        >>> similar_vacancies = VacancyEmbedding.objects.similar_vacancies(
+        ...     "Sample job description", 
+        ...     tag,
+        ...     vacancy__location="London",
+        ...     vacancy__is_active=True
+        ... )
+        
+        # With Q object filtering
+        >>> from django.db.models import Q
+        >>> filters = Q(vacancy__location="London") | Q(vacancy__location="Remote")
+        >>> similar_vacancies = VacancyEmbedding.objects.similar_vacancies(
+        ...     "Sample job description", 
+        ...     tag,
+        ...     filters=filters
+        ... )
         """
         response = tag.embed(text)
         chunks = tag.response_chunks(response)
@@ -148,13 +170,21 @@ class VacancyEmbeddingManager(models.Manager):
         else:
             query_vector = chunks[0]  # for now take the first chunk
 
-        vacancy_embeddings = (
+        queryset = (
             VacancyEmbedding.objects.filter(tag=tag)
             .distance(query_vector)
             .select_related("vacancy", "embedding")
-            .order_by("distance")[:top_n]
         )
 
+        if filters:
+            queryset = queryset.filter(filters)
+            print("Vacancies after filters:", queryset.count())
+        if filter_kwargs:
+            queryset = queryset.filter(**filter_kwargs)
+            print("After applying filter_kwargs, vacancy IDs:", list(queryset.values_list("vacancy_id", flat=True)))
+
+        vacancy_embeddings = queryset.order_by("distance")[:top_n]
+        print("Top similar vacancies (ordered by distance) IDs:", list(vacancy_embeddings.values_list("vacancy_id", flat=True)))
         return vacancy_embeddings
 
 class VacancyEmbedding(TaggedEmbedding):
