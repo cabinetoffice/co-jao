@@ -32,8 +32,6 @@ UK_GEOJSON_URL = settings.STATIC_URL + \
 
 def format_error(error: Exception):
     if settings.DEBUG:
-        # Output the full traceback in debug mode
-        # get traceback
         import traceback
 
         return f"{error}\n{traceback.format_exc()}"
@@ -66,13 +64,9 @@ class JobAdvertOptimiserView(FormView):
         SimilarVacanciesResponse,
     ]:
 
-        # Use django channels to reimplement with a websocket
-        # Once websocket is open, send one thing
-        #  The backend will hadle sending things back as they're ready
         session_key = self.get_or_create_session_key()
         async with get_async_client(session_key) as client:
             results = await asyncio.gather(
-                get_advice(client, job_description),
                 get_similar_adverts(client, job_description),
                 return_exceptions=True,
             )

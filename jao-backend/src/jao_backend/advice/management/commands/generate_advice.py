@@ -86,14 +86,17 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         limit = options['limit']
 
-        self.stdout.write(self.style.SUCCESS('=== Job Description Advice Generator ==='))
+        self.stdout.write(self.style.SUCCESS(
+            '=== Job Description Advice Generator ==='))
 
         filters = self.build_filters(options)
         if filters.children:
             self.stdout.write(self.style.WARNING("Applied filters."))
 
-        self.stdout.write('Please enter the job description you want to analyze.')
-        self.stdout.write('You can paste multiple lines. Press Ctrl+D (or Ctrl+Z on Windows) when done:\n')
+        self.stdout.write(
+            'Please enter the job description you want to analyze.')
+        self.stdout.write(
+            'You can paste multiple lines. Press Ctrl+D (or Ctrl+Z on Windows) when done:\n')
 
         lines = []
         try:
@@ -107,20 +110,25 @@ class Command(BaseCommand):
 
         job_description = '\n'.join(lines).strip()
         if not job_description:
-            self.stdout.write(self.style.ERROR('No job description provided. Exiting.'))
+            self.stdout.write(self.style.ERROR(
+                'No job description provided. Exiting.'))
             return
 
-        self.stdout.write(f'\n{self.style.SUCCESS("Analyzing job description...")}')
+        self.stdout.write(
+            f'\n{self.style.SUCCESS("Analyzing job description...")}')
         self.stdout.write(f'Using {limit} similar vacancies for comparison.\n')
 
         try:
-            tag = EmbeddingTag.get_tag(EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID)
+            tag = EmbeddingTag.get_tag(
+                EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID)
 
             if options.get("grammar"):
                 similar_vacancies = []
-                self.stdout.write('Grammar mode enabled. Skipping similar vacancies lookup.\n')
+                self.stdout.write(
+                    'Grammar mode enabled. Skipping similar vacancies lookup.\n')
             else:
-                self.stdout.write(f'Using {limit} similar vacancies for comparison.\n')
+                self.stdout.write(
+                    f'Using {limit} similar vacancies for comparison.\n')
 
                 if filters.children:
                     similar_vacancies = VacancyEmbedding.objects.similar_vacancies(
@@ -132,9 +140,11 @@ class Command(BaseCommand):
                     )
 
                 vacancy_count = len(similar_vacancies)
-                self.stdout.write(f'Found {vacancy_count} similar vacancies, generating advice...\n')
+                self.stdout.write(
+                    f'Found {vacancy_count} similar vacancies, generating advice...\n')
                 if vacancy_count == 0:
-                    self.stdout.write(self.style.WARNING('No similar vacancies found with the applied filters.'))
+                    self.stdout.write(self.style.WARNING(
+                        'No similar vacancies found with the applied filters.'))
                     return
 
             instructions = []
@@ -148,14 +158,17 @@ class Command(BaseCommand):
 
                 if options.get("female_ratio"):
                     instructions.append(
-                        f"Provide advice to attract more female applicants (≥{options['female_ratio']*100:.0f}%)."
+                        f"Provide advice to attract more female applicants (≥{
+                            options['female_ratio']*100:.0f}%)."
                     )
                 if options.get("disability_ratio"):
                     instructions.append(
-                        f"Provide advice to attract more applicants with disabilities (≥{options['disability_ratio']*100:.0f}%)."
+                        f"Provide advice to attract more applicants with disabilities (≥{
+                            options['disability_ratio']*100:.0f}%)."
                     )
                 if not instructions:
-                    instructions.append("Provide actionable advice to improve this job advert using the similar vacancies as context.")
+                    instructions.append(
+                        "Provide actionable advice to improve this job advert using the similar vacancies as context.")
 
             similar_vacancies_text = ""
             if not options.get("grammar"):
@@ -167,7 +180,8 @@ class Command(BaseCommand):
             Job Description:
             {job_description}
 
-            {"Similar Vacancies:\n" + similar_vacancies_text if similar_vacancies_text else ""}
+            {"Similar Vacancies:\n" +
+                similar_vacancies_text if similar_vacancies_text else ""}
 
             Instruction:
             {' '.join(instructions)}
@@ -176,7 +190,8 @@ class Command(BaseCommand):
             response = completion(
                 model=CHAT_MODEL_OPTIONS["ollama"],
                 messages=[
-                    {"role": "system", "content": "You are an assistant that improves job adverts."},
+                    {"role": "system",
+                        "content": "You are an assistant that improves job adverts."},
                     {"role": "user", "content": prompt}
                 ],
             )
@@ -193,4 +208,3 @@ class Command(BaseCommand):
 
         except Exception as e:
             raise CommandError(f'Error generating advice: {str(e)}')
-
