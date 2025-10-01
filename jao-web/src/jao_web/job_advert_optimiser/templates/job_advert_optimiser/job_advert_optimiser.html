@@ -55,14 +55,15 @@
                                 Type of General Advice
                             </label>
                             <select class="govuk-select" id="advice-option" name="advice-option">
-                                <option value="written-quality" selected>Improve grammar and language</option>
-                                <option value="gender-balance">I Want A Better Gender Balance</option>
-                                <option value="disability-balance">I Want A Better Disability Balance</option>
+                                <option value="general" selected>Improve grammar and language</option>
+                                <option value="gender">I Want A Better Gender Balance</option>
+                                <option value="disability">I Want A Better Disability Balance</option>
                             </select>
                         </p>
 
                         <p>
-                            <button class="govuk-button" type="submit">Get Advice</button>
+                            <button class="govuk-button" type="button"
+					    data-action="get_advice">Get Advice</button>
                         </p>
                     </div>
 	       	    	<div class="govuk-inset-text">
@@ -245,7 +246,7 @@
     	    }
     
     	    // Get Advice button
-            const adviceButton = document.querySelector('[data-action="get-advice"]');
+            const adviceButton = document.querySelector('[data-action="get_advice"]');
             if (adviceButton) {
                 adviceButton.addEventListener('click', function(e) {
                     e.preventDefault();
@@ -267,6 +268,7 @@
                             type: 'get_advice',
                             advice_category: adviceCategory,
                             advice_option: adviceOption,
+    			    job_description: document.querySelector('[name="job_description"]').value,
                             session_key: sessionKey
                         }));
                     });

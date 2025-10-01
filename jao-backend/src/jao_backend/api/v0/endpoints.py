@@ -9,6 +9,7 @@ import numpy as np
 from ninja import NinjaAPI
 
 from jao_backend_schemas.advice import AdviceResponse
+from jao_backend_schemas.advice import AdviceRequest
 from jao_backend_schemas.maps import AreaFrequenciesResponse
 from jao_backend_schemas.plots import PlotlyFiguresResponse
 from jao_backend_schemas.vacancies import SimilarVacanciesResponse
@@ -18,7 +19,8 @@ from jao_backend_schemas.vacancies import VacancyListing
 from jao_backend.common.text_processing.clean_oleeo import parse_oleeo_bbcode
 from jao_backend.embeddings.models import EmbeddingTag
 from jao_backend.vacancies.models import VacancyEmbedding
-from jao_backend.advice.advice import get_advice
+from jao_backend.advice.advice import AdviceService
+advice_service = AdviceService()
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +79,7 @@ def get_similar_vacancies(text, top_n=10):
 
 
 @api.post("/advice")
-def advice(request: HttpRequest, payload: JobDescriptionRequest) -> StreamingHttpResponse:
+def advice(request: HttpRequest, payload: AdviceRequest) -> StreamingHttpResponse:
 
     similar_vacancies = get_similar_vacancies_cached(
         payload.description, top_n=10)
@@ -89,7 +91,9 @@ def advice(request: HttpRequest, payload: JobDescriptionRequest) -> StreamingHtt
 
     def generate():
         """Generator for streaming response"""
-        for chunk in get_advice(payload.description, formatted_vacancies):
+        for chunk in advice_service.get_advice(payload.description,
+                                               formatted_vacancies,
+                                               payload.advice_type):
             logger.debug(f"Streaming chunk: {chunk}")
             yield f"data: {json.dumps({'content': chunk})}\n\n"
 
