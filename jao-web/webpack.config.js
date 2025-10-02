@@ -10,7 +10,8 @@ module.exports = {
   context: path.resolve(__dirname, 'src'),
   entry: {
     Base: [
-        './jao_web/common/static/common/js/base.js'
+        './jao_web/common/static/common/js/base.js',
+	'./jao_web/common/static/common/scss/govuk.scss'
     ],
     JAO: [
         './jao_web/job_advert_optimiser/static/job_advert_optimiser/scss/main.scss',

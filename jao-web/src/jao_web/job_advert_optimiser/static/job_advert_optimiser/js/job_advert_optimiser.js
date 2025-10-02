@@ -43,12 +43,18 @@ function initWebSocket() {
 }
 
 function showStatus(message) {
-    document.getElementById('loading-status').textContent = message;
-    document.getElementById('loading-status').style.display = 'block';
+    const statusElement = document.getElementById('loading-status');
+    if (statusElement) {
+        statusElement.textContent = message;
+        statusElement.style.display = 'block';
+    }
 }
 
 function hideStatus() {
-    document.getElementById('loading-status').style.display = 'none';
+    const statusElement = document.getElementById('loading-status');
+    if (statusElement) {
+        statusElement.style.display = 'none';
+    }
 }
 
 function appendAdviceChunk(chunk) {
@@ -56,8 +62,9 @@ function appendAdviceChunk(chunk) {
     if (adviceContent) {
         adviceContent.innerHTML += chunk;
     }
+    
     const tabs = document.getElementById('tabs-1');
-    if(tabs){
+    if (tabs) {
         tabs.style.display = 'block';
     }
 }
@@ -77,7 +84,7 @@ function displaySimilarVacancies(vacancies) {
     const container = document.createElement('div');
     container.id = 'accordion-1';
     
-    vacancies.forEach((vacancy, index) => {
+    vacancies.forEach((vacancy) => {
         const section = document.createElement('div');
         section.style.borderBottom = '1px solid #b1b4b6';
         section.style.padding = '15px 0';
@@ -117,14 +124,27 @@ function decodeHtml(html) {
     decoded = decoded.replace(/\[br\/\]/g, '<br>');
     decoded = decoded.replace(/\[br\]/g, '<br>');
     return decoded;
-} 
+}
 
 function showTabs() {
-    document.getElementById('tabs-1').style.display = 'block';
+    const tabsElement = document.getElementById('tabs-1');
+    if (!tabsElement) return;
+    
+    tabsElement.style.display = 'block';
+    
+    // Initialize GOV.UK tabs component
+    if (window.GOVUKFrontend && window.GOVUKFrontend.Tabs) {
+        const tabsModule = tabsElement.querySelector('[data-module="govuk-tabs"]');
+        if (tabsModule) {
+            new window.GOVUKFrontend.Tabs(tabsModule).init();
+        }
+    }
 }
 
 function showError(service, message) {
     const container = document.querySelector('.govuk-width-container');
+    if (!container) return;
+    
     const errorDiv = document.createElement('div');
     errorDiv.className = 'govuk-error-summary';
     errorDiv.setAttribute('role', 'alert');
@@ -150,17 +170,59 @@ function ensureWebSocketOpen() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+function initializePage() {
+    console.log('Initializing page');
+    
     initWebSocket();
     
+    // Use event delegation on document body for advice dropdown
+    document.body.addEventListener('change', function(e) {
+        if (e.target && e.target.id === 'advice-option') {
+            console.log('Advice option changed to:', e.target.value);
+            const selectedType = e.target.value;
+            const genderRatioGroup = document.getElementById('gender-ratio-group');
+            const disabilityRatioGroup = document.getElementById('disability-ratio-group');
+            
+            if (selectedType === 'gender') {
+                if (genderRatioGroup) genderRatioGroup.style.display = 'block';
+                if (disabilityRatioGroup) disabilityRatioGroup.style.display = 'none';
+            } else if (selectedType === 'disability') {
+                if (genderRatioGroup) genderRatioGroup.style.display = 'none';
+                if (disabilityRatioGroup) disabilityRatioGroup.style.display = 'block';
+            } else {
+                if (genderRatioGroup) genderRatioGroup.style.display = 'none';
+                if (disabilityRatioGroup) disabilityRatioGroup.style.display = 'none';
+            }
+        }
+    });
+    
+    // Use event delegation for slider inputs
+    document.body.addEventListener('input', function(e) {
+        if (e.target && e.target.id === 'gender-ratio') {
+            const genderRatioValue = document.getElementById('gender-ratio-value');
+            if (genderRatioValue) {
+                genderRatioValue.textContent = e.target.value;
+            }
+        }
+        if (e.target && e.target.id === 'disability-ratio') {
+            const disabilityRatioValue = document.getElementById('disability-ratio-value');
+            if (disabilityRatioValue) {
+                disabilityRatioValue.textContent = e.target.value;
+            }
+        }
+    });
+    
     const form = document.querySelector('form');
-    console.log('Form found:', document.querySelector('form'));
     if (form) {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
             
-            const jobDescription = document.querySelector('[name="job_description"]').value;
+            const jobDescriptionInput = document.querySelector('[name="job_description"]');
+            if (!jobDescriptionInput) return;
+            
+            const jobDescription = jobDescriptionInput.value;
             const sessionKey = window.sessionKey;
+            
             const tabs = document.getElementById('tabs-1');
             if (tabs) tabs.style.display = 'none';
             
@@ -180,57 +242,24 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Advice category and slider controls
-    const adviceOption = document.getElementById('advice-option');
-    const genderRatioGroup = document.getElementById('gender-ratio-group');
-    const disabilityRatioGroup = document.getElementById('disability-ratio-group');
-    const genderRatioSlider = document.getElementById('gender-ratio');
-    const disabilityRatioSlider = document.getElementById('disability-ratio');
-    const genderRatioValue = document.getElementById('gender-ratio-value');
-    const disabilityRatioValue = document.getElementById('disability-ratio-value');
-    
-    if (genderRatioSlider) {
-        genderRatioSlider.addEventListener('input', function() {
-            genderRatioValue.textContent = this.value;
-        });
-    }
-    if (disabilityRatioSlider) {
-        disabilityRatioSlider.addEventListener('input', function() {
-            disabilityRatioValue.textContent = this.value;
-        });
-    }
-    
-    // Show/hide sliders based on advice type
-    if (adviceOption) {
-        adviceOption.addEventListener('change', function() {
-            const selectedType = this.value;
-            
-            if (selectedType === 'gender') {
-                genderRatioGroup.style.display = 'block';
-                disabilityRatioGroup.style.display = 'none';
-            } else if (selectedType === 'disability') {
-                genderRatioGroup.style.display = 'none';
-                disabilityRatioGroup.style.display = 'block';
-            } else {
-                genderRatioGroup.style.display = 'none';
-                disabilityRatioGroup.style.display = 'none';
-            }
-        });
-    }
-    
-    // Get Advice button
-    const adviceButton = document.querySelector('[data-action="get-advice"]');
-    if (adviceButton) {
-        adviceButton.addEventListener('click', function(e) {
+    // Get Advice button - use event delegation
+    document.body.addEventListener('click', function(e) {
+        if (e.target && e.target.getAttribute('data-action') === 'get-advice') {
             e.preventDefault();
             
-            const adviceType = document.getElementById('advice-option').value;
+            const adviceOption = document.getElementById('advice-option');
+            const genderRatioSlider = document.getElementById('gender-ratio');
+            const disabilityRatioSlider = document.getElementById('disability-ratio');
+            
+            if (!adviceOption) return;
+            
+            const adviceType = adviceOption.value;
             const sessionKey = window.sessionKey;
             
             const options = {};
-            if (adviceType === 'gender') {
+            if (adviceType === 'gender' && genderRatioSlider) {
                 options.female_ratio = parseFloat(genderRatioSlider.value);
-            } else if (adviceType === 'disability') {
+            } else if (adviceType === 'disability' && disabilityRatioSlider) {
                 options.disability_ratio = parseFloat(disabilityRatioSlider.value);
             }
             
@@ -249,12 +278,22 @@ document.addEventListener('DOMContentLoaded', function() {
                     session_key: sessionKey
                 }));
             });
-        });
-    }
+        }
+    });
     
-    // Display initial similar vacancies if they exist (from Django context)
+    // Display initial similar vacancies if they exist
     if (window.initialSimilarVacancies) {
         displaySimilarVacancies(window.initialSimilarVacancies);
         showTabs();
     }
-});
+}
+
+// Expose function globally
+window.initializeJobAdvertOptimiser = initializePage;
+
+// Auto-initialize
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializePage);
+} else {
+    setTimeout(initializePage, 0);
+}
