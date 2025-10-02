@@ -81,11 +81,14 @@ def get_similar_vacancies(text, top_n=10):
 @api.post("/advice")
 def advice(request: HttpRequest, payload: AdviceRequest) -> StreamingHttpResponse:
 
+    print(payload)
+
     formatted_vacancies = [
         f"Job Title: {vacancy.title}\nDescription: {
             parse_oleeo_bbcode(vacancy.description)}"
         for vacancy in payload.similar_vacancies
     ]
+    print(formatted_vacancies)
 
     def generate():
         """Generator for streaming response"""

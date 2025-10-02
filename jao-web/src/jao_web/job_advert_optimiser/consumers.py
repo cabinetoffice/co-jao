@@ -1,6 +1,7 @@
 import json
 import logging
 import asyncio
+from django.core.cache import cache
 from channels.generic.websocket import AsyncWebsocketConsumer
 from jao_web.common.text_processing.clean_oleeo import parse_oleeo_bbcode
 from jao_web.job_advert_optimiser.services.client import get_async_client
@@ -25,6 +26,16 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
             await self.send(json.dumps(data))
         except Exception as e:
             logger.exception("Error sending message")
+
+    def store_in_session(self, session_key, data):
+        """Store data in cache using session key"""
+        cache_key = f"job_advert_{session_key}"
+        cache.set(cache_key, data, timeout=3600)  # 1 hour timeout
+
+    def get_from_session(self, session_key):
+        """Retrieve data from cache using session key"""
+        cache_key = f"job_advert_{session_key}"
+        return cache.get(cache_key, {})
 
     async def receive(self, text_data):
         try:
@@ -81,7 +92,7 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
         advice_category = data.get('advice_category')
         advice_option = data.get('advice_option')
         session_key = data.get('session_key')
-        job_description = data.get('job_description')
+        job_description = self.get_from_session(session_key)["job_description"]
 
         if not job_description:
             await self.send_json({
@@ -95,32 +106,31 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
 
         async with get_async_client(session_key) as client:
             # Map advice options to advice types
-            advice_type = self._map_advice_type(advice_option)
-            await self._get_advice(client, job_description, advice_type)
+            advice_type = advice_option if advice_option in [
+                'general', 'gender', 'disability'] else 'general'
+            await self._get_advice(client, job_description, session_key, advice_type)
 
         await self.send_json({'type': 'advice_complete'})
 
-    def _map_advice_type(self, advice_option):
-        """Map frontend advice option to backend advice type"""
-        mapping = {
-            'written-quality': 'general',
-            'gender-balance': 'gender',
-            'disability-balance': 'disability'
-        }
-        return mapping.get(advice_option, 'general')
-
-    async def _get_advice(self, client, job_description, advice_type='general',
-                          session_key):
+    async def _get_advice(self, client, job_description, session_key, advice_type='general'):
         """Get advice from backend"""
         await self.send_json({
             'type': 'status',
             'message': 'Generating personalized advice...'
         })
+        logger.info(f"Sending advice request with advice_type: {advice_type}")
+        logger.info(f"Job description length: {len(job_description)}")
 
-        session_key = data['session_key']
-        session_data = await self.get_from_session(session_key)
+        session_data = self.get_from_session(session_key)
         similar_vacancies = session_data['similar_vacancies']
 
+        # similar_vacancies = [
+        #     {
+        #         'title': v.get('job_title'),                'description': v.get('full_job_desc')}
+        #     for v in similar_vacancies_raw
+        # ]
+
+        logger.info(f"Number of similar vacancies: {len(similar_vacancies)}")
         try:
             async with client.stream(
                 "POST",
@@ -183,9 +193,9 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
                 for v in getattr(similar_response, 'similar_vacancies', [])
             ]
 
-            await self.store_in_session(session_key, {
+            self.store_in_session(session_key, {
                 'job_description': job_description,
-                'similar_vacancies': [v.model_dump() for v in vacancies_data]
+                'similar_vacancies': vacancies_data
             })
 
             await self.send_json({
