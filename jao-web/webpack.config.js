@@ -15,6 +15,7 @@ module.exports = {
     JAO: [
         './jao_web/job_advert_optimiser/static/job_advert_optimiser/scss/main.scss',
         './jao_web/job_advert_optimiser/static/job_advert_optimiser/js/main.js',
+        './jao_web/job_advert_optimiser/static/job_advert_optimiser/js/job_advert_optimiser.js',
         ]
   },
   output: {

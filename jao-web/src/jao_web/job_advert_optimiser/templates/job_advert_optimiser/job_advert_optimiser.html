@@ -1,4 +1,4 @@
-{% extends "common/base.html" %}
+G
 
 {% load render_bundle from webpack_loader %}
 {% load crispy_forms_tags crispy_forms_gds %}
@@ -60,10 +60,35 @@
                                 <option value="disability">I Want A Better Disability Balance</option>
                             </select>
                         </p>
+			    <div class="govuk-form-group" id="gender-ratio-group" style="display: none;">
+                                <label class="govuk-label" for="gender-ratio">
+                                    Minimum Female Applicant Ratio: <span id="gender-ratio-value">0.5</span>
+                                </label>
+                                <input type="range" id="gender-ratio" name="gender-ratio" 
+                                       min="0.3" max="0.7" step="0.05" value="0.5"
+                                       style="width: 100%;">
+                                <div style="display: flex; justify-content: space-between; font-size: 14px; color: #505a5f;">
+                                    <span>30%</span>
+                                    <span>70%</span>
+                                </div>
+                            </div>
+                            
+                            <div class="govuk-form-group" id="disability-ratio-group" style="display: none;">
+                                <label class="govuk-label" for="disability-ratio">
+                                    Minimum Disability Applicant Ratio: <span id="disability-ratio-value">0.5</span>
+                                </label>
+                                <input type="range" id="disability-ratio" name="disability-ratio" 
+                                       min="0.3" max="0.7" step="0.05" value="0.5"
+                                       style="width: 100%;">
+                                <div style="display: flex; justify-content: space-between; font-size: 14px; color: #505a5f;">
+                                    <span>30%</span>
+                                    <span>70%</span>
+                                </div>
+                            </div>
 
                         <p>
                             <button class="govuk-button" type="button"
-					    data-action="get_advice">Get Advice</button>
+					    data-action="get-advice">Get Advice</button>
                         </p>
                     </div>
 	       	    	<div class="govuk-inset-text">
@@ -82,212 +107,8 @@
 {% endblock content %}
 
 {% block extra_js %}
-    {% render_bundle 'JAO' 'js' %}
     <script>
-        let ws = null;
-        
-        function initWebSocket() {
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = protocol + '//' + window.location.host + '/ws/job_advert/';
-            
-            console.log('Connecting to:', wsUrl);
-            ws = new WebSocket(wsUrl);
-            
-            ws.onopen = function() {
-                console.log('WebSocket connected');
-            };
-            
-            ws.onmessage = function(e) {
-    		const data = JSON.parse(e.data);
-    		console.log('Received:', data);
-    
-		if (data.type === 'status') {
-        	    showStatus(data.message);
-   		} else if (data.type === 'advice_chunk') {
-        	    appendAdviceChunk(data.data);
-    		} else if (data.type === 'advice_complete') {
-        	    console.log('Advice streaming complete');
-        	    hideStatus();
-    		} else if (data.type === 'similar_vacancies') {
-        	    displaySimilarVacancies(data.data);
-    		} else if (data.type === 'error') {
-        	    showError(data.service || 'general', data.message);
-    		} else if (data.type === 'complete') {
-                    hideStatus();
-        	    showTabs();
-   		}
-	    };
-
-	    function appendAdviceChunk(chunk) {
-   		const adviceContent = document.querySelector('.advice-content');
-    		if (adviceContent) {
-        	    adviceContent.innerHTML += chunk;
-    		}
-    		const tabs = document.getElementById('tabs-1');
-    		if(tabs){
-    	            tabs.style.display = 'block';
-    		}
-}
-            
-            ws.onerror = function(error) {
-                console.error('WebSocket error:', error);
-                showError('connection', 'Connection error occurred');
-            };
-            
-            ws.onclose = function() {
-                console.log('WebSocket closed');
-            };
-        }
-        
-        function showStatus(message) {
-            document.getElementById('loading-status').textContent = message;
-            document.getElementById('loading-status').style.display = 'block';
-        }
-        
-        function hideStatus() {
-            document.getElementById('loading-status').style.display = 'none';
-        }
-        
-    	function displaySimilarVacancies(vacancies) {
-            const similarTab = document.getElementById('similar-adverts');
-            if (!similarTab) {
-                console.error('Similar adverts tab not found');
-                return;
-            }
-            
-            const container = document.createElement('div');
-            container.id = 'accordion-1';
-            
-            vacancies.forEach((vacancy, index) => {
-                const section = document.createElement('div');
-                section.style.borderBottom = '1px solid #b1b4b6';
-                section.style.padding = '15px 0';
-                
-                const heading = document.createElement('h3');
-                heading.style.cursor = 'pointer';
-                heading.style.margin = '0';
-                heading.textContent = '▶ ' + vacancy.job_title;
-                
-                const content = document.createElement('div');
-                content.style.display = 'none';
-                content.style.paddingTop = '10px';
-                content.innerHTML = decodeHtml(vacancy.full_job_desc);
-                
-                heading.onclick = function() {
-                    if (content.style.display === 'none') {
-                        content.style.display = 'block';
-                        heading.textContent = '▼ ' + vacancy.job_title;
-                    } else {
-                        content.style.display = 'none';
-                        heading.textContent = '▶ ' + vacancy.job_title;
-                    }
-                };
-                
-                section.appendChild(heading);
-                section.appendChild(content);
-                container.appendChild(section);
-            });
-            
-            similarTab.appendChild(container);
-}
-    	function decodeHtml(html) {
- 	    const txt = document.createElement('textarea');
-	    txt.innerHTML = html;
-    	    let decoded = txt.value;
-            decoded = decoded.replace(/\[br\/\]/g, '<br>');
-   	    decoded = decoded.replace(/\[br\]/g, '<br>');
-    	    return decoded;
-	} 
-
-        function showTabs() {
-            document.getElementById('tabs-1').style.display = 'block';
-        }
-        
-        function showError(service, message) {
-            const container = document.querySelector('.govuk-width-container');
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'govuk-error-summary';
-            errorDiv.setAttribute('role', 'alert');
-            errorDiv.innerHTML = `
-                <h2 class="govuk-error-summary__title">Error in ${service}</h2>
-                <div class="govuk-error-summary__body">
-                    <p>${message}</p>
-                </div>
-            `;
-            container.insertBefore(errorDiv, container.firstChild);
-        }
-        
-        // Intercept form submission
-        document.addEventListener('DOMContentLoaded', function() {
-    	    // Initialize WebSocket once on page load
-    	    initWebSocket();
-    
-    	    // Main form submission
-    	    const form = document.querySelector('form');
-    	    if (form) {
-        	form.addEventListener('submit', function(e) {
-            	    e.preventDefault();
-            
-            	    const jobDescription = document.querySelector('[name="job_description"]').value;
-            	    const sessionKey = '{{ session_key }}';
-            
-            	    // Hide tabs initially
-            	    const tabs = document.getElementById('tabs-1');
-            	    if (tabs) tabs.style.display = 'none';
-            
-            	    ensureWebSocketOpen().then(() => {
-               	        ws.send(JSON.stringify({
-                            job_description: jobDescription,
-                            session_key: sessionKey
-                    	}));
-                        showStatus('Processing...');
-            	    });
-                });
-    	    }
-    
-    	    // Get Advice button
-            const adviceButton = document.querySelector('[data-action="get_advice"]');
-            if (adviceButton) {
-                adviceButton.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    
-                    const adviceCategory = document.getElementById('advice-category').value;
-                    const adviceOption = document.getElementById('advice-option').value;
-                    const sessionKey = '{{ session_key }}';
-                    
-                    // Clear previous advice
-                    const adviceContent = document.querySelector('.advice-content');
-                    if (adviceContent) {
-                        adviceContent.innerHTML = '';
-                    }
-                    
-                    showStatus('Getting advice...');
-                    
-                    ensureWebSocketOpen().then(() => {
-                        ws.send(JSON.stringify({
-                            type: 'get_advice',
-                            advice_category: adviceCategory,
-                            advice_option: adviceOption,
-    			    job_description: document.querySelector('[name="job_description"]').value,
-                            session_key: sessionKey
-                        }));
-                    });
-                });
-            }
-        });
-
-        function ensureWebSocketOpen() {
-    	    return new Promise((resolve) => {
-        	if (ws && ws.readyState === WebSocket.OPEN) {
-            	    resolve();
-        	} else {
-            	    initWebSocket();
-                    ws.addEventListener('open', function() {
-                        resolve();
-            	    }, { once: true });
-        	}
-    });
-}
-
+        window.sessionKey = '{{ session_key }}';
     </script>
+    {% render_bundle 'JAO' 'js' %}
 {% endblock extra_js %}

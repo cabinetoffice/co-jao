@@ -72,7 +72,7 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
                     job_description[:100]}...")
 
         async with get_async_client(session_key) as client:
-            await self._get_similar_adverts(client, job_description)
+            await self._get_similar_adverts(client, job_description, session_key)
 
         await self.send_json({'type': 'complete'})
 
@@ -109,12 +109,17 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
         }
         return mapping.get(advice_option, 'general')
 
-    async def _get_advice(self, client, job_description, advice_type='general'):
+    async def _get_advice(self, client, job_description, advice_type='general',
+                          session_key):
         """Get advice from backend"""
         await self.send_json({
             'type': 'status',
             'message': 'Generating personalized advice...'
         })
+
+        session_key = data['session_key']
+        session_data = await self.get_from_session(session_key)
+        similar_vacancies = session_data['similar_vacancies']
 
         try:
             async with client.stream(
@@ -122,7 +127,8 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
                 "advice",
                 json={
                     "description": job_description,
-                    "advice_type": advice_type
+                    "advice_type": advice_type,
+                    "similar_vacancies": similar_vacancies
                 },
                 timeout=300
             ) as response:
@@ -157,7 +163,7 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
                 'message': str(e)
             })
 
-    async def _get_similar_adverts(self, client, job_description):
+    async def _get_similar_adverts(self, client, job_description, session_key):
         """Get similar adverts from backend"""
         await self.send_json({
             'type': 'status',
@@ -173,10 +179,14 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
                     'vacancy_id': v.vacancy_id,
                     'job_title': v.job_title,
                     'full_job_desc': parse_oleeo_bbcode(v.full_job_desc)
-
                 }
                 for v in getattr(similar_response, 'similar_vacancies', [])
             ]
+
+            await self.store_in_session(session_key, {
+                'job_description': job_description,
+                'similar_vacancies': [v.model_dump() for v in vacancies_data]
+            })
 
             await self.send_json({
                 'type': 'similar_vacancies',

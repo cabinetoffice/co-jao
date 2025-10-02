@@ -11,7 +11,7 @@ from jao_backend.application_statistics.models.lists import Gender, Disability
 from jao_backend.application_statistics.models.statistics import AggregatedApplicationStatistic
 from jao_backend_schemas.advice import AdviceResponse
 from jao_backend.settings.common import EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID
-from .prompts import GENERAL_ADVICE_PROMPT, GENDER_BALANCE_PROMPT, DISABILITY_BALANCE_PROMPT
+from jao_backend.advice.prompts import ADVICE_PROMPTS
 
 LITELLM_API_BASE = settings.LITELLM_API_BASE
 LITELLM_CUSTOM_PROVIDER = settings.LITELLM_CUSTOM_PROVIDER
@@ -83,57 +83,62 @@ class AdviceService():
 
     def _update_rag_content(self, user_input, filters):
         updated_vacancies = VacancyEmbedding.objects.similar_vacancies(
-            user_input, self.tag, top_n=self.rag_object_limit, filters=filters
+            user_input, self.tag, top_n=self.rag_content_limit, filters=filters
         )
         vacancy_count = len(updated_vacancies)
-        self.stdout.write(
-            f'Found {vacancy_count} updated vacancies, generating advice...\n')
         if vacancy_count == 0:
             raise Exception(self.style.WARNING(
                 'No similar vacancies found with the applied filters.'))
         return updated_vacancies
 
     def _advice_handler(self, user_input, rag_content, advice_type, options=None):
-        prompt_id = self.prompt_ids[f"{advice_type}"]
-        try:
-            if prompt_id == "general":
-                return completion(
-                    model=self.model,
-                    prompt_id=prompt_id,
-                    prompt_variables={"user_input": user_input,
-                                      "vacancies": rag_content},
-                    stream=True,
-                    max_tokens=1500,
-                    api_base=LITELLM_API_BASE,
-                    custom_llm_provider=LITELLM_CUSTOM_PROVIDER
+        # For non-general advice, apply filters and get updated RAG content
+        if advice_type != "general" and options:
+            filters = self.build_filters(options)
+            try:
+                updated_vacancies = self._update_rag_content(
+                    user_input, filters)
+                # Rebuild RAG content with filtered vacancies
+                rag_content = "\n\n".join(
+                    [f"Job Ad {i+1}:\n{vacancy.vacancy.full_job_desc}"
+                     for i, vacancy in enumerate(updated_vacancies)]
                 )
-            else:
-                filters = self.build_filters(options)
-                updated_rag_content = self._updated_rag_content(self,
-                                                                user_input,
-                                                                filters)
-                return completion(
-                    model=self.model,
-                    prompt_id=prompt_id,
-                    prompt_variables={"user_input": user_input,
-                                      "vacancies": rag_content},
-                    stream=True,
-                    max_tokens=1500,
-                    api_base=LITELLM_API_BASE,
-                    custom_llm_provider=LITELLM_CUSTOM_PROVIDER
-                )
+            except Exception as e:
+                logger.error(f'Error filtering vacancies: {str(e)}')
+                # Fall back to original rag_content if filtering fails
 
+        prompt_config = ADVICE_PROMPTS.get(advice_type)
+        if not prompt_config:
+            raise ValueError(f"Unknown advice type: {advice_type}")
+
+        messages = [
+            {"role": "system", "content": prompt_config["system"]},
+            {"role": "user", "content": prompt_config["user_template"].format(
+                rag_content=rag_content,
+                user_input=user_input
+            )}
+        ]
+
+        try:
+            return completion(
+                model=self.model,
+                messages=messages,
+                stream=True,
+                max_tokens=1500,
+                api_base=LITELLM_API_BASE,
+                custom_llm_provider=LITELLM_CUSTOM_PROVIDER
+            )
         except Exception as e:
-            raise Exception(f'Error generating advice: {str(e)}')
+            logger.error(f'Error generating advice: {str(e)}')
+            raise
 
     def get_advice(self, user_input, similar_vacancies, advice_type,
                    options=None):
         rag_content = "\n\n".join(
             [f"Job Ad {i+1}:\n{ad}" for i, ad in enumerate(similar_vacancies)])
-
         try:
             response = self._advice_handler(
-                self, user_input, rag_content, advice_type)
+                user_input, rag_content, advice_type, options)
             for chunk in response:
                 if chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
