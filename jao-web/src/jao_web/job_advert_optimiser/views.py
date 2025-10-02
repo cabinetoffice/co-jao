@@ -49,7 +49,7 @@ class JobAdvertOptimiserView(FormView):
     form_class = JobAdvertForm
     success_url = reverse_lazy(
         "job_advert_optimiser"
-    )  # This can be any URL you want to redirect to on success
+    )
 
     def get_or_create_session_key(self):
         session = self.request.session
@@ -59,17 +59,11 @@ class JobAdvertOptimiserView(FormView):
             session_key = session.session_key
         return session_key
 
-    async def get_data(self, job_description) -> Tuple[
-        AdviceResponse,
-        SimilarVacanciesResponse,
-    ]:
-
+    async def get_data(self, job_description) -> SimilarVacanciesResponse:
         session_key = self.get_or_create_session_key()
         async with get_async_client(session_key) as client:
-            results = await asyncio.gather(
-                get_similar_adverts(client, job_description),
-                return_exceptions=True,
-            )
+            results = await get_similar_adverts(client, job_description)
+            print("RESULTS -------", results)
         return results
 
     def get_context_data(self, **kwargs):
@@ -83,89 +77,40 @@ class JobAdvertOptimiserView(FormView):
 
     @async_to_sync
     async def form_valid(self, form):
-        job_description = form.cleaned_data["job_description"]
-
-        (
-            advice_response,
-            similar_vacancies_response,
-        ) = await self.get_data(job_description)
-
-        print(f"HERE THEE HERON:__________\n{advice_response}\n_________")
-
-        logger.info(f"\n=== ADVICE RESPONSE ===")
-        logger.info(f"Type: {type(advice_response)}")
-        logger.info(f"Is Exception: {isinstance(advice_response, Exception)}")
-        if isinstance(advice_response, Exception):
-            logger.info(f"Exception: {advice_response}")
-            advice = None
-        else:
-            logger.info(f"Response object: {advice_response}")
-            logger.info(f"Has advice attr: {
-                        hasattr(advice_response, 'advice')}")
-            if hasattr(advice_response, 'advice'):
-                advice = advice_response.advice
-                logger.info(f"Advice content: {advice}")
-            else:
-                logger.info(f"Available attributes: {dir(advice_response)}")
-                advice = str(advice_response)
-
-        # Debug similar vacancies
-        logger.info(f"\n=== SIMILAR VACANCIES RESPONSE ===")
-        logger.info(f"Type: {type(similar_vacancies_response)}")
-        logger.info(f"Is Exception: {isinstance(
-            similar_vacancies_response, Exception)}")
-        if isinstance(similar_vacancies_response, Exception):
-            logger.info(f"Exception: {similar_vacancies_response}")
-            similar_vacancies = []
-        else:
-            logger.info(f"Response object: {similar_vacancies_response}")
-            logger.info(f"Has similar_vacancies attr: {
-                hasattr(similar_vacancies_response, 'similar_vacancies')}")
-            if hasattr(similar_vacancies_response, 'similar_vacancies'):
-                similar_vacancies = similar_vacancies_response.similar_vacancies
-                logger.info(f"Vacancies count: {len(similar_vacancies)}")
-                if similar_vacancies:
-                    logger.info(f"First vacancy: {similar_vacancies[0]}")
-                    logger.info(f"First vacancy type: {
-                                type(similar_vacancies[0])}")
-            else:
-                logger.info(f"Available attributes: {
-                    dir(similar_vacancies_response)}")
-                similar_vacancies = []
-
-        # Handle possible exceptions from asyncio.gather
-        service_errors = []
-        if isinstance(advice_response, Exception):
-            logger.error("Error fetching advice: %s",
-                         format_error(advice_response))
-            service_errors.append(advice_response)
-            advice_response = None
-
-        if isinstance(similar_vacancies_response, Exception):
-            service_errors.append(similar_vacancies_response)
-            logger.error("Error fetching similar vacancies: %s",
-                         format_error(similar_vacancies_response))
-            similar_vacancies_response = None
-
-        advice = advice_response.advice if advice_response else None
-        similar_vacancies = (
-            similar_vacancies_response.similar_vacancies
-            if similar_vacancies_response
-            else []
-        )
-
-        print(service_errors)
-
         context = self.get_context_data(form=form)
-        context.update(
-            {
-                "show_extra_widgets": True,
-                "job_advert_advice": advice,
-                "similar_vacancies": similar_vacancies,
-                "service_errors": service_errors,
-            }
-        )
+        context['show_extra_widgets'] = True
         return self.render_to_response(context)
+
+    # @async_to_sync
+    # async def form_valid(self, form):
+    #     job_description = form.cleaned_data["job_description"]
+    #     similar_vacancies_response = await self.get_data(job_description)
+    #
+    #     service_errors = []
+    #
+    #     if isinstance(similar_vacancies_response, Exception):
+    #         service_errors.append(similar_vacancies_response)
+    #         logger.error("Error fetching similar vacancies: %s",
+    #                      format_error(similar_vacancies_response))
+    #         similar_vacancies_response = None
+    #
+    #     similar_vacancies = (
+    #         similar_vacancies_response
+    #         if similar_vacancies_response
+    #         else []
+    #     )
+    #
+    #     print(service_errors)
+    #
+    #     context = self.get_context_data(form=form)
+    #     context.update(
+    #         {
+    #             "show_extra_widgets": True,
+    #             "similar_vacancies": similar_vacancies,
+    #             "service_errors": service_errors,
+    #         }
+    #     )
+    #     return self.render_to_response(context)
 
     def form_invalid(self, form):
         context = self.get_context_data(form=form)

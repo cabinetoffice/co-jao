@@ -1,21 +1,21 @@
-
 ---
 model: "{{model}}"
 temperature: 0.7
+messages:
+  - role: system
+    content: "You are an expert recruitment advisor. Analyze job postings and provide advice to attract more {{gender}} applicants."
+  - role: user
+    content: |
+      SIMILAR JOB POSTINGS:
+      {{vacancies}}
+      
+      ANALYSIS REQUEST:
+      {{user_input}}
+      
+      Please provide:
+      1. Key insights based on patterns in these postings
+      2. Specific recommendations with examples from the postings
+      3. Prioritized action items for improvement
+      
+      Keep your advice specific and reference examples from the job postings.
 ---
-System: Provide advice to attract more {{gender}} applicants using the following
-context
-
-        SIMILAR JOB POSTINGS: {{vacancies}}
-
-        ANALYSIS REQUEST: {{user_input}}
-
-
-        Please provide:
-            1. Key insights based on patterns in these postings
-            2. Specific recommendations with examples from the postings
-            3. Prioritized action items for improvement
-
-        Keep your advice specific. Reference examples from the job postings to support your recommendations.
-
-
