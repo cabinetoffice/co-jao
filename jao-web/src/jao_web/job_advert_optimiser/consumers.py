@@ -164,8 +164,6 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
                             'data': content
                         })
 
-            await self.send_json({'type': 'advice_complete'})
-
         except asyncio.TimeoutError:
             logger.error("Advice request timed out")
             await self.send_json({
@@ -212,8 +210,6 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
                             'type': 'draft_chunk',
                             'data': content
                         })
-
-            await self.send_json({'type': 'draft_complete'})
 
         except asyncio.TimeoutError:
             logger.error("Similar adverts request timed out")
