@@ -92,7 +92,7 @@
                     </div>
 	       	    	<div class="govuk-inset-text">
           			<h3 class="govuk-heading-m">Generated Advice</h3>
-		        	<div class="advice-content">
+		        	<div class="advice-content" id="advice-content">
 	                	</div>
 	       	    	</div>
                 {% endgds_tabs_tab %}
@@ -106,10 +106,11 @@
 {% endblock content %}
 
 {% block extra_js %}
-    <script>
-        window.sessionKey = '{{ session_key }}';
-        // Manually initialize after bundle loads
-        let ws = null;
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+window.sessionKey = '{{ session_key }}';
+// Manually initialize after bundle loads
+let ws = null;
 
 function initWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -122,27 +123,59 @@ function initWebSocket() {
         console.log('WebSocket connected');
     };
     
+    let accumulatedAdvice = '';
+
     ws.onmessage = function(e) {
         const data = JSON.parse(e.data);
         console.log('Received:', data);
         
-        if (data.type === 'status') {
-            showStatus(data.message);
-        } else if (data.type === 'advice_chunk') {
-            appendAdviceChunk(data.data);
-        } else if (data.type === 'advice_complete') {
-            console.log('Advice streaming complete');
-            hideStatus();
-        } else if (data.type === 'similar_vacancies') {
-            displaySimilarVacancies(data.data);
-        } else if (data.type === 'error') {
-            showError(data.service || 'general', data.message);
-        } else if (data.type === 'complete') {
-            hideStatus();
-            showTabs();
+        switch(data.type) {
+            case 'status':
+                showStatus(data.message);
+                break;
+                
+            case 'advice_chunk':
+                // Accumulate chunks for proper markdown parsing
+                accumulatedAdvice += data.data;
+                appendAdviceChunk(accumulatedAdvice);
+                break;
+                
+            case 'advice_complete':
+                console.log('Advice streaming complete');
+                hideStatus();
+                // Reset accumulator for next advice request
+                accumulatedAdvice = '';
+                break;
+                
+            case 'similar_vacancies':
+                displaySimilarVacancies(data.data);
+                break;
+                
+            case 'error':
+                showError(data.service || 'general', data.message);
+                break;
+                
+            case 'complete':
+                hideStatus();
+                showTabs();
+                break;
+                
+            default:
+                console.warn('Unknown message type:', data.type);
+                break;
         }
     };
-    
+
+    function appendAdviceChunk(markdownText) {
+        const adviceContainer = document.getElementById('advice-content');
+        
+        // Parse accumulated markdown and render as HTML
+        const htmlContent = marked.parse(markdownText);
+        adviceContainer.innerHTML = htmlContent;
+        
+        // Optional: Auto-scroll to bottom as content streams
+        adviceContainer.scrollTop = adviceContainer.scrollHeight;
+    }    
     ws.onerror = function(error) {
         console.error('WebSocket error:', error);
         showError('connection', 'Connection error occurred');

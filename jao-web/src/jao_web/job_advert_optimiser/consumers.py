@@ -90,7 +90,7 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
     async def handle_get_advice(self, data):
         """Handle getting advice only"""
         advice_category = data.get('advice_category')
-        advice_option = data.get('advice_option')
+        advice_type = data.get('advice_type')
         session_key = data.get('session_key')
         job_description = self.get_from_session(session_key)["job_description"]
 
@@ -101,13 +101,8 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
             })
             return
 
-        logger.info(
-            f"Getting advice - Category: {advice_category}, Option: {advice_option}")
-
         async with get_async_client(session_key) as client:
             # Map advice options to advice types
-            advice_type = advice_option if advice_option in [
-                'general', 'gender', 'disability'] else 'general'
             await self._get_advice(client, job_description, session_key, advice_type)
 
         await self.send_json({'type': 'advice_complete'})
@@ -118,19 +113,9 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
             'type': 'status',
             'message': 'Generating personalized advice...'
         })
-        logger.info(f"Sending advice request with advice_type: {advice_type}")
-        logger.info(f"Job description length: {len(job_description)}")
-
         session_data = self.get_from_session(session_key)
         similar_vacancies = session_data['similar_vacancies']
 
-        # similar_vacancies = [
-        #     {
-        #         'title': v.get('job_title'),                'description': v.get('full_job_desc')}
-        #     for v in similar_vacancies_raw
-        # ]
-
-        logger.info(f"Number of similar vacancies: {len(similar_vacancies)}")
         try:
             async with client.stream(
                 "POST",
