@@ -37,6 +37,9 @@
 
         <div id="tabs-1" style="display: none;">
             {% gds_tabs id="tabs-1" title="Contents" %}
+            	{% gds_tabs_tab id="similar-adverts" label="Similar Adverts" %}
+                    <h2 class="govuk-heading-l">Similar Adverts</h2>
+            	{% endgds_tabs_tab %}
                 {% gds_tabs_tab id="advice" label="Advice" %}
                     <h2 class="govuk-heading-l">Advice</h2>
                     <div class="govuk-form-group">
@@ -96,10 +99,19 @@
 	                	</div>
 	       	    	</div>
                 {% endgds_tabs_tab %}
-                {% gds_tabs_tab id="similar-adverts" label="Similar Adverts" %}
-                    <h2 class="govuk-heading-l">Similar Adverts</h2>
+            	{% gds_tabs_tab id="draft" label="Draft Description" %}
+                    <h2 class="govuk-heading-l">Draft Description</h2>
+		    <div class="govuk-inset-text">
+          			<h3 class="govuk-heading-m" style="display:
+				none;">AI Generated
+				    Description</h3>
+		        	<div class="draft-content" id="draft-content">
+	                	</div>
+	       	    	</div>
 
-                {% endgds_tabs_tab %}
+                    <button class="govuk-button" type="button"
+					    data-action="get-draft">Get a Draft</button>
+            	{% endgds_tabs_tab %}
             {% endgds_tabs %}
 	</div>
     </div>
@@ -137,19 +149,26 @@ function initWebSocket() {
             case 'advice_chunk':
                 // Accumulate chunks for proper markdown parsing
                 accumulatedAdvice += data.data;
-                appendAdviceChunk(accumulatedAdvice);
+                appendMarkdownChunk(accumulatedAdvice, 'advice-content');
                 break;
                 
             case 'advice_complete':
-                console.log('Advice streaming complete');
                 hideStatus();
-                // Reset accumulator for next advice request
                 accumulatedAdvice = '';
                 break;
                 
             case 'similar_vacancies':
                 displaySimilarVacancies(data.data);
                 break;
+
+	    case 'draft':
+		accumulatedDraft += data.data;
+
+	    case 'advice_complete':
+                hideStatus();
+                accumulatedAdvice = '';
+                break;
+
                 
             case 'error':
                 showError(data.service || 'general', data.message);
@@ -166,16 +185,15 @@ function initWebSocket() {
         }
     };
 
-    function appendAdviceChunk(markdownText) {
-        const adviceContainer = document.getElementById('advice-content');
+    function appendMarkdownChunk(markdownText, id) {
+        const markdownContainer = document.getElementById(id);
         
         // Parse accumulated markdown and render as HTML
         const htmlContent = marked.parse(markdownText);
-        adviceContainer.innerHTML = htmlContent;
-        
-        // Optional: Auto-scroll to bottom as content streams
-        adviceContainer.scrollTop = adviceContainer.scrollHeight;
+        markdownContainer.innerHTML = htmlContent;
+        markdownContainer.scrollTop = markdownContainer.scrollHeight;
     }    
+
     ws.onerror = function(error) {
         console.error('WebSocket error:', error);
         showError('connection', 'Connection error occurred');
@@ -319,7 +337,6 @@ function initializePage() {
     
     initWebSocket();
     
-    // Use event delegation on document body for advice dropdown
     document.body.addEventListener('change', function(e) {
         if (e.target && e.target.id === 'advice-option') {
             console.log('Advice option changed to:', e.target.value);
@@ -340,7 +357,6 @@ function initializePage() {
         }
     });
     
-    // Use event delegation for slider inputs
     document.body.addEventListener('input', function(e) {
         if (e.target && e.target.id === 'gender-ratio') {
             const genderRatioValue = document.getElementById('gender-ratio-value');
@@ -419,6 +435,28 @@ function initializePage() {
                     type: 'get_advice',
                     advice_type: adviceType,
                     options: options,
+                    session_key: sessionKey
+                }));
+            });
+        }
+    });
+    
+    document.body.addEventListener('click', function(e) {
+        if (e.target && e.target.getAttribute('data-action') === 'get-draft') {
+            e.preventDefault();
+            
+            const sessionKey = window.sessionKey;
+            
+            const draftContent = document.querySelector('.draft-content');
+            if (draftContent) {
+                draftContent.innerHTML = '';
+            }
+            
+            showStatus('Getting advice...');
+            
+            ensureWebSocketOpen().then(() => {
+                ws.send(JSON.stringify({
+		    type: 'get_draft',
                     session_key: sessionKey
                 }));
             });

@@ -6,7 +6,8 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from jao_web.common.text_processing.clean_oleeo import parse_oleeo_bbcode
 from jao_web.job_advert_optimiser.services.client import get_async_client
 from jao_web.job_advert_optimiser.services.services import (
-    get_similar_adverts
+    get_similar_adverts,
+    get_draft
 )
 
 logger = logging.getLogger(__name__)
@@ -102,10 +103,26 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
             return
 
         async with get_async_client(session_key) as client:
-            # Map advice options to advice types
             await self._get_advice(client, job_description, session_key, advice_type)
 
         await self.send_json({'type': 'advice_complete'})
+
+    async def handle_get_draft(self, data):
+        """Handle job description drafting"""
+        session_key = data.get('session_key')
+        job_description = self.get_from_session(session_key)["job_description"]
+
+        if not job_description:
+            await self.send_json({
+                'type': 'error',
+                'message': 'Job description is required'
+            })
+            return
+
+        async with get_async_client(session_key) as client:
+            await self._get_draft(client, job_description, session_key)
+
+        await self.send_json({'type': 'Description drafted'})
 
     async def _get_advice(self, client, job_description, session_key, advice_type='general'):
         """Get advice from backend"""
@@ -155,6 +172,55 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
             await self.send_json({
                 'type': 'error',
                 'service': 'advice',
+                'message': str(e)
+            })
+
+    async def _get_draft(self, client, job_description, session_key):
+        """Get drafted job description from backend"""
+        await self.send_json({
+            'tyep': 'status',
+            'message': 'Draft job advert...'
+        })
+        session_data = self.get_from_session(session_key)
+        similar_vacancies = session_data['similar_vacancies']
+        try:
+            async with client.stream(
+                "POST",
+                "draft",
+                json={
+                    "description": job_description,
+                    "similar_vacancies": similar_vacancies
+                },
+                timeout=300
+            ) as response:
+                async for line in response.aiter_lines():
+                    if line.startswith('data: '):
+                        data = line[6:]
+                        if data == '[DONE]':
+                            break
+
+                        chunk_data = json.loads(data)
+                        content = chunk_data.get('content', '')
+
+                        await self.send_json({
+                            'type': 'advice_chunk',
+                            'data': content
+                        })
+
+            await self.send_json({'type': 'advice_complete'})
+
+        except asyncio.TimeoutError:
+            logger.error("Similar adverts request timed out")
+            await self.send_json({
+                'type': 'error',
+                'service': 'similar_vacancies',
+                'message': 'Request timed out after 2 minutes'
+            })
+        except Exception as e:
+            logger.exception("Error getting similar vacancies")
+            await self.send_json({
+                'type': 'error',
+                'service': 'similar_vacancies',
                 'message': str(e)
             })
 
