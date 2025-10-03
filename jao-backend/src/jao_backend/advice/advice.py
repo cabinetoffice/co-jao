@@ -34,18 +34,6 @@ class AdviceService():
             settings, 'LITELLM_COMPLETION_MODEL', 'gpt-3.5-turbo')
         self.rag_content_limit = 10
 
-    def _get_advice_for_type(self, user_input, rag_content):
-        return completion(
-            model=self.model,
-            prompt_id=self.prompt_ids["general"],
-            prompt_variables={"user_input": user_input,
-                              "vacancies": rag_content},
-            stream=True,
-            max_tokens=1500,
-            api_base=LITELLM_API_BASE,
-            custom_llm_provider=LITELLM_CUSTOM_PROVIDER
-        )
-
     def build_filters(self, options):
         filters = Q()
 
@@ -108,6 +96,13 @@ class AdviceService():
                 # Fall back to original rag_content if filtering fails
 
         prompt_config = ADVICE_PROMPTS.get(advice_type)
+        print("********")
+        print("********")
+        print(advice_type)
+        print(prompt_config)
+
+        print("********")
+        print("********")
         if not prompt_config:
             raise ValueError(f"Unknown advice type: {advice_type}")
 

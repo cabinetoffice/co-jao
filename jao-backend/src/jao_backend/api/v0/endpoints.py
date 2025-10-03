@@ -80,15 +80,11 @@ def get_similar_vacancies(text, top_n=10):
 
 @api.post("/advice")
 def advice(request: HttpRequest, payload: AdviceRequest) -> StreamingHttpResponse:
-
-    print(payload)
-
     formatted_vacancies = [
-        f"Job Title: {vacancy.title}\nDescription: {
-            parse_oleeo_bbcode(vacancy.description)}"
+        f"Job Title: {vacancy.job_title}\nDescription: {
+            parse_oleeo_bbcode(vacancy.full_job_desc)}"
         for vacancy in payload.similar_vacancies
     ]
-    print(formatted_vacancies)
 
     def generate():
         """Generator for streaming response"""
@@ -99,7 +95,6 @@ def advice(request: HttpRequest, payload: AdviceRequest) -> StreamingHttpRespons
             yield f"data: {json.dumps({'content': chunk})}\n\n"
 
         yield "data: [DONE]\n\n"
-
     return StreamingHttpResponse(
         generate(),
         content_type='text/event-stream'
@@ -110,7 +105,6 @@ def advice(request: HttpRequest, payload: AdviceRequest) -> StreamingHttpRespons
 def similar_adverts(
     request: HttpRequest, payload: JobDescriptionRequest
 ) -> SimilarVacanciesResponse:
-    # For now convert this into the older format
     similar_vacancies_list = [
         VacancyListing.model_validate(
             {
