@@ -7,7 +7,6 @@ from jao_web.common.text_processing.clean_oleeo import parse_oleeo_bbcode
 from jao_web.job_advert_optimiser.services.client import get_async_client
 from jao_web.job_advert_optimiser.services.services import (
     get_similar_adverts,
-    get_draft
 )
 
 logger = logging.getLogger(__name__)
@@ -43,18 +42,25 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
             data = json.loads(text_data)
             # default to original behavior
             message_type = data.get('type', 'process_description')
+            match message_type:
+                case 'get_advice':
+                    await self.handle_get_advice(data)
 
-            if message_type == 'get_advice':
-                await self.handle_get_advice(data)
-            elif message_type == 'process_description' or 'job_description' in data:
-                # Only process similar vacancies
-                await self.handle_process_description(data)
-            else:
-                await self.send_json({
-                    'type': 'error',
-                    'message': 'Unknown message type'
-                })
+                case 'get_draft':
+                    await self.handle_get_draft(data)
 
+                case 'process_description':
+                    await self.handle_process_description(data)
+
+                case _:
+                    # Handle legacy behavior where 'job_description' in data
+                    if 'job_description' in data:
+                        await self.handle_process_description(data)
+                    else:
+                        await self.send_json({
+                            'type': 'error',
+                            'message': 'Unknown message type'
+                        })
         except json.JSONDecodeError:
             logger.exception("Invalid JSON received")
             await self.send_json({
@@ -122,7 +128,7 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
         async with get_async_client(session_key) as client:
             await self._get_draft(client, job_description, session_key)
 
-        await self.send_json({'type': 'Description drafted'})
+        await self.send_json({'type': 'draft_complete'})
 
     async def _get_advice(self, client, job_description, session_key, advice_type='general'):
         """Get advice from backend"""
@@ -178,7 +184,7 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
     async def _get_draft(self, client, job_description, session_key):
         """Get drafted job description from backend"""
         await self.send_json({
-            'tyep': 'status',
+            'type': 'status',
             'message': 'Draft job advert...'
         })
         session_data = self.get_from_session(session_key)
@@ -203,11 +209,11 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
                         content = chunk_data.get('content', '')
 
                         await self.send_json({
-                            'type': 'advice_chunk',
+                            'type': 'draft_chunk',
                             'data': content
                         })
 
-            await self.send_json({'type': 'advice_complete'})
+            await self.send_json({'type': 'draft_complete'})
 
         except asyncio.TimeoutError:
             logger.error("Similar adverts request timed out")

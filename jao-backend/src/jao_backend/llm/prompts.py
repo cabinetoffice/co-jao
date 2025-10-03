@@ -286,7 +286,7 @@ MANDATORY:
 }
 
 
-DRAFT_JOB_AD_PROMPT = {
+DRAFT_PROMPT = {
     "system": """You are an expert recruitment copywriter specializing in creating compelling, inclusive, and effective job advertisements. Your expertise includes:
 - Crafting engaging job descriptions that attract diverse, qualified candidates
 - Using persuasive yet authentic language that reflects company culture
