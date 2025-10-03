@@ -10,8 +10,9 @@ from jao_backend.vacancies.models import VacancyEmbedding
 from jao_backend.application_statistics.models.lists import Gender, Disability
 from jao_backend.application_statistics.models.statistics import AggregatedApplicationStatistic
 from jao_backend_schemas.advice import AdviceResponse
+from jao_backend_schemas.draft import DraftResponse
 from jao_backend.settings.common import EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID
-from jao_backend.advice.prompts import ADVICE_PROMPTS
+from jao_backend.llm.prompts import ADVICE_PROMPTS, DRAFT_PROMPT
 
 LITELLM_API_BASE = settings.LITELLM_API_BASE
 LITELLM_CUSTOM_PROVIDER = settings.LITELLM_CUSTOM_PROVIDER
@@ -20,7 +21,7 @@ LITELLM_COMPLETION_MODEL = settings.LITELLM_COMPLETION_MODEL
 logger = logging.getLogger(__name__)
 
 
-class AdviceService():
+class LLMService():
 
     def __init__(self):
         self.tag = EmbeddingTag.get_tag(
@@ -79,30 +80,45 @@ class AdviceService():
                 'No similar vacancies found with the applied filters.'))
         return updated_vacancies
 
+    def _draft_handler(self, user_input, rag_content):
+
+        prompt_config = DRAFT_PROMPT
+
+        messages = [
+            {"role": "system", "content": prompt_config["system"]},
+            {"role": "user", "content": prompt_config["user_template"].format(
+                rag_content=rag_content,
+                user_input=user_input
+            )}
+        ]
+
+        try:
+            return completion(
+                model=self.model,
+                messages=messages,
+                stream=True,
+                max_tokens=1500,
+                api_base=LITELLM_API_BASE,
+                custom_llm_provider=LITELLM_CUSTOM_PROVIDER
+            )
+        except Exception as e:
+            logger.error(f'Error generating advice: {str(e)}')
+            raise
+
     def _advice_handler(self, user_input, rag_content, advice_type, options=None):
-        # For non-general advice, apply filters and get updated RAG content
         if advice_type != "general" and options:
             filters = self.build_filters(options)
             try:
                 updated_vacancies = self._update_rag_content(
                     user_input, filters)
-                # Rebuild RAG content with filtered vacancies
                 rag_content = "\n\n".join(
                     [f"Job Ad {i+1}:\n{vacancy.vacancy.full_job_desc}"
                      for i, vacancy in enumerate(updated_vacancies)]
                 )
             except Exception as e:
                 logger.error(f'Error filtering vacancies: {str(e)}')
-                # Fall back to original rag_content if filtering fails
 
         prompt_config = ADVICE_PROMPTS.get(advice_type)
-        print("********")
-        print("********")
-        print(advice_type)
-        print(prompt_config)
-
-        print("********")
-        print("********")
         if not prompt_config:
             raise ValueError(f"Unknown advice type: {advice_type}")
 
@@ -148,3 +164,24 @@ class AdviceService():
         except Exception as e:
             logger.error(f"Error generating advice with LiteLLM: {str(e)}")
             yield "Sorry, I'm unable to generate advice at the moment. Please try again later."
+
+    def get_draft(self, user_input, similar_vacancies):
+        rag_content = "\n\n".join(
+            [f"Job Ad {i+1}:\n{ad}" for i, ad in enumerate(similar_vacancies)])
+        try:
+            response = self._draft_handler(
+                user_input, rag_content)
+            for chunk in response:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+
+        except APIConnectionError as e:
+            logger.error(
+                "Connection refused to the completion service. "
+                "Ensure the service is running and accessible: %s",
+                e,
+            )
+            raise
+        except Exception as e:
+            logger.error(f"Error generating advice with LiteLLM: {str(e)}")
+            yield "Sorry, I'm unable to generate drafts at the moment. Please try again later."

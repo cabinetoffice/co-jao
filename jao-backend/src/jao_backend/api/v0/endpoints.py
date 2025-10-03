@@ -10,6 +10,8 @@ from ninja import NinjaAPI
 
 from jao_backend_schemas.advice import AdviceResponse
 from jao_backend_schemas.advice import AdviceRequest
+from jao_backend_schemas.draft import DraftResponse
+from jao_backend_schemas.draft import DraftRequest
 from jao_backend_schemas.maps import AreaFrequenciesResponse
 from jao_backend_schemas.plots import PlotlyFiguresResponse
 from jao_backend_schemas.vacancies import SimilarVacanciesResponse
@@ -19,8 +21,8 @@ from jao_backend_schemas.vacancies import VacancyListing
 from jao_backend.common.text_processing.clean_oleeo import parse_oleeo_bbcode
 from jao_backend.embeddings.models import EmbeddingTag
 from jao_backend.vacancies.models import VacancyEmbedding
-from jao_backend.advice.advice import AdviceService
-advice_service = AdviceService()
+from jao_backend.llm.llm_service import LLMService
+llm_service = LLMService()
 
 logger = logging.getLogger(__name__)
 
@@ -78,29 +80,6 @@ def get_similar_vacancies(text, top_n=10):
     ]
 
 
-@api.post("/advice")
-def advice(request: HttpRequest, payload: AdviceRequest) -> StreamingHttpResponse:
-    formatted_vacancies = [
-        f"Job Title: {vacancy.job_title}\nDescription: {
-            parse_oleeo_bbcode(vacancy.full_job_desc)}"
-        for vacancy in payload.similar_vacancies
-    ]
-
-    def generate():
-        """Generator for streaming response"""
-        for chunk in advice_service.get_advice(payload.description,
-                                               formatted_vacancies,
-                                               payload.advice_type):
-            logger.debug(f"Streaming chunk: {chunk}")
-            yield f"data: {json.dumps({'content': chunk})}\n\n"
-
-        yield "data: [DONE]\n\n"
-    return StreamingHttpResponse(
-        generate(),
-        content_type='text/event-stream'
-    )
-
-
 @api.post("/similar_adverts", response=SimilarVacanciesResponse)
 def similar_adverts(
     request: HttpRequest, payload: JobDescriptionRequest
@@ -117,53 +96,95 @@ def similar_adverts(
     ]
     return SimilarVacanciesResponse(similar_vacancies=similar_vacancies_list)
 
+
+@api.post("/advice")
+def advice(request: HttpRequest, payload: AdviceRequest) -> StreamingHttpResponse:
+    formatted_vacancies = [
+        f"Job Title: {vacancy.job_title}\nDescription: {
+            parse_oleeo_bbcode(vacancy.full_job_desc)}"
+        for vacancy in payload.similar_vacancies
+    ]
+
+    def generate():
+        """Generator for streaming response"""
+        for chunk in llm_service.get_advice(payload.description,
+                                            formatted_vacancies,
+                                            payload.advice_type):
+            logger.debug(f"Streaming chunk: {chunk}")
+            yield f"data: {json.dumps({'content': chunk})}\n\n"
+
+        yield "data: [DONE]\n\n"
+    return StreamingHttpResponse(
+        generate(),
+        content_type='text/event-stream'
+    )
+
+
+@api.post("/draft")
+def draft(request: HttpRequest, payload: DraftResponse) -> StreamingHttpResponse:
+    formatted_vacancies = [
+        f"Job Title: {vacancy.job_title}\nDescription: {
+            parse_oleeo_bbcode(vacancy.full_job_desc)}"
+        for vacancy in payload.similar_vacancies
+    ]
+
+    def generate():
+        for chunk in llm_service.get_draft(payload.description, formatted_vacancies):
+            yield f"data: {json.dumps({'content': chunk})}\n\n"
+    yield "data: [DONE]\n\n"
+    return StreamingHttpResponse(
+        generate(),
+        content_type='text/event-stream'
+    )
+
+
 # Write a query using the similar vacancies data from application stastics -
 # aggregated application statistic model
 
 
-@api.post("/similar_advert_plots")
-def similar_advert_plots(
-    request: HttpRequest, payload: JobDescriptionRequest
-) -> PlotlyFiguresResponse:
-    """
-    Get a graph of the job description.
-    """
-    # Stub: this required aggregated data
-    logger.info(
-        "STUB: similar_advert_plots endpoint called with description: %s",
-        payload.description,
-    )
-    graphs = []
-    return PlotlyFiguresResponse(plotly_figures=graphs)
-
-# ADD Skills Ingester to write skills to DB
-
-
-@api.post("/skills_plots")
-def skills_plots(request, payload: JobDescriptionRequest) -> PlotlyFiguresResponse:
-    """
-    Get a graph of the job description.
-    """
-    # Stub: skills are not ingested right now.
-    logger.info(
-        "STUB: skills_plots endpoint called with description: %s", payload.description
-    )
-    graphs = []
-    result = PlotlyFiguresResponse(plotly_figures=graphs)
-    return result
-
-# Maybe REMOVE the location response
-
-
-@api.post("/applicant_locations")
-def applicant_locations(
-    request, payload: JobDescriptionRequest
-) -> AreaFrequenciesResponse:
-    # Stub: OLEEO ingestion of locations is TBD
-    logger.info(
-        "STUB: applicant_locations endpoint called with description: %s",
-        payload.description,
-    )
-    area_frequencies: AreaFrequencyProperties = []
-    # TODO: populate area_frequencies with instances of AreaFrequencyProperties from the database.
-    return AreaFrequenciesResponse(area_frequencies=area_frequencies)
+# @api.post("/similar_advert_plots")
+# def similar_advert_plots(
+#     request: HttpRequest, payload: JobDescriptionRequest
+# ) -> PlotlyFiguresResponse:
+#     """
+#     Get a graph of the job description.
+#     """
+#     # Stub: this required aggregated data
+#     logger.info(
+#         "STUB: similar_advert_plots endpoint called with description: %s",
+#         payload.description,
+#     )
+#     graphs = []
+#     return PlotlyFiguresResponse(plotly_figures=graphs)
+#
+# # ADD Skills Ingester to write skills to DB
+#
+#
+# @api.post("/skills_plots")
+# def skills_plots(request, payload: JobDescriptionRequest) -> PlotlyFiguresResponse:
+#     """
+#     Get a graph of the job description.
+#     """
+#     # Stub: skills are not ingested right now.
+#     logger.info(
+#         "STUB: skills_plots endpoint called with description: %s", payload.description
+#     )
+#     graphs = []
+#     result = PlotlyFiguresResponse(plotly_figures=graphs)
+#     return result
+#
+# # Maybe REMOVE the location response
+#
+#
+# @api.post("/applicant_locations")
+# def applicant_locations(
+#     request, payload: JobDescriptionRequest
+# ) -> AreaFrequenciesResponse:
+#     # Stub: OLEEO ingestion of locations is TBD
+#     logger.info(
+#         "STUB: applicant_locations endpoint called with description: %s",
+#         payload.description,
+#     )
+#     area_frequencies: AreaFrequencyProperties = []
+#     # TODO: populate area_frequencies with instances of AreaFrequencyProperties from the database.
+#     return AreaFrequenciesResponse(area_frequencies=area_frequencies)
