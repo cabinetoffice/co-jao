@@ -102,13 +102,11 @@
             	{% gds_tabs_tab id="draft" label="Draft Description" %}
                     <h2 class="govuk-heading-l">Draft Description</h2>
 		    <div class="govuk-inset-text">
-          			<h3 class="govuk-heading-m" style="display:
-				none;">AI Generated
+          			<h3 class="govuk-heading-m">AI Generated
 				    Description</h3>
 		        	<div class="draft-content" id="draft-content">
-	                	</div>
-	       	    	</div>
-
+	                </div>
+	       	    </div>
                     <button class="govuk-button" type="button"
 					    data-action="get-draft">Get a Draft</button>
             	{% endgds_tabs_tab %}
@@ -136,6 +134,7 @@ function initWebSocket() {
     };
     
     let accumulatedAdvice = '';
+    let accumulatedDraft = '';
 
     ws.onmessage = function(e) {
         const data = JSON.parse(e.data);
@@ -161,12 +160,15 @@ function initWebSocket() {
                 displaySimilarVacancies(data.data);
                 break;
 
-	    case 'draft':
+	    case 'draft_chunk':
+		console.log(data.data)
 		accumulatedDraft += data.data;
+		appendMarkdownChunk(accumulatedDraft, 'draft-content')
+		break;
 
-	    case 'advice_complete':
+	    case 'draft_complete':
                 hideStatus();
-                accumulatedAdvice = '';
+                accumulatedDraft = '';
                 break;
 
                 
@@ -219,17 +221,6 @@ function hideStatus() {
     }
 }
 
-function appendAdviceChunk(chunk) {
-    const adviceContent = document.querySelector('.advice-content');
-    if (adviceContent) {
-        adviceContent.innerHTML += chunk;
-    }
-    
-    const tabs = document.getElementById('tabs-1');
-    if (tabs) {
-        tabs.style.display = 'block';
-    }
-}
 
 function displaySimilarVacancies(vacancies) {
     const similarTab = document.getElementById('similar-adverts');
@@ -445,14 +436,14 @@ function initializePage() {
         if (e.target && e.target.getAttribute('data-action') === 'get-draft') {
             e.preventDefault();
             
-            const sessionKey = window.sessionKey;
+            const sessionKey = window.sessionKey;	
             
             const draftContent = document.querySelector('.draft-content');
             if (draftContent) {
                 draftContent.innerHTML = '';
             }
             
-            showStatus('Getting advice...');
+            showStatus('Getting draft...');
             
             ensureWebSocketOpen().then(() => {
                 ws.send(JSON.stringify({

@@ -121,7 +121,7 @@ def advice(request: HttpRequest, payload: AdviceRequest) -> StreamingHttpRespons
 
 
 @api.post("/draft")
-def draft(request: HttpRequest, payload: DraftResponse) -> StreamingHttpResponse:
+def draft(request: HttpRequest, payload: DraftRequest) -> StreamingHttpResponse:
     formatted_vacancies = [
         f"Job Title: {vacancy.job_title}\nDescription: {
             parse_oleeo_bbcode(vacancy.full_job_desc)}"
@@ -131,7 +131,7 @@ def draft(request: HttpRequest, payload: DraftResponse) -> StreamingHttpResponse
     def generate():
         for chunk in llm_service.get_draft(payload.description, formatted_vacancies):
             yield f"data: {json.dumps({'content': chunk})}\n\n"
-    yield "data: [DONE]\n\n"
+        yield "data: [DONE]\n\n"
     return StreamingHttpResponse(
         generate(),
         content_type='text/event-stream'
