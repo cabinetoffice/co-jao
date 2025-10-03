@@ -112,8 +112,8 @@ class LLMService():
                 updated_vacancies = self._update_rag_content(
                     user_input, filters)
                 rag_content = "\n\n".join(
-                    [f"Job Ad {i+1}:\n{vacancy.vacancy.full_job_desc}"
-                     for i, vacancy in enumerate(updated_vacancies)]
+                    [f"Job Ad {v.vacancy.job_title}:\n{v.vacancy.full_job_desc}"
+                     for v in enumerate(updated_vacancies)]
                 )
             except Exception as e:
                 logger.error(f'Error filtering vacancies: {str(e)}')
@@ -145,8 +145,7 @@ class LLMService():
 
     def get_advice(self, user_input, similar_vacancies, advice_type,
                    options=None):
-        rag_content = "\n\n".join(
-            [f"Job Ad {i+1}:\n{ad}" for i, ad in enumerate(similar_vacancies)])
+        rag_content = "\n\n---\n\n".join(similar_vacancies)
         try:
             response = self._advice_handler(
                 user_input, rag_content, advice_type, options)
@@ -166,8 +165,7 @@ class LLMService():
             yield "Sorry, I'm unable to generate advice at the moment. Please try again later."
 
     def get_draft(self, user_input, similar_vacancies):
-        rag_content = "\n\n".join(
-            [f"Job Ad {i+1}:\n{ad}" for i, ad in enumerate(similar_vacancies)])
+        rag_content = "\n\n---\n\n".join(similar_vacancies)
         try:
             response = self._draft_handler(
                 user_input, rag_content)
