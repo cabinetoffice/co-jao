@@ -49,7 +49,7 @@ variable "memory" {
 variable "desired_count" {
   description = "Number of frontend ECS tasks to run"
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "min_capacity" {
@@ -107,4 +107,10 @@ variable "enable_xray_tracing" {
   description = "Whether to enable AWS X-Ray tracing for the API"
   type        = bool
   default     = false
+}
+
+variable "frontend_allowed_cidrs" {
+  description = "List of CIDR blocks allowed to access frontend"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]  # Default allows all
 }

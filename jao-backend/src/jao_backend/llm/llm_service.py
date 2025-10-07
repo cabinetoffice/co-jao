@@ -164,7 +164,7 @@ class LLMService():
             logger.error(f"Error generating advice with LiteLLM: {str(e)}")
             yield "Sorry, I'm unable to generate advice at the moment. Please try again later."
 
-    def get_draft(self, user_input, similar_vacancies):
+    def generate_draft(self, user_input, similar_vacancies):
         rag_content = "\n\n---\n\n".join(similar_vacancies)
         try:
             response = self._draft_handler(

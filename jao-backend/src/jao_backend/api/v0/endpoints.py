@@ -1,7 +1,7 @@
 import hashlib
-from django.core.cache import cache
 import logging
 import json
+from django.core.cache import cache
 from django.conf import settings
 from django.http import HttpRequest, StreamingHttpResponse
 

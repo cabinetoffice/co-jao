@@ -69,10 +69,6 @@ locals {
   frontend_ecr_url = "${aws_ecr_repository.frontend.repository_url}:${var.image_tag}"
 }
 
-data "aws_lb" "backend" {
-  name = "jao-dev-nlb"
-}
-
 # Create S3 bucket for initialization scripts
 module "initialization_bucket" {
   source      = "./modules/s3_bucket"
@@ -194,6 +190,7 @@ module "ecs" {
     JAO_BACKEND_SUPERUSER_USERNAME = var.jao_backend_superuser_username
     JAO_BACKEND_SUPERUSER_PASSWORD = var.jao_backend_superuser_password
     JAO_BACKEND_SUPERUSER_EMAIL    = var.jao_backend_superuser_email
+    REDIS_HOST                     = module.celery_redis.celery_broker_url
     # Celery configuration
     CELERY_BROKER_URL                     = module.celery_redis.celery_broker_url
     CELERY_RESULT_BACKEND                 = module.celery_redis.celery_result_backend
@@ -215,7 +212,7 @@ module "ecs" {
   })
 
   health_check_path        = "/health"
-  internal_lb              = true
+  internal_lb              = false
   admin_lb_internet_facing = true
   logs_retention_in_days   = local.current_env.log_retention_days
 
@@ -247,13 +244,14 @@ module "frontend" {
   cpu                = var.task_cpu
   memory             = var.task_memory
   desired_count      = var.desired_count
+  frontend_allowed_cidrs = var.frontend_allowed_cidrs
 
   # Environment variables for the frontend service
   environment_variables = {
     DJANGO_DEBUG             = local.current_env.django_debug
     DJANGO_SETTINGS_MODULE   = "jao_web.settings.dev"
     PORT                     = "8000"
-    JAO_BACKEND_URL          = "http://${data.aws_lb.backend.dns_name}/"
+    JAO_BACKEND_URL          = module.ecs.load_balancer_dns_name
     JAO_BACKEND_TIMEOUT      = "15"
     JAO_BACKEND_ENABLE_HTTP2 = "true"
     SESSION_COOKIE_SECURE    = local.current_env.session_cookie_secure
@@ -339,7 +337,7 @@ module "vectordb" {
   database_name   = "${replace(var.app_name, "-", "")}${var.environment}db"
   master_username = "dbadmin"
   # master_password = var.skip_secret_creation ? "TemporaryPassword123!" : null
-  engine_version = "15.10"
+  engine_version = "15.12"
 
   use_serverless = false
   instance_count = 1

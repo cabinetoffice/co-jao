@@ -13,7 +13,7 @@ public_subnet_cidrs    = ["10.0.101.0/24", "10.0.102.0/24"]
 container_port = 8000
 task_cpu    = 512
 task_memory   = 4096
-desired_count = 2
+desired_count = 1
 image_tag     = "latest"
 
 # Environment Variables for Container
@@ -22,13 +22,12 @@ environment_variables = {
 }
 
 
-# Database Access - ADD YOUR IP HERE
-# This is what was missing and causing your connection issues
 allowed_cidr_blocks = [
   "195.144.8.0/24",
   "51.149.8.0/24",
   "195.144.8.62/32"
 ]
+
 # JAO Backend Configuration
 jao_backend_superuser_username = "admin"
 jao_backend_superuser_email    = "admin@example.com" 

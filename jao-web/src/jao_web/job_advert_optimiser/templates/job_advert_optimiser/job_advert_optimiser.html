@@ -43,21 +43,12 @@
                 {% gds_tabs_tab id="advice" label="Advice" %}
                     <h2 class="govuk-heading-l">Advice</h2>
                     <div class="govuk-form-group">
-                        <p>
                             <label class="govuk-label" for="sort">
-                                Type Of Advice
-                            </label>
-                            <select class="govuk-select" id="advice-category" name="advice-category">
-                                <option value="published" selected>General Advice</option>
-                                <option value="updated">Skills Advice</option>
-                            </select>
-                        </p>
-                        <p>
-                            <label class="govuk-label" for="sort">
-                                Type of General Advice
+                                Type of Advice
                             </label>
                             <select class="govuk-select" id="advice-option" name="advice-option">
-                                <option value="general" selected>Improve grammar and language</option>
+                                <option value="general" selected>Improve Grammar
+					    and Language</option>
                                 <option value="gender">I Want A Better Gender Balance</option>
                                 <option value="disability">I Want A Better Disability Balance</option>
                             </select>
@@ -124,7 +115,8 @@ let ws = null;
 
 function initWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = protocol + '//' + window.location.host + '/ws/job_advert/';
+    const wsEndpoint = '{{ websocket_endpoint }}'; 
+    const wsUrl = protocol + '//' + wsEndpoint + '/ws/job_advert/';
     
     console.log('Connecting to:', wsUrl);
     ws = new WebSocket(wsUrl);

@@ -33,6 +33,7 @@ def get_oleeo_bbcode_parser():
     parser.add_simple_formatter("p", "<p>%(value)s</p>")
     parser.add_simple_formatter("list", "<ul>%(value)s</ul>")
     parser.add_simple_formatter("*", "<li>%(value)s</li>")
+    parser.add_simple_formatter("size", "%(value)s", strip=True)
     return parser
 
 
