@@ -61,7 +61,7 @@ variable "task_memory" {
 variable "desired_count" {
   description = "Number of ECS tasks to run"
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "environment_variables" {
@@ -288,7 +288,7 @@ variable "jao_backend_superuser_email" {
 variable "oleeo_url" {
   description = "oleeo url"
   type        = string
-  default     = ""
+  default     = "mssql://user:password@host:port/dbname"
 }
 
 # Redis/ElastiCache Configuration
@@ -362,4 +362,10 @@ variable "enable_bastion_host" {
   description = "Enable bastion host for database access"
   type        = bool
   default     = false
+}
+
+variable "frontend_allowed_cidrs" {
+  description = "List of CIDR blocks allowed to access frontend"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]  # Open by default
 }

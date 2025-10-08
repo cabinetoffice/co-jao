@@ -71,6 +71,8 @@ class JobAdvertOptimiserView(FormView):
         context.update(
             {
                 "session_key": self.get_or_create_session_key(),
+                'websocket_endpoint': settings.WEBSOCKET_ENDPOINT,
+
             }
         )
         return context

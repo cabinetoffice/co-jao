@@ -34,6 +34,8 @@ class LLMService():
         self.model = getattr(
             settings, 'LITELLM_COMPLETION_MODEL', 'gpt-3.5-turbo')
         self.rag_content_limit = 10
+        self.timeout = getattr(settings, 'JAO_BACKEND_TIMEOUT', 300)
+        self.max_tokens = int(getattr(settings, 'MAX_TOKENS', 4000))
 
     def build_filters(self, options):
         filters = Q()
@@ -97,9 +99,11 @@ class LLMService():
                 model=self.model,
                 messages=messages,
                 stream=True,
-                max_tokens=1500,
+                max_tokens=self.max_tokens,
                 api_base=LITELLM_API_BASE,
-                custom_llm_provider=LITELLM_CUSTOM_PROVIDER
+                custom_llm_provider=LITELLM_CUSTOM_PROVIDER,
+                timeout=self.timeout,
+                request_timeout=self.timeout
             )
         except Exception as e:
             logger.error(f'Error generating advice: {str(e)}')
@@ -135,9 +139,11 @@ class LLMService():
                 model=self.model,
                 messages=messages,
                 stream=True,
-                max_tokens=1500,
+                max_tokens=self.max_tokens,
                 api_base=LITELLM_API_BASE,
-                custom_llm_provider=LITELLM_CUSTOM_PROVIDER
+                custom_llm_provider=LITELLM_CUSTOM_PROVIDER,
+                timeout=self.timeout,
+                request_timeout=self.timeout
             )
         except Exception as e:
             logger.error(f'Error generating advice: {str(e)}')
@@ -164,7 +170,7 @@ class LLMService():
             logger.error(f"Error generating advice with LiteLLM: {str(e)}")
             yield "Sorry, I'm unable to generate advice at the moment. Please try again later."
 
-    def get_draft(self, user_input, similar_vacancies):
+    def generate_draft(self, user_input, similar_vacancies):
         rag_content = "\n\n---\n\n".join(similar_vacancies)
         try:
             response = self._draft_handler(

@@ -46,4 +46,9 @@ RUN mkdir -p /app/src/frontend && \
 EXPOSE 8000
 
 # Development command with auto-reload
-CMD ["poetry", "run", "python", "src/manage.py", "runserver", "0.0.0.0:8000"]
+CMD sh -c "set -e && \
+    echo 'Starting development server with WebSocket support...' && \
+    poetry run daphne -b 0.0.0.0 -p 8000 \
+        --websocket_timeout 600 \
+        --application-close-timeout 600 \
+        asgi:application"

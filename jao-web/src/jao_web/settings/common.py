@@ -20,9 +20,10 @@ PROJECT_DIR = BASE_DIR.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
-JAO_BACKEND_URL = os.getenv("JAO_BACKEND_URL", "http://localhost:8001/jao")
+JAO_BACKEND_URL = os.getenv("JAO_BACKEND_URL", "localhost:8000")
 JAO_BACKEND_ENABLE_HTTP2 = True
 JAO_BACKEND_TIMEOUT = os.getenv("JAO_BACKEND_TIMEOUT", 90)
+WEBSOCKET_ENDPOINT = os.environ.get("JAO_BACKEND_URL", 'localhost:8000')
 
 
 ALLOWED_HOSTS = ['*']
