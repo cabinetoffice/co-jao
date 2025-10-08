@@ -88,7 +88,6 @@ services:
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
       # Add API endpoint for backend communication
-      - JAO_BACKEND_URL=http://jao-backend:8000/v0
       - REDIS_HOST=redis
     volumes:
       # Mount source code for hot reloading during development

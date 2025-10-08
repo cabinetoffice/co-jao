@@ -140,20 +140,26 @@ resource "aws_security_group" "frontend_lb" {
   description = "Security group for frontend load balancer"
   vpc_id      = var.vpc_id
 
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Allow HTTP traffic"
+  dynamic "ingress" {
+    for_each = var.frontend_allowed_cidrs
+    content {
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = [ingress.value]
+      description = "Allow HTTP from ${ingress.value}"
+    }
   }
 
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Allow HTTPS traffic"
+  dynamic "ingress" {
+    for_each = var.frontend_allowed_cidrs
+    content {
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      cidr_blocks = [ingress.value]
+      description = "Allow HTTPS from ${ingress.value}"
+    }
   }
 
   egress {
@@ -291,6 +297,7 @@ resource "aws_ecs_service" "frontend" {
   desired_count          = var.desired_count
   launch_type            = "FARGATE"
   enable_execute_command = true
+  force_new_deployment = true
 
   network_configuration {
     subnets          = var.public_subnet_ids

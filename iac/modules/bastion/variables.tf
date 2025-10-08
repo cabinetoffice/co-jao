@@ -10,6 +10,11 @@ variable "vpc_id" {
   type        = string
 }
 
+variable "vpc_cidr_blocks" {
+  description = "CIdR blocks for bastion to connect to services"
+  type = list(string)
+}
+
 variable "public_subnet_id" {
   description = "Public subnet ID for bastion host"
   type        = string

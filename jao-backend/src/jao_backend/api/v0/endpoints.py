@@ -1,7 +1,7 @@
 import hashlib
-from django.core.cache import cache
 import logging
 import json
+from django.core.cache import cache
 from django.conf import settings
 from django.http import HttpRequest, StreamingHttpResponse
 
@@ -21,8 +21,8 @@ from jao_backend_schemas.vacancies import VacancyListing
 from jao_backend.common.text_processing.clean_oleeo import parse_oleeo_bbcode
 from jao_backend.embeddings.models import EmbeddingTag
 from jao_backend.vacancies.models import VacancyEmbedding
-from jao_backend.llm.llm_service import LLMService
-llm_service = LLMService()
+# from jao_backend.llm.llm_service import LLMService
+# llm_service = LLMService()
 
 logger = logging.getLogger(__name__)
 

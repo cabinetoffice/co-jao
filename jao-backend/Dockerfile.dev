@@ -59,5 +59,7 @@ EXPOSE 8000
 # Development command with auto-reload
 CMD sh -c "set -e && \
     echo 'Running migrations...' && \
-    echo 'Starting development server with auto-reload...' && \
-    poetry run python src/manage.py runserver 0.0.0.0:8000"
+    echo 'Starting development server with WebSocket support...' && \
+    poetry run hypercorn src.asgi:application --bind 0.0.0.0:8000 \
+        --read-timeout 600 \
+        --keep-alive 600"
