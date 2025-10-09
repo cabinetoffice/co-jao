@@ -15,6 +15,15 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, close_code):
         logger.info(f"WebSocket disconnected: {close_code}")
 
+    async def send_keepalive(self):
+        """Send periodic keepalive messages"""
+        try:
+            while True:
+                await asyncio.sleep(30)  # Every 30 seconds
+                await self.send_json({'type': 'keepalive'})
+        except asyncio.CancelledError:
+            pass
+
     async def send_json(self, data):
         """Helper to send JSON data"""
         try:
@@ -25,12 +34,21 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
     def store_in_session(self, session_key, data):
         """Store data in cache using session key"""
         cache_key = f"job_advert_{session_key}"
-        cache.set(cache_key, data, timeout=3600)  # 1 hour timeout
+        cache.set(cache_key, data, timeout=3600)
 
     def get_from_session(self, session_key):
-        """Retrieve data from cache using session key"""
+        """Retrieve data from cache and extend timeout"""
         cache_key = f"job_advert_{session_key}"
-        return cache.get(cache_key, {})
+        data = cache.get(cache_key, {})
+
+        if data:
+            logger.debug(f"Cache hit for session: {session_key}")
+            # Extend timeout on access
+            cache.set(cache_key, data, timeout=3600)
+        else:
+            logger.warning(f"Cache miss for session: {session_key}")
+
+        return data
 
     async def receive(self, text_data):
         try:
@@ -87,8 +105,16 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
         """Handle getting advice only"""
         advice_type = data.get('advice_type')
         session_key = data.get('session_key')
-        job_description = self.get_from_session(
-            session_key).get("job_description")
+
+        session_data = self.get_from_session(session_key)
+        if not session_data:
+            logger.warning(f"Session data not found for key: {session_key}")
+            await self.send_json({
+                'type': 'error',
+                'message': 'Session expired. Please process your job description again.'
+            })
+            return
+        job_description = session_data.get("job_description")
 
         if not job_description:
             await self.send_json({
@@ -102,8 +128,16 @@ class JobAdvertConsumer(AsyncWebsocketConsumer):
     async def handle_get_draft(self, data):
         """Handle job description drafting"""
         session_key = data.get('session_key')
-        job_description = self.get_from_session(
-            session_key).get("job_description")
+
+        session_data = self.get_from_session(session_key)
+        if not session_data:
+            logger.warning(f"Session data not found for key: {session_key}")
+            await self.send_json({
+                'type': 'error',
+                'message': 'Session expired. Please process your job description again.'
+            })
+            return
+        job_description = session_data.get("job_description")
 
         if not job_description:
             await self.send_json({

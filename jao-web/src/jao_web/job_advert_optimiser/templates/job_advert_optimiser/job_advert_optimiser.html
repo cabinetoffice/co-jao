@@ -112,6 +112,9 @@
 window.sessionKey = '{{ session_key }}';
 // Manually initialize after bundle loads
 let ws = null;
+let reconnectAttempts = 0;
+let maxReconnectAttempts = 5;
+let reconnectInterval = 1000;
 
 function initWebSocket() {
     const protocol = 'ws:';
@@ -123,6 +126,8 @@ function initWebSocket() {
     
     ws.onopen = function() {
         console.log('WebSocket connected');
+	reconnectAttempts = 0; // Reset on successful connection
+        reconnectInterval = 1000; // Reset backoff
     };
     
     let accumulatedAdvice = '';
@@ -133,6 +138,10 @@ function initWebSocket() {
         console.log('Received:', data);
         
         switch(data.type) {
+	    case 'keepalive':
+		console.log('keep alive');
+		break;
+
             case 'status':
                 showStatus(data.message);
                 break;
@@ -193,10 +202,21 @@ function initWebSocket() {
         showError('connection', 'Connection error occurred');
     };
     
-    ws.onclose = function() {
-        console.log('WebSocket closed');
-    };
-}
+    ws.onclose = function(event) {
+        console.log('WebSocket closed:', event.code, event.reason);
+        if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++;
+            console.log(`Reconnecting... (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
+            
+            setTimeout(() => {
+                initWebSocket();
+            }, reconnectInterval);
+            
+            reconnectInterval = Math.min(reconnectInterval * 2, 30000);
+        } else if (reconnectAttempts >= maxReconnectAttempts) {
+            showError('connection', 'Lost connection to server. Please refresh the page.');
+        }
+    };}
 
 function showStatus(message) {
     const statusElement = document.getElementById('loading-status');
@@ -303,15 +323,43 @@ function showError(service, message) {
 }
 
 function ensureWebSocketOpen() {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+        // Check if WebSocket exists and is open
         if (ws && ws.readyState === WebSocket.OPEN) {
             resolve();
-        } else {
-            initWebSocket();
+            return;
+        }
+        
+        // If WebSocket is connecting, wait for it
+        if (ws && ws.readyState === WebSocket.CONNECTING) {
             ws.addEventListener('open', function() {
                 resolve();
             }, { once: true });
+            
+            ws.addEventListener('error', function() {
+                reject(new Error('WebSocket connection failed'));
+            }, { once: true });
+            return;
         }
+        
+        // Otherwise, create new connection
+        console.log('WebSocket not open, reconnecting...');
+        initWebSocket();
+        
+        ws.addEventListener('open', function() {
+            resolve();
+        }, { once: true });
+        
+        ws.addEventListener('error', function() {
+            reject(new Error('WebSocket connection failed'));
+        }, { once: true });
+        
+        // Timeout after 5 seconds
+        setTimeout(() => {
+            if (ws.readyState !== WebSocket.OPEN) {
+                reject(new Error('WebSocket connection timeout'));
+            }
+        }, 5000);
     });
 }
 
