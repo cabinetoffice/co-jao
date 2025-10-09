@@ -95,4 +95,5 @@ CMD sh -c "set -e && \
     DJANGO_SUPERUSER_USERNAME=$JAO_BACKEND_SUPERUSER_USERNAME DJANGO_SUPERUSER_EMAIL=$JAO_BACKEND_SUPERUSER_EMAIL DJANGO_SUPERUSER_PASSWORD=$JAO_BACKEND_SUPERUSER_PASSWORD \
     poetry run python src/manage.py createsuperuser --noinput || echo 'Superuser creation failed or user already exists' && \
     echo 'Starting server...' && \
-    poetry run hypercorn src.asgi:application --bind 0.0.0.0:8000"
+    poetry run hypercorn src.asgi:application --bind 0.0.0.0:8000 \
+        --websocket-ping-interval 30"
