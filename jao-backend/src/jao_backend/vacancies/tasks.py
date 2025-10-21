@@ -21,6 +21,7 @@ from jao_backend.common.celery import app as celery
 from jao_backend.ingest.ingester.ingest_vacancies import OleeoVacanciesIngest
 from jao_backend.ingest.ingester.ingest_aggregated_applicants import (
     OleeoApplicantStatisticsAggregator,
+    OleeoApplicantRegionAggregator
 )
 
 logger = get_task_logger(__name__)
@@ -41,7 +42,7 @@ TASK_KWARGS = {
 }
 
 @celery.task(**TASK_KWARGS)
-@on_db_disconnect_raise(using="oleeo")
+@on_db_disconnect_raise(using="oleeo_upstream")
 def embed_vacancies(limit=settings.JAO_BACKEND_VACANCY_EMBED_LIMIT):
     """
     Run embedding, on vacancies (limited by the setting `JAO_BACKEND_VACANCY_EMBED_LIMIT`).
@@ -84,7 +85,7 @@ def embed_vacancies(limit=settings.JAO_BACKEND_VACANCY_EMBED_LIMIT):
 
 
 @celery.task(**TASK_KWARGS)
-@on_db_disconnect_raise(using="oleeo")
+@on_db_disconnect_raise(using="oleeo_upstream")
 def ingest_vacancies(batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE):
     """
     Ingest data from OLEEO / R2D2.
@@ -103,7 +104,7 @@ def ingest_vacancies(batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE):
 
 
 @celery.task(**TASK_KWARGS)
-@on_db_disconnect_raise(using="oleeo")
+@on_db_disconnect_raise(using="oleeo_upstream")
 def aggregate_applicant_statistics(
     batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE, initial_vacancy_id=None
 ):
@@ -124,9 +125,38 @@ def aggregate_applicant_statistics(
     )
     ingester.do_ingest()
 
+@celery.task(**TASK_KWARGS)
+@on_db_disconnect_raise(using="oleeo_upstream")
+def aggregate_applicant_regions(batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE, initial_vacancy_id=None):
+    """
+    Aggregates applicant region counts from the Oleeo database using the
+    specialized OleeoApplicantRegionAggregator.
+
+    This task reads applicant postcodes, maps them to regions via a CSV lookup,
+    counts applicants per region for each vacancy, and stores the results
+    in the AggregatedApplicationCount table.
+    """
+    logger = get_task_logger(__name__) # Use the task logger
+
+    if not settings.JAO_BACKEND_ENABLE_OLEEO:
+        logger.error("OLEEO integration is disabled, cannot aggregate regions.")
+        raise ImproperlyConfigured("OLEEO integration is not enabled")
+
+    logger.info(f"Starting Oleeo applicant region aggregation with max_batch_size={batch_size}")
+
+    try:
+        aggregator = OleeoApplicantRegionAggregator(
+            batch_size=batch_size, initial_vacancy_id=initial_vacancy_id
+        )
+        aggregator.do_ingest()
+        logger.info("Oleeo applicant region aggregation finished successfully.")
+    except Exception as e:
+        logger.error(f"Error during applicant region aggregation: {e}", exc_info=True)
+        # Re-raise the exception so Celery can handle retries based on TASK_KWARGS
+        raise
 
 update_vacancies = chain(
-    ingest_vacancies.s(), aggregate_applicant_statistics.s(), embed_vacancies.s()
+    ingest_vacancies.s(), aggregate_applicant_statistics.s(), aggregate_applicant_regions.s(), embed_vacancies.s()
 )
 """
 Ingest vacancies, and then start embedding.

@@ -34,3 +34,7 @@ class Religion(ProtectedCharacteristicList):
 
 class SexualOrientation(ProtectedCharacteristicList):
     """Sexual orientations JAO stores aggregated data about."""
+
+
+class Region(ProtectedCharacteristicList):
+    """Regions JAO stores aggregated data about."""
