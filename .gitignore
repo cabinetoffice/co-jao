@@ -186,6 +186,8 @@ iac/.DS_Store
 terraform.tfstate
 terraform.tfstate.backup
 
+# Ignore database backups
+*.dump
 db_dumps/*
 
 # Sphinx documentation (handles docs at any level)

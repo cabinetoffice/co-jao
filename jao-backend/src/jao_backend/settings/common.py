@@ -229,8 +229,7 @@ JAO_BACKEND_ENABLE_OLEEO = is_truthy(
     os.environ.get("JAO_BACKEND_ENABLE_OLEEO", "false")
 )
 if JAO_BACKEND_ENABLE_OLEEO:
-    DATABASES["oleeo"] = dj_database_url.config(
-        env="JAO_BACKEND_OLEEO_DATABASE_URL")
+    DATABASES["oleeo_upstream"] = dj_database_url.config(env="JAO_BACKEND_OLEEO_DATABASE_URL")
     DATABASE_ROUTERS = ["jao_backend.common.routers.router.OleeoRouter"]
 
 # Session engine, use the default database backed sessions

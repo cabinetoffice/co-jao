@@ -86,3 +86,21 @@ class AggregatedApplicationStatistic(BaseApplicationCategoryStatistic):
             f"content_object={repr(self.content_object)}, "
             f"ratio={self.ratio}>"
         )
+
+class AggregatedApplicationCount(BaseApplicationCategoryStatistic):
+    """
+    Stores the raw application COUNT for a given characteristic category.
+    This is optimized for fast aggregation across multiple vacancies.
+    """
+    object_id = models.PositiveIntegerField(db_index=True)
+    content_object = GenericForeignKey("content_type", "object_id")
+
+    count = models.PositiveIntegerField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["vacancy", "content_type", "object_id"],
+                name="aggregated_application_count_unique_constraint",
+            )
+        ]

@@ -11,7 +11,7 @@ except ImportError:
 DEBUG = True
 
 # A larger timeout is used to allow
-JAO_BACKEND_TIMEOUT = os.environ.get("JAO_BACKEND_TIMEOUT", 15)
+JAO_BACKEND_TIMEOUT = os.environ.get("JAO_BACKEND_TIMEOUT", 60)
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-0+=k_0_cz_8laec^(@6l*$wb(3(^u-=3iy13=$o_$p1vmg*#t0"
