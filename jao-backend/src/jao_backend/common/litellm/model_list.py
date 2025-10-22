@@ -140,11 +140,11 @@ class LlamaCPPModelList(ModelListBase):
         """Checks if the Llama.cpp server is running and responsive."""
         try:
             # A request to the models endpoint is a reliable check
-            return (
-                requests.get(f"{cls.BASE_URL}/v1/models",
-                             timeout=2).status_code == 200
-            )
-        except requests.exceptions.RequestException:
+            url = f"{cls.BASE_URL}/v1/models"
+            if not url.startswith(("http://", "https://")):
+                raise ValueError("Invalid URL scheme")
+            return requests.get(url, timeout=2).status_code == 200
+        except (requests.exceptions.RequestException, ValueError):
             logger.error(f"Llama.cpp server is not available at {
                          cls.BASE_URL}")
             return False
