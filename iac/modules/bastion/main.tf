@@ -36,13 +36,12 @@ resource "aws_iam_role" "bastion_ssm_role" {
   })
 }
 
-# Attach AWS managed policy for SSM
 resource "aws_iam_role_policy_attachment" "bastion_ssm_policy" {
   role       = aws_iam_role.bastion_ssm_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-# Create instance profile
+
 resource "aws_iam_instance_profile" "bastion_profile" {
   name = "${var.name_prefix}-bastion-instance-profile"
   role = aws_iam_role.bastion_ssm_role.name
@@ -52,13 +51,11 @@ resource "aws_iam_instance_profile" "bastion_profile" {
   })
 }
 
-# Security group for bastion host
 resource "aws_security_group" "bastion" {
   name_prefix = "${var.name_prefix}-bastion-"
   vpc_id      = var.vpc_id
   description = "Security group for bastion host"
   
-  # SSH access from your IP
   ingress {
     from_port   = 22
     to_port     = 22
@@ -66,22 +63,28 @@ resource "aws_security_group" "bastion" {
     cidr_blocks = var.allowed_cidr_blocks
     description = "SSH access from allowed IPs"
   }
-  
-  # Allow all outbound traffic for SSM and database access
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Allow all outbound traffic"
-  }
 
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = var.vpc_cidr_blocks
+    description = "HTTPS to VPC for SSM endpoints"
+  }
+  
+  egress {
+    from_port   = 5432 
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = var.vpc_cidr_blocks
+    description = "Database access within VPC"
+  }
+  
   tags = merge(var.tags, {
     Name = "${var.name_prefix}-bastion-sg"
   })
 }
 
-# Bastion EC2 instance
 resource "aws_instance" "bastion" {
   ami                         = data.aws_ami.amazon_linux.id
   instance_type               = var.instance_type
@@ -90,6 +93,11 @@ resource "aws_instance" "bastion" {
   vpc_security_group_ids      = [aws_security_group.bastion.id]
   iam_instance_profile        = aws_iam_instance_profile.bastion_profile.name
   associate_public_ip_address = true
+
+  metadata_options {
+    http_endpoint = "enabled"
+    http_tokens = "required"
+  }
   
   user_data = <<-EOF
     #!/bin/bash
