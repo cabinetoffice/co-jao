@@ -191,9 +191,8 @@ function initWebSocket() {
     function appendMarkdownChunk(markdownText, id) {
         const markdownContainer = document.getElementById(id);
         
-        // Parse accumulated markdown and render as HTML
-        const htmlContent = marked.parse(markdownText);
-        markdownContainer.innerHTML = htmlContent;
+	const htmlContent = "<%=JsEncode(marked.parse(markdownText)%>";
+        markdownContainer.innerHTML = escapeHTML(htmlContent);
         markdownContainer.scrollTop = markdownContainer.scrollHeight;
     }    
 
@@ -233,6 +232,16 @@ function hideStatus() {
     }
 }
 
+function escapeHTML (unsafe_str) {
+    return unsafe_str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\"/g, '&quot;')
+      .replace(/\'/g, '&#39;')
+      .replace(/\//g, '&#x2F;')
+}
+
 
 function displaySimilarVacancies(vacancies) {
     const similarTab = document.getElementById('similar-adverts');
@@ -262,7 +271,7 @@ function displaySimilarVacancies(vacancies) {
         const content = document.createElement('div');
         content.style.display = 'none';
         content.style.paddingTop = '10px';
-        content.innerHTML = decodeHtml(vacancy.full_job_desc);
+	content.innerHTML = escapeHTML(decodeHtml("<%=JsEncode(vacancy.full_job_desc)%>"));
         
         heading.onclick = function() {
             if (content.style.display === 'none') {
@@ -283,8 +292,8 @@ function displaySimilarVacancies(vacancies) {
 }
 
 function decodeHtml(html) {
-    const txt = document.createElement('textarea');
-    txt.innerHTML = html;
+const txt = "<%=JsEncode(document.createElement('textarea'))%>";
+    txt.innerHTML = escapeHTML(html);
     let decoded = txt.value;
     decoded = decoded.replace(/\[br\/\]/g, '<br>');
     decoded = decoded.replace(/\[br\]/g, '<br>');
@@ -313,12 +322,12 @@ function showError(service, message) {
     const errorDiv = document.createElement('div');
     errorDiv.className = 'govuk-error-summary';
     errorDiv.setAttribute('role', 'alert');
-    errorDiv.innerHTML = `
+    errorDiv.innerHTML = escapeHTML(`
         <h2 class="govuk-error-summary__title">Error in ${service}</h2>
         <div class="govuk-error-summary__body">
             <p>${message}</p>
         </div>
-    `;
+    `);
     container.insertBefore(errorDiv, container.firstChild);
 }
 
