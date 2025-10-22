@@ -1,6 +1,10 @@
+import numpy as np
+
+
 class ChunkingStrategy:
     def chunk(self, embedding_vectors):
         raise NotImplementedError
+
 
 class MeanStrategy(ChunkingStrategy):
     def chunk(self, embedding_vectors):

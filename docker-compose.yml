@@ -47,7 +47,6 @@ services:
       - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-eu-west-2}
     volumes:
       - ./jao-backend/src:/app/src
-      - ./jao-backend:/app/backend-src
     depends_on:
       - db
       - redis
@@ -70,7 +69,6 @@ services:
       - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-eu-west-2}
     volumes:
       - ./jao-backend/src:/app/src
-      - ./jao-backend:/app/backend-src
     depends_on:
       - db
       - redis
