@@ -55,7 +55,7 @@ EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 # WEBPACK_LOADER['DEFAULT']['STATS_FILE'] = BASE_DIR / 'static/webpack-bundles/webpack-stats-dev.json'
 
 if DEPLOYMENT_TYPE == "local" and LITELLM_CUSTOM_PROVIDER == "ollama":
-    LITELLM_API_BASE = LITELLM_API_BASE or "http://127.0.0.1:11434/api/embed"
+    LITELLM_API_BASE = LITELLM_API_BASE or "http://host.docker.internal:11434"
 
 try:
     import debug_toolbar
