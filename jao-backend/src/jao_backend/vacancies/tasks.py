@@ -136,7 +136,7 @@ def aggregate_applicant_regions(batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_B
     counts applicants per region for each vacancy, and stores the results
     in the AggregatedApplicationCount table.
     """
-    logger = get_task_logger(__name__) # Use the task logger
+    logger = get_task_logger(__name__)
 
     if not settings.JAO_BACKEND_ENABLE_OLEEO:
         logger.error("OLEEO integration is disabled, cannot aggregate regions.")
@@ -152,7 +152,7 @@ def aggregate_applicant_regions(batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_B
         logger.info("Oleeo applicant region aggregation finished successfully.")
     except Exception as e:
         logger.error(f"Error during applicant region aggregation: {e}", exc_info=True)
-        # Re-raise the exception so Celery can handle retries based on TASK_KWARGS
+
         raise
 
 update_vacancies = chain(

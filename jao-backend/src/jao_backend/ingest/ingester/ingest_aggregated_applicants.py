@@ -1,171 +1,3 @@
-# from django.conf import settings
-# from django.db import transaction
-# from django.utils.log import logging
-# from django.db.models import Count
-# from django.db.models import Q
-# from django.db.models import DecimalField
-# from django.db.models import F
-# from django.db.models import Max
-# from django.db.models import OuterRef
-# from django.db.models import Subquery
-# from django.db.models.functions import Cast
-# from django.contrib.contenttypes.models import ContentType
-# from contextlib import suppress
-# from django.db.models import Model
-
-# from jao_backend.vacancies.models import Vacancy
-# from jao_backend.common.models import ListModel
-# from jao_backend.application_statistics.models import AggregatedApplicationStatistic
-# from jao_backend.oleeo.models import Dandi, Vacancies
-# from jao_backend.oleeo.base_models import NoDestinationModel
-# from jao_backend.oleeo.base_querysets import sliding_window_range
-
-# logger = logging.getLogger(__name__)
-
-
-# def is_list_model(model: Model):
-#     with suppress(NoDestinationModel):
-#         return issubclass(model.get_destination_model(), ListModel)
-#     return False
-
-
-# def get_related_list_models(model: Model):
-#     return {
-#         field.name: field.related_model
-#         for field in model._meta.fields
-#         if getattr(field, "related_model", False) and is_list_model(field.related_model)
-#     }
-
-
-# class OleeoApplicantStatisticsAggregator:
-#     def __init__(self, batch_size, initial_vacancy_id):
-#         self.batch_size = batch_size
-#         self.initial_vacancy_id = initial_vacancy_id
-
-#     def _get_vacancy_statistics_per_characteristic(
-#         self, vacancy_id_start, vacancy_id_end, characteristic_field
-#     ):
-#         # Important to limit this to vacancies that have been ingested locally,
-#         # otherwise me may violate foreign key constraints when creating statistics.
-#         local_vacancies = [*Vacancy.objects.order_by("pk").filter(
-#                                                     pk__gte=vacancy_id_start,
-#                                                     pk__lte=vacancy_id_end).values_list("pk", flat=True)
-#                            ]
-#         field_path = f"applications__dandi__{characteristic_field}"
-#         total_apps_subquery = (
-#             Vacancies.objects_for_ingest.valid_for_ingest()
-#             .filter(
-#                 vacancy_id=OuterRef("vacancy_id"),
-#                 applications__isnull=False,
-#                 applications__dandi__isnull=False,
-#             )
-#             .annotate(total_count=Count("applications", distinct=True))
-#             .values("total_count")
-#         )
-
-#         return (
-#             Vacancies.objects_for_ingest.valid_for_ingest()
-#             .filter(
-#                 Q(vacancy_id__gte=vacancy_id_start, vacancy_id__lte=vacancy_id_end) & Q(vacancy_id__in=local_vacancies),
-#                 applications__isnull=False,
-#                 applications__dandi__isnull=False,
-#                 **{f"{field_path}__isnull": False},
-#             )
-#             .values("vacancy_id", field_path)
-#             .annotate(
-#                 characteristic_count=Count("applications"),
-#                 total_applications=Subquery(total_apps_subquery),
-#                 ratio=Cast(
-#                     F("characteristic_count") * 1.0 / F("total_applications"),
-#                     DecimalField(max_digits=15, decimal_places=14),
-#                 ),
-#                 latest_updated=Max("applications__dandi__row_last_updated"),
-#                 object_id=F(field_path),
-#             )
-#             .order_by("vacancy_id", field_path)
-#         )
-
-#     def _create_statistics_from_characteristic_data(
-#         self, characteristic_data, characteristic_field, relations
-#     ):
-#         src_list_model = relations[characteristic_field]
-#         destination_list_model = src_list_model.get_destination_model()
-#         content_type = ContentType.objects.get_for_model(destination_list_model)
-
-#         for row in characteristic_data:
-#             yield AggregatedApplicationStatistic(
-#                 vacancy_id=row["vacancy_id"],
-#                 content_type=content_type,
-#                 object_id=row["object_id"],
-#                 ratio=row["ratio"],
-#                 updated_at=row["latest_updated"],
-#             )
-
-#     def do_ingest(self):
-#         if not settings.JAO_BACKEND_ENABLE_OLEEO:
-#             logger.error("OLEEO integration is disabled")
-#             raise ValueError("OLEEO integration is not enabled")
-
-#         max_batch_size = (
-#             self.batch_size or settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE
-#         )
-#         relations = get_related_list_models(Dandi)
-#         max_vacancy_id = Vacancy.objects.order_by("pk").last().pk
-
-#         logger.info("Aggregate.. %s", max_vacancy_id)
-#         logger.info("Relations found: %s", list(relations.keys()))
-#         logger.info("Update aggregated statistics")
-
-#         initial_vacancy_id = (
-#             Vacancy.objects.first().pk
-#             if self.initial_vacancy_id is None
-#             else self.initial_vacancy_id
-#         )
-#         max_id = Vacancy.objects.last().pk
-
-#         for batch_start, batch_end in sliding_window_range(
-#             initial_vacancy_id, max_id, max_batch_size, 0, progress_bar=None
-#         ):
-#             logger.info(f"Processing batch {batch_start}-{batch_end}")
-#             with transaction.atomic():
-#                 deleted_count = AggregatedApplicationStatistic.objects.filter(
-#                     vacancy_id__gte=batch_start, vacancy_id__lte=batch_end
-#                 ).delete()[0]
-#                 logger.info(f"  Deleted {deleted_count} existing statistics")
-
-#                 statistics = []
-#                 for characteristic_field in relations.keys():
-#                     logger.info(f"  Processing {characteristic_field}...")
-#                     characteristic_data = (
-#                         self._get_vacancy_statistics_per_characteristic(
-#                             batch_start, batch_end, characteristic_field
-#                         )
-#                     )
-#                     statistics.extend(
-#                         list(
-#                             self._create_statistics_from_characteristic_data(
-#                                 characteristic_data, characteristic_field, relations
-#                             )
-#                         )
-#                     )
-
-#                 if statistics:
-#                     count = AggregatedApplicationStatistic.objects.bulk_create(
-#                         statistics
-#                     )
-#                     logger.info(
-#                         f"  Batch {batch_start}-{batch_end}: Created {len(count)} total statistics"
-#                     )
-#                 else:
-#                     logger.info(
-#                         f"  Batch {batch_start}-{batch_end}: No statistics to create"
-#                     )
-
-#             logger.info(f"Completed batch {batch_start}-{batch_end}")
-
-# ===============================================
-# Imports and Helper Functions
-# ===============================================
 import os
 import csv
 from collections import defaultdict
@@ -179,18 +11,17 @@ from django.db.models.functions import Cast
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 
-# Import your models (adjust paths if needed)
 from jao_backend.vacancies.models import Vacancy
 from jao_backend.common.models import ListModel
-# Import BOTH statistics models now
+
 from jao_backend.application_statistics.models import AggregatedApplicationStatistic, AggregatedApplicationCount, Region
-from jao_backend.oleeo.models import Dandi, Vacancies # Make sure Dandi is imported from oleeo.models
+from jao_backend.oleeo.models import Dandi, Vacancies 
 from jao_backend.oleeo.base_models import NoDestinationModel
 from jao_backend.oleeo.base_querysets import sliding_window_range
 
 logger = logging.getLogger(__name__)
 
-# --- Helper functions (used by the original aggregator) ---
+
 def is_list_model(model: Model):
     with suppress(NoDestinationModel):
         # Check if the model has get_destination_model and if it's a subclass of ListModel
@@ -208,9 +39,6 @@ def get_related_list_models(model: Model):
                 relations[field.name] = field.related_model
     return relations
 
-# ===============================================
-# Standard D&I Statistics Aggregator (Ratios)
-# ===============================================
 class OleeoApplicantStatisticsAggregator:
     def __init__(self, batch_size, initial_vacancy_id):
         self.batch_size = batch_size
@@ -228,10 +56,9 @@ class OleeoApplicantStatisticsAggregator:
             return Vacancies.objects_for_ingest.none() # Return empty queryset if no local vacancies
 
         field_path = f"applications__dandi__{characteristic_field}"
-        # Subquery to count distinct applications per vacancy *that provided D&I data*
-        # This is crucial for calculating the ratio correctly based on those who answered.
+
         total_answered_subquery = (
-            Vacancies.objects_for_ingest.using('oleeo_upstream') # Specify DB
+            Vacancies.objects_for_ingest.using('oleeo_upstream')
             .filter(
                 vacancy_id=OuterRef("vacancy_id"),
                 applications__isnull=False,
@@ -243,8 +70,8 @@ class OleeoApplicantStatisticsAggregator:
         )
 
         return (
-            Vacancies.objects_for_ingest.using('oleeo_upstream') # Specify DB
-            # Remove valid_for_ingest() here, apply filters directly
+            Vacancies.objects_for_ingest.using('oleeo_upstream') 
+
             .filter(
                 Q(vacancy_id__gte=vacancy_id_start, vacancy_id__lte=vacancy_id_end) & Q(vacancy_id__in=local_vacancies),
                 applications__isnull=False,
@@ -253,17 +80,17 @@ class OleeoApplicantStatisticsAggregator:
             )
             .values("vacancy_id", field_path) # Group by vacancy and the characteristic's ID
             .annotate(
-                characteristic_count=Count("applications", distinct=True), # Count distinct applications per group
-                total_applications_answered=Subquery(total_answered_subquery), # Use the subquery for denominator
+                characteristic_count=Count("applications", distinct=True),
+                total_applications_answered=Subquery(total_answered_subquery),
                 # Calculate ratio based on those who answered this specific question
                 ratio=Cast(
                     F("characteristic_count") * 1.0 / F("total_applications_answered"),
                     DecimalField(max_digits=15, decimal_places=14),
                 ),
-                latest_updated=Max("applications__dandi__row_last_updated"), # Get latest timestamp from Dandi record
-                object_id=F(field_path), # The characteristic's ID (e.g., gender_id)
+                latest_updated=Max("applications__dandi__row_last_updated"),
+                object_id=F(field_path),
             )
-            .filter(total_applications_answered__gt=0) # Avoid division by zero
+            .filter(total_applications_answered__gt=0)
             .order_by("vacancy_id", field_path)
         )
 
@@ -276,7 +103,7 @@ class OleeoApplicantStatisticsAggregator:
             content_type = ContentType.objects.get_for_model(destination_list_model)
         except (NoDestinationModel, ContentType.DoesNotExist) as e:
              logger.warning(f"Could not get destination model or ContentType for {characteristic_field}: {e}. Skipping.")
-             return # Skip processing if destination/contenttype is missing
+             return
 
         for row in characteristic_data:
              # Ensure ratio is not None before creating the object
@@ -399,9 +226,6 @@ class OleeoApplicantStatisticsAggregator:
         logger.info("Standard applicant statistics aggregation finished.")
 
 
-# ===============================================
-# Applicant Region Aggregator (Counts)
-# ===============================================
 class OleeoApplicantRegionAggregator:
     """
     Ingester for processing Oleeo applicant postcodes, mapping them to regions,
@@ -418,14 +242,14 @@ class OleeoApplicantRegionAggregator:
     def _load_region_map(self):
         """Loads the postcode-to-region CSV into the self.region_lookup dictionary."""
         logger.info("Loading postcode-to-region mapping file...")
-        # Ensure correct path construction relative to BASE_DIR
+
         fixture_path = os.path.join(settings.BASE_DIR, 'jao_backend', 'application_statistics', 'fixtures', 'postcode_regions.csv')
         try:
             with open(fixture_path, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    outward_code = row.get('Postcode') # Use .get for safety
-                    region_name = row.get('NUTS1 region') # Use .get for safety
+                    outward_code = row.get('Postcode')
+                    region_name = row.get('NUTS1 region')
                     if outward_code and region_name:
                         # Standardize keys and values (strip whitespace)
                         self.region_lookup[outward_code.strip().upper()] = region_name.strip()
@@ -500,13 +324,11 @@ class OleeoApplicantRegionAggregator:
                     logger.debug(f"Skipping Dandi record {dandi_record.pk} due to missing application or vacancy_id link.")
 
             processed_count += 1
-            # Optional: Log progress less frequently for large batches
-            # if processed_count % 10000 == 0:
-            #     logger.debug(f"   ...processed {processed_count} applicants in batch...")
+
 
         logger.info(f"  Processed {processed_count} applicants for this batch, aggregated stats for {len(vacancy_stats)} vacancies.")
 
-        # Prepare AggregatedApplicationCount objects for bulk creation
+
         counts_to_create = []
         for vacancy_id, region_counts in vacancy_stats.items():
             for region_obj, count in region_counts.items():
@@ -609,8 +431,7 @@ class OleeoApplicantRegionAggregator:
             except Exception as e:
                 # Log any error during the batch processing but continue to the next batch
                 logger.error(f"Error processing region counts batch {batch_start}-{batch_end}: {e}", exc_info=True)
-                # Depending on requirements, you might want to raise the exception
-                # or implement more sophisticated error handling/retries here.
+
                 continue # Continue to the next batch
 
             logger.info(f"Completed region counts batch {batch_start}-{batch_end}")
