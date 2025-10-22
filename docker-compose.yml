@@ -6,6 +6,8 @@ services:
       dockerfile: ./jao-backend/Dockerfile.dev
     ports:
       - "8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  
     env_file:
       - .env
     environment:
@@ -79,6 +81,8 @@ services:
       dockerfile: ./jao-web/Dockerfile.dev
     ports:
       - "8001:8000"  # Different port to avoid conflict
+    env_file:
+      - .env
     environment:
       - ENV=dev
       - PYTHONPATH=/app/src
