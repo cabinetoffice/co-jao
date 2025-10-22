@@ -23,6 +23,11 @@ variable "public_subnet_id" {
 variable "allowed_cidr_blocks" {
   description = "CIDR blocks allowed to SSH to bastion"
   type        = list(string)
+  
+  validation {
+    condition = !contains(var.allowed_cidr_blocks, "0.0.0.0/0") && !contains(var.allowed_cidr_blocks, "::/0")
+    error_message = "allowed_cidr_blocks cannot contain 0.0.0.0/0 or ::/0"
+  }
 }
 
 variable "ssh_public_key" {
