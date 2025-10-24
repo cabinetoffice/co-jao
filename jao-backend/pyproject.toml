@@ -56,6 +56,7 @@ django-async-stream = "^0.3"
 channels = "^4.3.1"
 channels-redis = "^4.3.0"
 daphne = "^4.2.1"
+autobahn = "^23.6.2"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.7.0"
