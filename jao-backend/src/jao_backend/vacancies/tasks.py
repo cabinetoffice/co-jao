@@ -19,6 +19,7 @@ from jao_backend.vacancies.models import Vacancy
 
 from jao_backend.common.celery import app as celery
 from jao_backend.ingest.ingester.ingest_vacancies import OleeoVacanciesIngest
+from jao_backend.ingest.ingester.ingest_applicant_text import ApplicantTextIngest
 from jao_backend.ingest.ingester.ingest_aggregated_applicants import (
     OleeoApplicantStatisticsAggregator,
     OleeoApplicantRegionAggregator
@@ -155,8 +156,37 @@ def aggregate_applicant_regions(batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_B
 
         raise
 
+@celery.task(**TASK_KWARGS)
+@on_db_disconnect_raise(using="oleeo_upstream")
+def ingest_applicant_text(batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE, initial_vacancy_id=None):
+    """
+    Ingests and aggregates applicant free-text fields from the Oleeo database
+    using the specialized ApplicantTextIngest class.
+
+    This task performs two steps:
+    1. Ingests raw text (personal statement, employment history, skill experience) into the
+       ApplicationText table.
+    2. Aggregates all text for each vacancy into the
+       VacancyTextAggregate table.
+    """
+    if not settings.JAO_BACKEND_ENABLE_OLEEO:
+        logger.error("OLEEO integration is disabled, cannot ingest applicant text.")
+        raise ImproperlyConfigured("OLEEO integration is not enabled")
+
+    logger.info(f"Starting applicant text ingestion with max_batch_size={batch_size}")
+
+    try:
+        ingester = ApplicantTextIngest(
+            batch_size=batch_size, initial_vacancy_id=initial_vacancy_id
+        )
+        ingester.do_ingest()
+        logger.info("Applicant text ingestion finished successfully.")
+    except Exception as e:
+        logger.error(f"Error during applicant text ingestion: {e}", exc_info=True)
+        raise
+
 update_vacancies = chain(
-    ingest_vacancies.s(), aggregate_applicant_statistics.s(), aggregate_applicant_regions.s(), embed_vacancies.s()
+    ingest_vacancies.s(), aggregate_applicant_statistics.s(), aggregate_applicant_regions.s(), ingest_applicant_text.s(), embed_vacancies.s()
 )
 """
 Ingest vacancies, and then start embedding.

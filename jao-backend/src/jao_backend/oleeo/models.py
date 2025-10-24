@@ -31,7 +31,11 @@ class Applications(OleeoUpstreamModel):
         null=True,
     )
     employment_history = models.TextField(blank=True, null=True)
+    previous_skill_experience = models.TextField(blank=True, null=True)
+    personal_statement = models.TextField(blank=True, null=True)
     row_last_updated = models.DateTimeField()
+
+    objects_for_ingest = models.Manager()
 
     class Meta:
         managed = False  # Created from a view. Don't remove.
