@@ -1,5 +1,4 @@
 {% extends "common/base.html" %}
-
 {% load render_bundle from webpack_loader %}
 {% load crispy_forms_tags crispy_forms_gds %}
 {% load govuk_frontend_django %}
@@ -32,136 +31,494 @@
             </div>
         {% endif %}
 
-        {% if show_extra_widgets %}
+    	<div id="loading-status" class="govuk-inset-text" style="display: none;">
+    		Connecting...
+	</div>
+
+        <div id="tabs-1" style="display: none;">
             {% gds_tabs id="tabs-1" title="Contents" %}
+            	{% gds_tabs_tab id="similar-adverts" label="Similar Adverts" %}
+                    <h2 class="govuk-heading-l">Similar Adverts</h2>
+            	{% endgds_tabs_tab %}
                 {% gds_tabs_tab id="advice" label="Advice" %}
                     <h2 class="govuk-heading-l">Advice</h2>
                     <div class="govuk-form-group">
-                        <p>
                             <label class="govuk-label" for="sort">
-                                Type Of Advice
-                            </label>
-                            <select class="govuk-select" id="advice-category" name="advice-category">
-                                <option value="published" selected>General Advice</option>
-                                <option value="updated">Skills Advice</option>
-                            </select>
-                        </p>
-                        <p>
-                            <label class="govuk-label" for="sort">
-                                Type of General Advice
+                                Type of Advice
                             </label>
                             <select class="govuk-select" id="advice-option" name="advice-option">
-                                <option value="published" selected>I Want More Applicants</option>
-                                <option value="updated">I Want Better Quality Applicants</option>
-                                <option value="updated">I Want A Better Gender Balance</option>
-                                <option value="updated">I Want More External Applicants</option>
-                                <option value="updated">I Want A Better Disability Balance</option>
+                                <option value="general" selected>I Want General
+				    Advice</option>
+                                <option value="gender">I Want A Better Gender Balance</option>
+                                <option value="disability">I Want A Better Disability Balance</option>
                             </select>
                         </p>
+			    <div class="govuk-form-group" id="gender-ratio-group" style="display: none;">
+                                <label class="govuk-label" for="gender-ratio">
+                                    Minimum Female Applicant Ratio: <span id="gender-ratio-value">0.5</span>
+                                </label>
+                                <input type="range" id="gender-ratio" name="gender-ratio" 
+                                       min="0.3" max="0.7" step="0.05" value="0.5"
+                                       style="width: 100%;">
+                                <div style="display: flex; justify-content: space-between; font-size: 14px; color: #505a5f;">
+                                    <span>30%</span>
+                                    <span>70%</span>
+                                </div>
+                            </div>
+                            
+                            <div class="govuk-form-group" id="disability-ratio-group" style="display: none;">
+                                <label class="govuk-label" for="disability-ratio">
+                                    Minimum Disability Applicant Ratio: <span id="disability-ratio-value">0.5</span>
+                                </label>
+                                <input type="range" id="disability-ratio" name="disability-ratio" 
+                                       min="0.3" max="0.7" step="0.05" value="0.5"
+                                       style="width: 100%;">
+                                <div style="display: flex; justify-content: space-between; font-size: 14px; color: #505a5f;">
+                                    <span>30%</span>
+                                    <span>70%</span>
+                                </div>
+                            </div>
 
                         <p>
-                            <button class="govuk-button" type="submit" disabled>Get Advice</button>
+                            <button class="govuk-button" type="button"
+					    data-action="get-advice">Get Advice</button>
                         </p>
                     </div>
+	       	    	<div class="govuk-inset-text">
+          			<h3 class="govuk-heading-m">Generated Advice</h3>
+		        	<div class="advice-content" id="advice-content">
+	                	</div>
+	       	    	</div>
                 {% endgds_tabs_tab %}
-                {% gds_tabs_tab id="similar-adverts" label="Similar Adverts" %}
-                    <h2 class="govuk-heading-l">Similar Adverts</h2>
-                    {% gds_accordion id="accordion-1" %}
-                        {% for vacancy in similar_vacancies %}
-                            {% gds_accordion_item heading=vacancy.job_title summary="" %}
-                                <p id="{{ vacancy.vacancy_id }}">{{ vacancy.full_job_desc|safe }}</p>
-                            {% endgds_accordion_item %}
-                        {% endfor %}
-                    {% endgds_accordion %}
-                {% endgds_tabs_tab %}
-                {% gds_tabs_tab id="demographics" label="Demographics" %}
-                    <h2 class="govuk-heading-l">Demographics</h2>
-                    {% for figure in similar_vacancies_figures %}
-                        <p>{{ figure.to_html|safe }}</p>
-                    {% endfor %}
-                {% endgds_tabs_tab %}
-                {% gds_tabs_tab id="skills" label="Skills" %}
-                    <h2 class="govuk-heading-l">Skills</h2>
-                    {% for figure in skills_figures %}
-                        <p>{{ figure.to_html|safe }}</p>
-                    {% endfor %}
-                {% endgds_tabs_tab %}
-                {% gds_tabs_tab id="summary" label="Summary" %}
-                    <h2 class="govuk-heading-l">Summary</h2>
-                    <p>{{ summary_figure.to_html|safe }}</p>
-                {% endgds_tabs_tab %}
-                {% gds_tabs_tab id="locations" label="Locations" %}
-                    <h2 class="govuk-heading-l">Locations</h2>
-                    <div id="applicant-map-container" style="width: 100%; height: 600px;">
-                    </div>
-                {% endgds_tabs_tab %}
+            	{% gds_tabs_tab id="draft" label="Draft Description" %}
+                    <h2 class="govuk-heading-l">Draft Description</h2>
+		    <div class="govuk-inset-text">
+          			<h3 class="govuk-heading-m">AI Generated
+				    Description</h3>
+		        	<div class="draft-content" id="draft-content">
+	                </div>
+	       	    </div>
+                    <button class="govuk-button" type="button"
+					    data-action="get-draft">Get a Draft</button>
+            	{% endgds_tabs_tab %}
             {% endgds_tabs %}
-        {% endif %}
+	</div>
     </div>
 {% endblock content %}
 
 {% block extra_js %}
-    {% render_bundle 'JAO' 'js' %}
-    {{ applicant_map_data|json_script:"applicant-map-data" }}
-    <script>
-        const initMapContainer = (mapData) => {
-            // Attach map to the correct elements and set ensure it updates it's
-            // size when the tab is selected.
-            console.debug('Initialising map with data:', mapData);
-            Base.onDOMContentLoaded(() => {
-                const mapContainer = document.getElementById('applicant-map-container');
-                if (!mapContainer) {
-                    console.warn('No map container found.');
-                    return;
-                }
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+window.sessionKey = '{{ session_key|escapejs}}';
+// Manually initialize after bundle loads
+let ws = null;
+let reconnectAttempts = 0;
+let maxReconnectAttempts = 5;
+let reconnectInterval = 1000;
 
-                const locationsTab = document.getElementById('tab_locations');
-                let map = JAO.renderApplicantMap(mapContainer, mapData);
+function initWebSocket() {
+    const protocol = 'ws:';
+    const wsEndpoint = '{{ websocket_endpoint|escapejs }}'; 
+    const wsUrl = protocol + '//' + wsEndpoint + '/ws/job_advert/';
+    
+    console.log('Connecting to:', wsUrl);
+    ws = new WebSocket(wsUrl);
+    
+    ws.onopen = function() {
+        console.log('WebSocket connected');
+	reconnectAttempts = 0; // Reset on successful connection
+        reconnectInterval = 1000; // Reset backoff
+    };
+    
+    let accumulatedAdvice = '';
+    let accumulatedDraft = '';
 
-                // Tabs in GDS frontend are hidden by default.
-                // Spawning the map into a hidden container results in incorrect size,
-                // breaking the map renderer.
-                //
-                // To fix this, invalidate the map size when the is selected by the user,
-                // ARIA events cover mouse keyboard + other interactions to select the tab.
-                Base.onAriaSelected(locationsTab, () => {
-                    map.invalidateSize();
-                });
-            });
-        };
+    ws.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        console.log('Received:', data);
+        
+        switch(data.type) {
+	    case 'keepalive':
+		console.log('keep alive');
+		break;
 
-        function getMapMetaData() {
-            // Grab the initial map data
-            // Note: geodata is separate, static data - and can be found using
-            //       the geojson_url key.
-            const mapDataElement = document.getElementById('applicant-map-data');
-            if (mapDataElement?.textContent) {
-                return JSON.parse(mapDataElement.textContent);
+            case 'status':
+                showStatus(data.message);
+                break;
+                
+            case 'advice_chunk':
+                // Accumulate chunks for proper markdown parsing
+                accumulatedAdvice += data.data;
+                appendMarkdownChunk(accumulatedAdvice, 'advice-content');
+                break;
+                
+            case 'advice_complete':
+                hideStatus();
+                accumulatedAdvice = '';
+                break;
+                
+            case 'similar_vacancies':
+                displaySimilarVacancies(data.data);
+                break;
+
+	    case 'draft_chunk':
+		console.log(data.data)
+		accumulatedDraft += data.data;
+		appendMarkdownChunk(accumulatedDraft, 'draft-content')
+		break;
+
+	    case 'draft_complete':
+                hideStatus();
+                accumulatedDraft = '';
+                break;
+
+                
+            case 'error':
+                showError(data.service || 'general', data.message);
+                break;
+                
+            case 'complete':
+                hideStatus();
+                showTabs();
+                break;
+                
+            default:
+                console.warn('Unknown message type:', data.type);
+                break;
+        }
+    };
+
+    function appendMarkdownChunk(markdownText, id) {
+        const markdownContainer = document.getElementById(id);
+        
+	const htmlContent = marked.parse(markdownText);
+        markdownContainer.innerHTML = htmlContent;
+        markdownContainer.scrollTop = markdownContainer.scrollHeight;
+    }    
+
+    ws.onerror = function(error) {
+        console.error('WebSocket error:', error);
+        showError('connection', 'Connection error occurred');
+    };
+    
+    ws.onclose = function(event) {
+        console.log('WebSocket closed:', event.code, event.reason);
+        if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++;
+            console.log(`Reconnecting... (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
+            
+            setTimeout(() => {
+                initWebSocket();
+            }, reconnectInterval);
+            
+            reconnectInterval = Math.min(reconnectInterval * 2, 30000);
+        } else if (reconnectAttempts >= maxReconnectAttempts) {
+            showError('connection', 'Lost connection to server. Please refresh the page.');
+        }
+    };}
+
+function showStatus(message) {
+    const statusElement = document.getElementById('loading-status');
+    if (statusElement) {
+        statusElement.textContent = message;
+        statusElement.style.display = 'block';
+    }
+}
+
+function hideStatus() {
+    const statusElement = document.getElementById('loading-status');
+    if (statusElement) {
+        statusElement.style.display = 'none';
+    }
+}
+
+// function escapeHTML (unsafe_str) {
+//     return unsafe_str
+//       .replace(/&/g, '&amp;')
+//       .replace(/</g, '&lt;')
+//       .replace(/>/g, '&gt;')
+//       .replace(/\"/g, '&quot;')
+//       .replace(/\'/g, '&#39;')
+//       .replace(/\//g, '&#x2F;')
+// }
+
+
+function displaySimilarVacancies(vacancies) {
+    const similarTab = document.getElementById('similar-adverts');
+    if (!similarTab) {
+        console.error('Similar adverts tab not found');
+        return;
+    }
+    
+    const existingAccordion = document.getElementById('accordion-1');
+    if (existingAccordion) {
+        existingAccordion.remove();
+    }
+    
+    const container = document.createElement('div');
+    container.id = 'accordion-1';
+    
+    vacancies.forEach((vacancy) => {
+        const section = document.createElement('div');
+        section.style.borderBottom = '1px solid #b1b4b6';
+        section.style.padding = '15px 0';
+        
+        const heading = document.createElement('h3');
+        heading.style.cursor = 'pointer';
+        heading.style.margin = '0';
+        heading.textContent = '▶ ' + vacancy.job_title;
+        
+        const content = document.createElement('div');
+        content.style.display = 'none';
+        content.style.paddingTop = '10px';
+	content.innerHTML = decodeHtml(vacancy.full_job_desc);
+        
+        heading.onclick = function() {
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                heading.textContent = '▼ ' + vacancy.job_title;
             } else {
-                console.debug('No map data found or empty content');
-                return null;
+                content.style.display = 'none';
+                heading.textContent = '▶ ' + vacancy.job_title;
+            }
+        };
+        
+        section.appendChild(heading);
+        section.appendChild(content);
+        container.appendChild(section);
+    });
+    
+    similarTab.appendChild(container);
+}
+
+function decodeHtml(html) {
+const txt = document.createElement('textarea');
+    txt.innerHTML = html;
+    let decoded = txt.value;
+    decoded = decoded.replace(/\[br\/\]/g, '<br>');
+    decoded = decoded.replace(/\[br\]/g, '<br>');
+    return decoded;
+}
+
+function showTabs() {
+    const tabsElement = document.getElementById('tabs-1');
+    if (!tabsElement) return;
+    
+    tabsElement.style.display = 'block';
+    
+    // Initialize GOV.UK tabs component
+    if (window.GOVUKFrontend && window.GOVUKFrontend.Tabs) {
+        const tabsModule = tabsElement.querySelector('[data-module="govuk-tabs"]');
+        if (tabsModule) {
+            new window.GOVUKFrontend.Tabs(tabsModule).init();
+        }
+    }
+}
+
+function showError(service, message) {
+    const container = document.querySelector('.govuk-width-container');
+    if (!container) return;
+    
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'govuk-error-summary';
+    errorDiv.setAttribute('role', 'alert');
+    errorDiv.innerHTML = `
+        <h2 class="govuk-error-summary__title">Error in ${service}</h2>
+        <div class="govuk-error-summary__body">
+            <p>${message}</p>
+        </div>
+    `;
+    container.insertBefore(errorDiv, container.firstChild);
+}
+
+function ensureWebSocketOpen() {
+    return new Promise((resolve, reject) => {
+        // Check if WebSocket exists and is open
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            resolve();
+            return;
+        }
+        
+        // If WebSocket is connecting, wait for it
+        if (ws && ws.readyState === WebSocket.CONNECTING) {
+            ws.addEventListener('open', function() {
+                resolve();
+            }, { once: true });
+            
+            ws.addEventListener('error', function() {
+                reject(new Error('WebSocket connection failed'));
+            }, { once: true });
+            return;
+        }
+        
+        // Otherwise, create new connection
+        console.log('WebSocket not open, reconnecting...');
+        initWebSocket();
+        
+        ws.addEventListener('open', function() {
+            resolve();
+        }, { once: true });
+        
+        ws.addEventListener('error', function() {
+            reject(new Error('WebSocket connection failed'));
+        }, { once: true });
+        
+        // Timeout after 5 seconds
+        setTimeout(() => {
+            if (ws.readyState !== WebSocket.OPEN) {
+                reject(new Error('WebSocket connection timeout'));
+            }
+        }, 5000);
+    });
+}
+
+function initializePage() {
+    console.log('Initializing page');
+    
+    initWebSocket();
+    
+    document.body.addEventListener('change', function(e) {
+        if (e.target && e.target.id === 'advice-option') {
+            console.log('Advice option changed to:', e.target.value);
+            const selectedType = e.target.value;
+            const genderRatioGroup = document.getElementById('gender-ratio-group');
+            const disabilityRatioGroup = document.getElementById('disability-ratio-group');
+            
+            if (selectedType === 'gender') {
+                if (genderRatioGroup) genderRatioGroup.style.display = 'block';
+                if (disabilityRatioGroup) disabilityRatioGroup.style.display = 'none';
+            } else if (selectedType === 'disability') {
+                if (genderRatioGroup) genderRatioGroup.style.display = 'none';
+                if (disabilityRatioGroup) disabilityRatioGroup.style.display = 'block';
+            } else {
+                if (genderRatioGroup) genderRatioGroup.style.display = 'none';
+                if (disabilityRatioGroup) disabilityRatioGroup.style.display = 'none';
             }
         }
-        async function loadGeoData(url) {
-            try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP error loading geo data from ${url} ${response.status}`);
-                return await response.json();
-            } catch (error) {
-                console.error('GeoJSON loading failed:', error.message);
-                return null;
+    });
+    
+    document.body.addEventListener('input', function(e) {
+        if (e.target && e.target.id === 'gender-ratio') {
+            const genderRatioValue = document.getElementById('gender-ratio-value');
+            if (genderRatioValue) {
+                genderRatioValue.textContent = e.target.value;
             }
         }
-
-        async function setupMap() {
-            // Entry point for setting up the map.
-            const mapMetaData = getMapMetaData();
-            if (!mapMetaData?.geojson_url) return;
-
-            const geoData = await loadGeoData(mapMetaData.geojson_url);
-            if (geoData) initMapContainer({...mapMetaData, geojson: geoData});
+        if (e.target && e.target.id === 'disability-ratio') {
+            const disabilityRatioValue = document.getElementById('disability-ratio-value');
+            if (disabilityRatioValue) {
+                disabilityRatioValue.textContent = e.target.value;
+            }
         }
+    });
+    
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const jobDescriptionInput = document.querySelector('[name="job_description"]');
+            if (!jobDescriptionInput) return;
+            
+            const jobDescription = jobDescriptionInput.value;
+            const sessionKey = window.sessionKey;
+            
+            const tabs = document.getElementById('tabs-1');
+            if (tabs) tabs.style.display = 'none';
+            
+            const adviceContent = document.querySelector('.advice-content');
+            if (adviceContent) {
+                adviceContent.innerHTML = '';
+            }
+            
+            ensureWebSocketOpen().then(() => {
+                ws.send(JSON.stringify({
+                    type: 'process_description',
+                    job_description: jobDescription,
+                    session_key: sessionKey
+                }));
+                showStatus('Processing job description...');
+            });
+        });
+    }
+    
+    // Get Advice button - use event delegation
+    document.body.addEventListener('click', function(e) {
+        if (e.target && e.target.getAttribute('data-action') === 'get-advice') {
+            e.preventDefault();
+            
+            const adviceOption = document.getElementById('advice-option');
+            const genderRatioSlider = document.getElementById('gender-ratio');
+            const disabilityRatioSlider = document.getElementById('disability-ratio');
+            
+            if (!adviceOption) return;
+            
+            const adviceType = adviceOption.value;
+            const sessionKey = window.sessionKey;
+            
+            const options = {};
+            if (adviceType === 'gender' && genderRatioSlider) {
+                options.female_ratio = parseFloat(genderRatioSlider.value);
+            } else if (adviceType === 'disability' && disabilityRatioSlider) {
+                options.disability_ratio = parseFloat(disabilityRatioSlider.value);
+            }
+            
+            const adviceContent = document.querySelector('.advice-content');
+            if (adviceContent) {
+                adviceContent.innerHTML = '';
+            }
+            
+            showStatus('Getting advice...');
+            
+            ensureWebSocketOpen().then(() => {
+                ws.send(JSON.stringify({
+                    type: 'get_advice',
+                    advice_type: adviceType,
+                    options: options,
+                    session_key: sessionKey
+                }));
+            });
+        }
+    });
+    
+    document.body.addEventListener('click', function(e) {
+        if (e.target && e.target.getAttribute('data-action') === 'get-draft') {
+            e.preventDefault();
+            
+            const sessionKey = window.sessionKey;	
+            
+            const draftContent = document.querySelector('.draft-content');
+            if (draftContent) {
+                draftContent.innerHTML = '';
+            }
+            
+            showStatus('Getting draft...');
+            
+            ensureWebSocketOpen().then(() => {
+                ws.send(JSON.stringify({
+		    type: 'get_draft',
+                    session_key: sessionKey
+                }));
+            });
+        }
+    });
+    
+    // Display initial similar vacancies if they exist
+    if (window.initialSimilarVacancies) {
+        displaySimilarVacancies(window.initialSimilarVacancies);
+        showTabs();
+    }
+}
 
-        setupMap();
+// Expose function globally
+window.initializeJobAdvertOptimiser = initializePage;
+
+// Auto-initialize
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializePage);
+} else {
+    setTimeout(initializePage, 0);
+}
+
     </script>
 {% endblock extra_js %}

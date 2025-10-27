@@ -44,26 +44,26 @@ class OleeoVacanciesIngest:
     # Models to ingest these are in order.  Dependencies of other models should come first.
     LIST_MODELS = [
         ListAgeGroup,
-        # ListApplicantType,
-        # ListApplicationStatus,
+        # 8 ListApplicantType,
+        #  ListApplicationStatus,
         # ListBusinessArea,
-        # ListCityTown,
-        # ListDepartment,
+        # 2 ListCityTown,
+        # 8 ListDepartment,
         ListDisability,
         ListEthnicGroup,
         ListEthnicity,
         ListGender,
-        # ListLocationType,
-        # ListPostcode,
-        # ListProfession,
-        # ListRegion,
+        # 2 ListLocationType,
+        # 2 ListPostcode,
+        # 2 ListProfession,
+        # 2 ListRegion,
         ListReligion,
         ListSexualOrientation,
         ListTypeOfRole,
         ListJobGrade,
         # ListVacancyApproach,
-        # ListVacancyPostcode,
-        # ListVacancyStatus,
+        # 2 ListVacancyPostcode,
+        # 8 ListVacancyStatus,
     ]
 
     DERIVED_MODELS = [
@@ -175,7 +175,8 @@ class OleeoVacanciesIngest:
         :param create_only:  Set to True only create new records; this is useful during deployment (especially during the initial deployment)
         """
 
-        logger.info("Ingest: %s -> %s", source_model.__name__, destination_model.__name__)
+        logger.info("Ingest: %s -> %s", source_model.__name__,
+                    destination_model.__name__)
         (source_instances, create_instances, update_instances, delete_qs) = (
             source_model.destination_pending_sync(
                 pk_start=pk_start,
@@ -192,7 +193,8 @@ class OleeoVacanciesIngest:
             logger.info("No %s changed.", source_model)
 
         logger.info(
-            "%s Create %s instances", source_model.__name__, len(create_instances)
+            "%s Create %s instances", source_model.__name__, len(
+                create_instances)
         )
         if create_instances:
             created_count = destination_model.objects.bulk_create(
@@ -204,7 +206,8 @@ class OleeoVacanciesIngest:
         del create_instances
 
         logger.info(
-            "%s Update %s instances", source_model.__name__, len(update_instances)
+            "%s Update %s instances", source_model.__name__, len(
+                update_instances)
         )
         if update_instances:
             for instance in update_instances:
@@ -233,7 +236,8 @@ class OleeoVacanciesIngest:
     @lru_cache(maxsize=1)
     def get_grade_groups() -> Dict[int, Set[Grade]]:
         grade_groups = {
-            grade_group.pk: set(grade_group.get_grades().values_list("pk", flat=True))
+            grade_group.pk: set(
+                grade_group.get_grades().values_list("pk", flat=True))
             for grade_group in OleeoGradeGroup.objects.all()
         }
         return grade_groups
@@ -242,7 +246,8 @@ class OleeoVacanciesIngest:
     @lru_cache(maxsize=1)
     def get_role_types() -> Dict[int, Set[RoleType]]:
         role_types = {
-            role_type.pk: set(role_type.get_role_types().values_list("pk", flat=True))
+            role_type.pk: set(
+                role_type.get_role_types().values_list("pk", flat=True))
             for role_type in OleeoRoleTypeGroup.objects.all()
         }
         return role_types
@@ -267,8 +272,10 @@ class OleeoVacanciesIngest:
             source_instance = source_vacancies[destination_instance.pk]
             source_grades = grade_groups.get(source_instance.job_grade_id)
             if source_grades is None:
-                logger.info("New job grade combination found, invalidating cache")
-                self._ingest_model(ListJobGrade, ListJobGrade.get_destination_model())
+                logger.info(
+                    "New job grade combination found, invalidating cache")
+                self._ingest_model(
+                    ListJobGrade, ListJobGrade.get_destination_model())
                 self._ingest_model(
                     OleeoGradeGroup, OleeoGradeGroup.get_destination_model()
                 )
@@ -302,7 +309,8 @@ class OleeoVacanciesIngest:
             source_instance = source_vacancies[destination_instance.pk]
             source_role_types = role_types.get(source_instance.type_of_role_id)
             if source_role_types is None:
-                logger.info("New role type combination found, invalidating cache")
+                logger.info(
+                    "New role type combination found, invalidating cache")
                 self._ingest_model(
                     ListTypeOfRole, ListTypeOfRole.get_destination_model()
                 )

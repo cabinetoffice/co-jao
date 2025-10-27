@@ -82,7 +82,8 @@ class Embedding(PolymorphicModel):
 
     @property
     def embedding(self):
-        raise NotImplementedError("Subclasses implement the embedding property.")
+        raise NotImplementedError(
+            "Subclasses implement the embedding property.")
 
     @classproperty
     def dimensions(self):
@@ -252,7 +253,7 @@ class EmbeddingTag(models.Model):
         """
         tags = {}
         for tag_data in settings.EMBEDDING_TAGS.values():
-            model_name = tag_data.pop("model")
+            model_name = tag_data.get("model")
             model, _ = EmbeddingModel.objects.get_or_create(
                 name=model_name, defaults={"is_active": True}
             )
