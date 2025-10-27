@@ -9,11 +9,7 @@ TEST_TAG_MODEL = os.environ.get(
 )
 
 # During test + CI, embeddings should be avoided or small
-EMBEDDING_TAGS[EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID].update(
-    {
-        "model": TEST_TAG_MODEL,
-    }
-)
+
 
 EMBEDDING_TAGS = {
     **EMBEDDING_TAGS,
@@ -26,6 +22,12 @@ EMBEDDING_TAGS = {
         "version": 1,
     },
 }
+
+EMBEDDING_TAGS[EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID].update(
+    {
+        "model": TEST_TAG_MODEL,
+    }
+)
 
 # Under test, Django will add "test" as a prefix to the database name and suffix a worker id under pytest-xdist
 DEFAULT_TEST_DATABASE_NAME = "postgresql:///jao-backend"

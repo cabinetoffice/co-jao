@@ -11,7 +11,7 @@ except ImportError:
 DEBUG = True
 
 # A larger timeout is used to allow
-JAO_BACKEND_TIMEOUT = os.environ.get("JAO_BACKEND_TIMEOUT", 15)
+JAO_BACKEND_TIMEOUT = os.environ.get("JAO_BACKEND_TIMEOUT", 60)
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-0+=k_0_cz_8laec^(@6l*$wb(3(^u-=3iy13=$o_$p1vmg*#t0"
@@ -55,7 +55,7 @@ EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 # WEBPACK_LOADER['DEFAULT']['STATS_FILE'] = BASE_DIR / 'static/webpack-bundles/webpack-stats-dev.json'
 
 if DEPLOYMENT_TYPE == "local" and LITELLM_CUSTOM_PROVIDER == "ollama":
-    LITELLM_API_BASE = LITELLM_API_BASE or "http://127.0.0.1:11434/api/embed"
+    LITELLM_API_BASE = LITELLM_API_BASE or "http://host.docker.internal:11434"
 
 try:
     import debug_toolbar

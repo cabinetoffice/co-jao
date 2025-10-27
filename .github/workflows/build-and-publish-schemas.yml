@@ -2,11 +2,11 @@ name: Build and Publish Wheel
 
 on:
   push:
-    branches: [merge-sagemaker]
+    branches: [fix/frontend]
     tags:
       - "v*"
   pull_request:
-    branches: [merge-sagemaker]
+    branches: [fix/frontend]
   release:
     types: [published]
 

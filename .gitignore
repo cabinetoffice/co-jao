@@ -175,6 +175,7 @@ iac/.terraform.lock.hcl
 iac/terraform.tfstate
 iac/terraform.tfstate.backup
 iac/terraform.tfvars
+iac/.terraform.tfvars
 iac/*.tfvars.local
 iac/tfplan
 iac/.DS_Store
@@ -185,6 +186,8 @@ iac/.DS_Store
 terraform.tfstate
 terraform.tfstate.backup
 
+# Ignore database backups
+*.dump
 db_dumps/*
 
 # Sphinx documentation (handles docs at any level)

@@ -51,7 +51,7 @@ variable "memory" {
 variable "desired_count" {
   description = "Number of ECS tasks to run"
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "environment_variables" {
@@ -227,7 +227,7 @@ variable "api_memory" {
 variable "api_desired_count" {
   description = "Number of web service instances"
   type        = number
-  default     = 2
+  default     = 1
 }
 
 # Celery Configuration
@@ -277,7 +277,7 @@ variable "worker_memory" {
 variable "worker_desired_count" {
   description = "Number of worker service instances"
   type        = number
-  default     = 2
+  default     = 1
 }
 
 # Celery Beat Configuration

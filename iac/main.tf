@@ -20,6 +20,7 @@ locals {
     ManagedBy   = "terraform"
   }
 
+
   # Environment-specific configurations
   env_config = {
     prod = {
@@ -189,6 +190,7 @@ module "ecs" {
     JAO_BACKEND_SUPERUSER_USERNAME = var.jao_backend_superuser_username
     JAO_BACKEND_SUPERUSER_PASSWORD = var.jao_backend_superuser_password
     JAO_BACKEND_SUPERUSER_EMAIL    = var.jao_backend_superuser_email
+    REDIS_HOST                     = module.celery_redis.celery_broker_url
     # Celery configuration
     CELERY_BROKER_URL                     = module.celery_redis.celery_broker_url
     CELERY_RESULT_BACKEND                 = module.celery_redis.celery_result_backend
@@ -198,7 +200,7 @@ module "ecs" {
     JAO_BACKEND_VACANCY_EMBED_LIMIT       = 70000
     #JAO_BACKEND_LITELLM_API_BASE          = "http://127.0.0.1:11434/api/embed" # Default for dev environment
     #JAO_BACKEND_LITELLM_CUSTOM_PROVIDER   = "ollama"                           # Default for dev environment
-    #JAO_EMBEDDER_SUMMARY_RESPONSIBILITIES = "ollama/nomic-embed-text:latest"
+    JAO_EMBEDDER_SUMMARY_RESPONSIBILITIES = "bedrock/amazon.titan-embed-text-v2:0"
 
     # API rate limiting and monitoring config
     ENABLE_RATE_LIMITING = "true"
@@ -210,7 +212,7 @@ module "ecs" {
   })
 
   health_check_path        = "/health"
-  internal_lb              = true
+  internal_lb              = false
   admin_lb_internet_facing = true
   logs_retention_in_days   = local.current_env.log_retention_days
 
@@ -242,13 +244,14 @@ module "frontend" {
   cpu                = var.task_cpu
   memory             = var.task_memory
   desired_count      = var.desired_count
+  frontend_allowed_cidrs = var.frontend_allowed_cidrs
 
   # Environment variables for the frontend service
   environment_variables = {
     DJANGO_DEBUG             = local.current_env.django_debug
     DJANGO_SETTINGS_MODULE   = "jao_web.settings.dev"
     PORT                     = "8000"
-    JAO_BACKEND_URL          = module.api_gateway.api_gateway_url
+    JAO_BACKEND_URL          = module.ecs.load_balancer_dns_name
     JAO_BACKEND_TIMEOUT      = "15"
     JAO_BACKEND_ENABLE_HTTP2 = "true"
     SESSION_COOKIE_SECURE    = local.current_env.session_cookie_secure
@@ -325,7 +328,7 @@ module "vectordb" {
   subnet_ids = module.vpc.private_subnet_ids
 
   allowed_security_groups = [aws_security_group.db_access.id]
-
+  allowed_cidr_blocks = var.allowed_cidr_blocks
   # Enable data science read replica if SageMaker is enabled
   create_data_science_replica = var.enable_sagemaker_environment
   data_science_instance_class = var.environment == "prod" ? "db.r6g.xlarge" : "db.serverless"
@@ -334,7 +337,7 @@ module "vectordb" {
   database_name   = "${replace(var.app_name, "-", "")}${var.environment}db"
   master_username = "dbadmin"
   # master_password = var.skip_secret_creation ? "TemporaryPassword123!" : null
-  engine_version = "15.10"
+  engine_version = "15.12"
 
   use_serverless = false
   instance_count = 1
@@ -429,6 +432,35 @@ resource "aws_security_group" "db_access" {
   depends_on = [module.vpc]
 }
 
+# Bastion host for database access
+module "bastion" {
+  count  = var.enable_bastion_host ? 1 : 0
+  source = "./modules/bastion"
+
+  name_prefix         = var.app_name
+  vpc_cidr_blocks        = [module.vpc.vpc_cidr_block]
+
+  vpc_id             = module.vpc.vpc_id
+  public_subnet_id   = module.vpc.public_subnet_ids[0]
+  allowed_cidr_blocks = var.allowed_cidr_blocks
+  ssh_public_key     = var.ssh_public_key
+  aurora_endpoint    = module.vectordb.cluster_endpoint
+
+  tags = local.common_tags
+}
+
+# Allow bastion to connect to Aurora
+resource "aws_security_group_rule" "bastion_to_aurora" {
+  count = var.enable_bastion_host ? 1 : 0
+  
+  type                     = "ingress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  source_security_group_id = module.bastion[0].bastion_security_group_id
+  security_group_id        = module.vectordb.security_group_id
+  description              = "Allow bastion host to connect to Aurora PostgreSQL"
+}
 
 
 module "celery_redis" {
@@ -632,3 +664,5 @@ module "sagemaker" {
 
   depends_on = [module.vectordb]
 }
+
+

@@ -610,8 +610,9 @@ resource "aws_ecs_service" "api" {
   desired_count          = var.desired_count
   launch_type            = "FARGATE"
   enable_execute_command = true
-
-  network_configuration {
+  force_new_deployment = true
+  
+    network_configuration {
     security_groups  = concat([aws_security_group.ecs_tasks.id], var.additional_security_group_ids)
     subnets          = var.private_subnet_ids
     assign_public_ip = false
@@ -667,6 +668,7 @@ resource "aws_ecs_service" "worker" {
   desired_count          = var.worker_desired_count
   launch_type            = "FARGATE"
   enable_execute_command = true
+  force_new_deployment = true
 
   network_configuration {
     security_groups  = concat([aws_security_group.ecs_tasks.id], var.additional_security_group_ids)
@@ -706,6 +708,7 @@ resource "aws_ecs_service" "beat" {
   desired_count          = 1
   launch_type            = "FARGATE"
   enable_execute_command = true
+  force_new_deployment = true
 
   network_configuration {
     security_groups  = concat([aws_security_group.ecs_tasks.id], var.additional_security_group_ids)

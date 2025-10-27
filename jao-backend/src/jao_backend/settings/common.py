@@ -24,6 +24,8 @@ from jao_backend.common.util import is_truthy
 ENV = os.environ.get("ENV", "dev").lower()
 IS_DEV_ENVIRONMENT = ENV in ["dev", "ci", "local"]
 
+ALLOWED_HOSTS = ['*']
+
 # DEPLOYMENT_TYPE determines which models and embedding backend to use.
 # - local:  Ollama backend, public models.
 # - aws:    Bedrock backend, proprietary models.
@@ -43,6 +45,8 @@ if LITELLM_CUSTOM_PROVIDER not in ["ollama", "bedrock"]:
 
 # Note: On bedrock this isn't usually set.
 LITELLM_API_BASE = os.environ.get("JAO_BACKEND_LITELLM_API_BASE")
+
+MAX_TOKENS = os.environ.get("MAX_TOKENS", 4000)
 
 JAO_BEDROCK_REGION = "eu-west-2"
 
@@ -112,8 +116,12 @@ INSTALLED_APPS = [
     "jao_backend.ingest",
     "jao_backend.oleeo",
     "jao_backend.healthcheck",
+    "jao_backend.llm",
+    "jao_backend.applicant_text"
 ]
 
+
+DEBUG = "true"
 
 # Embedding tags:
 #
@@ -131,9 +139,13 @@ TEST_RUNNER = "jao_backend.settings.tests.runner.PytestTestRunner"
 
 # Chat models, for lookup by LITELLM_CUSTOM_PROVIDER.
 CHAT_MODEL_OPTIONS = {
-    "ollama": "ollama/mistral:7b",
+    "ollama": "mistral:7b",
     "bedrock": "bedrock/anthropic.claude-3-sonnet-20240229-v1:0",
 }
+
+LITELLM_COMPLETION_MODEL = "mistral:7b" if DEPLOYMENT_TYPE == "local" else "bedrock/anthropic.claude-3-sonnet-20250219-v1:0"
+
+LITELLM_COMPLETION_MODEL = CHAT_MODEL_OPTIONS[LITELLM_CUSTOM_PROVIDER]
 
 # Text embedding models, for lookup by LITELLM_CUSTOM_PROVIDER.
 TEXT_EMBEDDING_MODEL_OPTIONS = {
@@ -167,6 +179,7 @@ EMBEDDING_TAGS = {
         "version": 1,
     },
 }
+
 
 MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -205,6 +218,10 @@ WSGI_APPLICATION = "wsgi.application"
 #
 
 # Note, special characters like in the DATABASE URLs may need to be url escaped, e.g. %23 instead of #
+# DATABASES = {
+#     "default": os.getenv("JAO_BACKEND_DATABASE_URL"),
+# }
+
 DATABASES = {
     "default": dj_database_url.config(env="JAO_BACKEND_DATABASE_URL"),
 }
@@ -213,8 +230,7 @@ JAO_BACKEND_ENABLE_OLEEO = is_truthy(
     os.environ.get("JAO_BACKEND_ENABLE_OLEEO", "false")
 )
 if JAO_BACKEND_ENABLE_OLEEO:
-    DATABASES["oleeo"] = dj_database_url.config(
-        env="JAO_BACKEND_OLEEO_DATABASE_URL")
+    DATABASES["oleeo_upstream"] = dj_database_url.config(env="JAO_BACKEND_OLEEO_DATABASE_URL")
     DATABASE_ROUTERS = ["jao_backend.common.routers.router.OleeoRouter"]
 
 # Session engine, use the default database backed sessions

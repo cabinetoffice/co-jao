@@ -1,0 +1,54 @@
+# Development Dockerfile for jao-web
+FROM python:3.12-slim AS base
+
+# Install Node.js and npm
+RUN apt-get update && \
+    apt-get install -y curl && \
+    curl -sL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Set environment variables
+ENV ENV=dev
+ENV PYTHONPATH="/app/src"
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Install Poetry
+RUN curl -sSL https://install.python-poetry.org | python -
+ENV PATH="/root/.local/bin:$PATH"
+
+# Copy dependency files
+COPY ./jao-web/pyproject.toml ./pyproject.toml
+COPY ./jao-web/package.json ./package.json
+
+# Install dependencies
+RUN poetry install --no-root --no-cache
+RUN npm install
+
+# Copy source code (this will be overridden by volume mount in dev)
+COPY ./jao-web/src/ ./src/
+COPY ./jao-web/*.py ./
+COPY ./jao-web/webpack.config.js ./webpack.config.js
+
+# Build frontend assets
+RUN npm run build
+
+# Create frontend module directory
+RUN mkdir -p /app/src/frontend && \
+    touch /app/src/frontend/__init__.py
+
+# Expose port
+EXPOSE 8000
+
+# Development command with auto-reload
+CMD sh -c "set -e && \
+    echo 'Starting development server with WebSocket support...' && \
+    poetry run daphne -b 0.0.0.0 -p 8000 \
+        --websocket_timeout 600 \
+        --application-close-timeout 600 \
+        asgi:application"
