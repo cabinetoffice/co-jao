@@ -37,5 +37,11 @@ class VacancyTextAggregate(models.Model):
     all_employment_history = models.TextField(blank=True)
     all_previous_skills = models.TextField(blank=True)
 
+    skills_extracted = models.BooleanField(
+        default=False, 
+        db_index=True, 
+        help_text="True if this text has been processed by the skills-worker."
+    )
+
     def __str__(self):
         return f"Aggregated text for {self.vacancy.pk}"
