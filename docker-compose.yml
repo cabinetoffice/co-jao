@@ -15,7 +15,8 @@ services:
       - PYTHONPATH=/app/src
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
-      # Add your database and other environment variables here
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - JAO_BACKEND_SUPERUSER_USERNAME=${JAO_BACKEND_SUPERUSER_USERNAME:-admin_local}
       - JAO_BACKEND_SUPERUSER_EMAIL=${JAO_BACKEND_SUPERUSER_EMAIL:-admin_local@example.com}
       - JAO_BACKEND_SUPERUSER_PASSWORD=${JAO_BACKEND_SUPERUSER_PASSWORD:-admin123} 
@@ -28,6 +29,8 @@ services:
       - ./jao-backend/src:/app/src
     depends_on:
       - db
+      - skills-worker
+      - redis
     networks:
       - jao-network
 
@@ -35,12 +38,16 @@ services:
     build:
       context: .
       dockerfile: ./jao-backend/Dockerfile.dev
-    command: poetry run celery -A jao_backend.common.celery worker --loglevel=INFO
+    command: poetry run celery -A jao_backend.common.celery worker --loglevel=INFO -Q celery
     env_file:
       - .env
     environment:
       - ENV=dev
       - PYTHONPATH=/app/src
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
@@ -121,6 +128,33 @@ services:
       - redis_data:/data
     networks:
       - jao-network
+
+  skills-worker:
+        platform: linux/arm64
+        build:
+          context: .
+          dockerfile: ./skills-worker/Dockerfile
+        command: celery -A skills_extraction.skills_celery_app worker --loglevel=INFO -Q skills_queue
+        env_file:
+          - .env
+        environment:
+          - ENV=dev
+          - PYTHONPATH=/app
+          - CELERY_BROKER_URL=redis://redis:6379/0 
+          - CELERY_RESULT_BACKEND=redis://redis:6379/0
+          - POSTGRES_DB=jao_dev
+          - POSTGRES_USER=jao_user
+          - POSTGRES_PASSWORD=jao_password
+          - POSTGRES_HOST=db
+          - POSTGRES_PORT=5432
+          - OMP_NUM_THREADS=1
+          - MKL_NUM_THREADS=1
+          - TOKENIZERS_PARALLELISM=false
+        depends_on:
+          - db
+          - redis
+        networks:
+          - jao-network
 
 volumes:
   postgres_data:

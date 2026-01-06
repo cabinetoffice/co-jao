@@ -6,6 +6,7 @@ from celery.canvas import chain
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+from django.db import transaction
 from litellm.exceptions import APIConnectionError
 from litellm.exceptions import RateLimitError
 from litellm.exceptions import ServiceUnavailableError
@@ -15,6 +16,8 @@ from jao_backend.common.celery.active_singleton import ActiveSingleton
 from jao_backend.common.db.connections import DatabaseConnectionLostError, on_db_disconnect_raise
 from jao_backend.vacancies.embed import embed_vacancy
 from jao_backend.vacancies.models import Vacancy
+from jao_backend.applicant_text.models import VacancyTextAggregate
+from jao_backend.skills.models import Skill
 
 
 from jao_backend.common.celery import app as celery
@@ -184,6 +187,103 @@ def ingest_applicant_text(batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_S
     except Exception as e:
         logger.error(f"Error during applicant text ingestion: {e}", exc_info=True)
         raise
+
+# @celery.task(name="skills.run_skill_extraction_pipeline") # Note: using 'celery.task'
+# def run_skill_extraction_pipeline():
+#     """
+#     This is the "Manager Task" run by a Py 3.12 worker.
+#     It orchestrates the entire skill extraction pipeline.
+#     """
+#     logger.info("Starting skill extraction pipeline...")
+#     BATCH_SIZE = 100
+#     skill_object_cache = {skill.name: skill for skill in Skill.objects.all()}
+
+#     #while True:
+#     unprocessed_records = list(
+#         VacancyTextAggregate.objects.filter(skills_extracted=False)
+#         .select_related('vacancy')
+#         .order_by('vacancy_id')
+#         [:BATCH_SIZE]
+#     )
+
+#     if not unprocessed_records:
+#         logger.info("No new applicant texts to process.")
+#         return
+
+#     logger.info(f"Processing batch of {len(unprocessed_records)} vacancy texts...")
+
+#     batch_of_texts_to_send = []
+#     for agg_text in unprocessed_records:
+#         combined_text = " ".join(filter(None, [
+#             agg_text.all_personal_statements,
+#             agg_text.all_employment_history,
+#             agg_text.all_previous_skills
+#         ]))
+#         batch_of_texts_to_send.append(combined_text)
+
+#     logger.info("Sending batch to skills-worker...")
+#     # Note: using 'celery.send_task'
+#     task = celery.send_task(
+#         "skills_worker.tasks.extract_from_applicant_text",
+#         args=[batch_of_texts_to_send]
+#     )
+#     result = task.get(timeout=600) 
+
+#     if result['status'] == 'error':
+#         logger.error(f"Error from skills-worker: {result['message']}")
+#         return
+
+#     extracted_data = result['data']
+
+#     logger.info("Saving results to database...")
+    
+#     records_to_mark_as_done = []
+    
+#     with transaction.atomic():
+#         for agg_record, skill_data in zip(unprocessed_records, extracted_data):
+#             try:
+#                 vacancy = agg_record.vacancy
+#                 skill_strings = skill_data['extracted_skills']
+
+#                 skills_to_link = []
+#                 for skill_name in skill_strings:
+#                     if skill_name in skill_object_cache:
+#                         skill_obj = skill_object_cache[skill_name]
+#                     else:
+#                         skill_obj, _ = Skill.objects.get_or_create(name=skill_name)
+#                         skill_object_cache[skill_name] = skill_obj
+                    
+#                     skills_to_link.append(skill_obj)
+                
+#                 vacancy.skills.set(skills_to_link)
+#                 records_to_mark_as_done.append(agg_record.pk)
+
+#             except Vacancy.DoesNotExist:
+#                 logger.warning(f"Vacancy {agg_record.vacancy_id} not found. Skipping.")
+#             except Exception as e:
+#                 logger.error(f"Error processing {agg_record.vacancy_id}: {e}")
+
+#         VacancyTextAggregate.objects.filter(
+#             pk__in=records_to_mark_as_done
+#         ).update(skills_extracted=True)
+
+#     logger.info("Skill extraction complete!")
+
+
+@celery.task(name="skills_worker.tasks.extract_from_applicant_text")
+def proxy_extract_from_applicant_text(applicant_text_batch: list[str]):
+    """
+    This is a PROXY task. It just exists to get the task name
+    'skills_worker.tasks.extract_from_applicant_text'
+    into the jao-backend Celery app's registry.
+    
+    The task_routes config in common/celery.py will ensure this
+    is sent to the 'skills_queue', where the
+    skills-worker will execute it.
+    """
+
+    pass
+
 
 update_vacancies = chain(
     ingest_vacancies.s(), aggregate_applicant_statistics.s(), aggregate_applicant_regions.s(), ingest_applicant_text.s(), embed_vacancies.s()
