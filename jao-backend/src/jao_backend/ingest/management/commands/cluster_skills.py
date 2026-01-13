@@ -21,7 +21,6 @@ class Command(BaseCommand):
         parser.add_argument('--clear', action='store_true', help='Reset all clusters and delete SkillCluster records.')
 
     def handle(self, *args, **options):
-        # 1. Action: Clear
         if options['clear']:
             self.stdout.write(self.style.WARNING("Clearing existing cluster data..."))
             with transaction.atomic():
@@ -29,11 +28,9 @@ class Command(BaseCommand):
                 SkillCluster.objects.all().delete()
             self.stdout.write(self.style.SUCCESS("Database reset complete."))
 
-        # 2. Action: Cluster
         if options['cluster']:
             self.run_clustering()
 
-        # 3. Action: Name
         if options['name']:
             self.run_naming()
 
@@ -49,14 +46,12 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR("Not enough skills to cluster."))
             return
 
-        # Math Logic
         model = SentenceTransformer("all-MiniLM-L6-v2")
         embeddings = model.encode(names, show_progress_bar=True)
         
         umap_embeddings = UMAP(n_neighbors=15, n_components=2, min_dist=0.0, random_state=42).fit_transform(embeddings)
         labels = hdbscan.HDBSCAN(min_cluster_size=5).fit_predict(umap_embeddings)
 
-        # Handle Noise
         valid_mask = labels != -1
         if np.any(valid_mask) and np.any(~valid_mask):
             knn = NearestNeighbors(n_neighbors=1).fit(umap_embeddings[valid_mask])
@@ -64,7 +59,6 @@ class Command(BaseCommand):
             _, nearest = knn.kneighbors(umap_embeddings[noise_idx])
             labels[noise_idx] = labels[valid_mask][nearest.flatten()]
 
-        # Save to DB
         clusters_found = np.unique(labels)
         with transaction.atomic():
             for c_id in clusters_found:
@@ -78,7 +72,6 @@ class Command(BaseCommand):
     def run_naming(self):
         self.stdout.write("--- Starting Naming Phase ---")
         
-        # Check if the LLM provider is actually reachable using your ModelLister
         if not ModelLister.is_available():
             self.stdout.write(self.style.ERROR(f"AI Provider ({settings.LITELLM_CUSTOM_PROVIDER}) is not reachable!"))
             return
@@ -88,7 +81,6 @@ class Command(BaseCommand):
             self.stdout.write("No clusters need naming.")
             return
 
-        # Prepare model string correctly for LiteLLM
         raw_model = settings.LITELLM_COMPLETION_MODEL
         full_model_name = ModelLister.get_litellm_model_name(raw_model)
 
