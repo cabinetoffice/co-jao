@@ -1,34 +1,3 @@
-# import logging
-# from django.core.management.base import BaseCommand
-# from django.db import connections
-# from jao_backend.common.management.helpers import TaskCommandMixin
-
-# from jao_backend.vacancies.tasks import run_skill_extraction_pipeline
-
-# logger = logging.getLogger(__name__)
-
-# class Command(TaskCommandMixin, BaseCommand):
-#     """
-#     This command triggers the skill extraction pipeline
-#     by queueing the main orchestration task.
-#     """
-#     help = "Queues the task to extract skills from applicant text."
-
-#     def handle(self, *args, **options):
-#         """
-#         The main handler that queues the Celery task.
-#         """
-#         connections.close_all()
-
-#         # This calls our new "Manager Task" and lets
-#         # the jao-worker (Py 3.12) handle it.
-#         self.run_task(options, run_skill_extraction_pipeline)
-
-#         self.stdout.write(self.style.SUCCESS(
-#             "Successfully queued applicant skill extraction task."
-#         ))
-
-
 import logging
 from django.core.management.base import BaseCommand
 from django.db import transaction
