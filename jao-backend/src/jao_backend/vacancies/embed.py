@@ -40,7 +40,8 @@ def embed_vacancy(vacancy: "Vacancy") -> "TaggedEmbedding":
     Returns:
         TaggedEmbedding: TaggedEmbedding instances created for the vacancy.
     """
-    tag = EmbeddingTag.get_tag(settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID)
+    tag = EmbeddingTag.get_tag(
+        settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID)
 
     # Data from OLEEO can contain bbcode, strip it before embedding.
     job_info_text = strip_oleeo_bbcode(

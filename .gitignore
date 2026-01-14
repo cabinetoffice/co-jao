@@ -175,6 +175,7 @@ iac/.terraform.lock.hcl
 iac/terraform.tfstate
 iac/terraform.tfstate.backup
 iac/terraform.tfvars
+iac/*.tfvars.local
 iac/tfplan
 iac/.DS_Store
 

@@ -248,7 +248,20 @@ variable "prevent_destroy" {
 }
 
 variable "tags" {
-  description = "A map of tags to add to all resources"
+  description = "Map of tags to apply to all resources"
   type        = map(string)
   default     = {}
+}
+
+# Data Science Replica Variables
+variable "create_data_science_replica" {
+  description = "Whether to create a dedicated read replica for data science workloads"
+  type        = bool
+  default     = false
+}
+
+variable "data_science_instance_class" {
+  description = "Instance class for the data science read replica (defaults to db.serverless)"
+  type        = string
+  default     = null
 }
