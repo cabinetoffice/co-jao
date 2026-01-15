@@ -107,7 +107,7 @@ class BedrockModelList(ModelListBase):
     def is_available(cls) -> bool:
         try:
             client = boto3.client("bedrock", region_name=BEDROCK_REGION)
-            client.list_foundation_models(maxResults=1)
+            #client.list_foundation_models(maxResults=1)
             return True
         except (ClientError, NoCredentialsError) as e:
             logger.error(f"Bedrock not available: {e}")
