@@ -6,6 +6,7 @@ from celery.canvas import chain
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+from django.db import transaction
 from litellm.exceptions import APIConnectionError
 from litellm.exceptions import RateLimitError
 from litellm.exceptions import ServiceUnavailableError
@@ -15,6 +16,8 @@ from jao_backend.common.celery.active_singleton import ActiveSingleton
 from jao_backend.common.db.connections import DatabaseConnectionLostError, on_db_disconnect_raise
 from jao_backend.vacancies.embed import embed_vacancy
 from jao_backend.vacancies.models import Vacancy
+from jao_backend.applicant_text.models import VacancyTextAggregate
+from jao_backend.skills.models import Skill
 
 
 from jao_backend.common.celery import app as celery
@@ -184,6 +187,21 @@ def ingest_applicant_text(batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_S
     except Exception as e:
         logger.error(f"Error during applicant text ingestion: {e}", exc_info=True)
         raise
+
+@celery.task(name="skills_worker.tasks.extract_from_applicant_text")
+def proxy_extract_from_applicant_text(applicant_text_batch: list[str]):
+    """
+    This is a PROXY task. It just exists to get the task name
+    'skills_worker.tasks.extract_from_applicant_text'
+    into the jao-backend Celery app's registry.
+    
+    The task_routes config in common/celery.py will ensure this
+    is sent to the 'skills_queue', where the
+    skills-worker will execute it.
+    """
+
+    pass
+
 
 update_vacancies = chain(
     ingest_vacancies.s(), aggregate_applicant_statistics.s(), aggregate_applicant_regions.s(), ingest_applicant_text.s(), embed_vacancies.s()

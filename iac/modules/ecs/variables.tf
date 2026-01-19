@@ -333,3 +333,22 @@ variable "additional_security_group_ids" {
   type        = list(string)
   default     = []
 }
+
+
+# Skills Worker Configuration (Python 3.10)
+variable "skills_worker_image_url" {
+  description = "ECR URL for the Python 3.10 skills worker image"
+  type        = string
+}
+
+variable "skills_worker_cpu" {
+  description = "CPU units for skills worker (e.g., 512)"
+  type        = number
+  default     = 512
+}
+
+variable "skills_worker_memory" {
+  description = "Memory for skills worker (e.g., 1024)"
+  type        = number
+  default     = 1024
+}

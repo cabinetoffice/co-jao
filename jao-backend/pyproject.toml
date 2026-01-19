@@ -57,6 +57,10 @@ channels = "^4.3.1"
 channels-redis = "^4.3.0"
 daphne = "^4.2.1"
 autobahn = "^23.6.2"
+sentence-transformers = "^5.2.0"
+umap-learn = "^0.5.11"
+hdbscan = "^0.8.41"
+scikit-learn = "^1.8.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.7.0"

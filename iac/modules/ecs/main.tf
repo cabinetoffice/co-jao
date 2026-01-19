@@ -165,6 +165,24 @@ locals {
       }
     }
   ])
+  # Skills Worker container definitions (Python 3.10)
+  skills_worker_container_definitions = jsonencode([
+    {
+      name      = "skills-worker"
+      image     = var.skills_worker_image_url
+      essential = true
+      command   = ["python", "skills_extraction.py"]
+      environment = local.base_environment
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = local.cloudwatch_log_group_name
+          "awslogs-region"        = data.aws_region.current.name
+          "awslogs-stream-prefix" = "skills-worker"
+        }
+      }
+    }
+  ])
 }
 
 # Data sources
@@ -598,6 +616,24 @@ resource "aws_ecs_task_definition" "beat" {
     local.common_tags,
     {
       Name = "${local.name}-beat-task-definition"
+    }
+  )
+}
+
+resource "aws_ecs_task_definition" "skills_worker" {
+  family                   = "${local.name}-skills-worker-task"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = var.skills_worker_cpu
+  memory                   = var.skills_worker_memory
+  execution_role_arn       = local.task_execution_role_arn
+  task_role_arn            = local.task_role_arn
+  container_definitions    = local.skills_worker_container_definitions
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.name}-skills-worker-task-definition"
     }
   )
 }
