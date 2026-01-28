@@ -15,7 +15,7 @@ locals {
     }
   ]
 
-  # Skills worker container environment (subset of vars + Redis for Celery communication)
+  # Skills worker container environment
   skills_worker_environment = [
     for key, value in var.skills_worker_environment_variables : {
       name  = key
