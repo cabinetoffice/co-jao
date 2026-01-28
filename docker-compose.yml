@@ -1,4 +1,3 @@
-
 services:
   jao-backend:
     build:
@@ -7,7 +6,7 @@ services:
     ports:
       - "8000:8000"
     extra_hosts:
-      - "host.docker.internal:host-gateway"  
+      - "host.docker.internal:host-gateway"
     env_file:
       - .env
     environment:
@@ -15,70 +14,19 @@ services:
       - PYTHONPATH=/app/src
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - JAO_BACKEND_SUPERUSER_USERNAME=${JAO_BACKEND_SUPERUSER_USERNAME:-admin_local}
       - JAO_BACKEND_SUPERUSER_EMAIL=${JAO_BACKEND_SUPERUSER_EMAIL:-admin_local@example.com}
-      - JAO_BACKEND_SUPERUSER_PASSWORD=${JAO_BACKEND_SUPERUSER_PASSWORD:-admin123} 
+      - JAO_BACKEND_SUPERUSER_PASSWORD=${JAO_BACKEND_SUPERUSER_PASSWORD:-admin123}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
       - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-eu-west-2}
+      - SKILLS_WORKER_URL=http://skills-worker:5000
     volumes:
-      # Mount source code for hot reloading during development
       - ./jao-backend/src:/app/src
     depends_on:
       - db
       - skills-worker
-      - redis
-    networks:
-      - jao-network
-
-  jao-worker:
-    build:
-      context: .
-      dockerfile: ./jao-backend/Dockerfile.dev
-    command: poetry run celery -A jao_backend.common.celery worker --loglevel=INFO -Q celery
-    env_file:
-      - .env
-    environment:
-      - ENV=dev
-      - PYTHONPATH=/app/src
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
-      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-eu-west-2}
-    volumes:
-      - ./jao-backend/src:/app/src
-    depends_on:
-      - db
-      - redis
-    networks:
-      - jao-network
-
-  jao-beat:
-    build:
-      context: .
-      dockerfile: ./jao-backend/Dockerfile.dev
-    command: poetry run celery -A jao_backend.common.celery beat --loglevel=INFO
-    env_file:
-      - .env
-    environment:
-      - ENV=dev
-      - PYTHONPATH=/app/src
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
-      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-eu-west-2}
-    volumes:
-      - ./jao-backend/src:/app/src
-    depends_on:
-      - db
-      - redis
     networks:
       - jao-network
 
@@ -87,7 +35,7 @@ services:
       context: .
       dockerfile: ./jao-web/Dockerfile.dev
     ports:
-      - "8001:8000"  # Different port to avoid conflict
+      - "8001:8000"
     env_file:
       - .env
     environment:
@@ -95,14 +43,10 @@ services:
       - PYTHONPATH=/app/src
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
-      # Add API endpoint for backend communication
-      - REDIS_HOST=redis
     volumes:
-      # Mount source code for hot reloading during development
       - ./jao-web/src:/app/src
     depends_on:
       - jao-backend
-      - redis
     networks:
       - jao-network
 
@@ -119,46 +63,27 @@ services:
     networks:
       - jao-network
 
-  # Optional: Redis for caching/sessions
-  redis:
-    image: redis:7-alpine
+  skills-worker:
+    platform: linux/arm64
+    build:
+      context: .
+      dockerfile: ./skills-worker/Dockerfile
     ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      - ENV=dev
+      - PYTHONPATH=/app
+      - PORT=5000
+      - OMP_NUM_THREADS=1
+      - MKL_NUM_THREADS=1
+      - TOKENIZERS_PARALLELISM=false
     networks:
       - jao-network
 
-  skills-worker:
-        platform: linux/arm64
-        build:
-          context: .
-          dockerfile: ./skills-worker/Dockerfile
-        command: celery -A skills_extraction.skills_celery_app worker --loglevel=INFO -Q skills_queue
-        env_file:
-          - .env
-        environment:
-          - ENV=dev
-          - PYTHONPATH=/app
-          - CELERY_BROKER_URL=redis://redis:6379/0 
-          - CELERY_RESULT_BACKEND=redis://redis:6379/0
-          - POSTGRES_DB=jao_dev
-          - POSTGRES_USER=jao_user
-          - POSTGRES_PASSWORD=jao_password
-          - POSTGRES_HOST=db
-          - POSTGRES_PORT=5432
-          - OMP_NUM_THREADS=1
-          - MKL_NUM_THREADS=1
-          - TOKENIZERS_PARALLELISM=false
-        depends_on:
-          - db
-          - redis
-        networks:
-          - jao-network
-
 volumes:
   postgres_data:
-  redis_data:
 
 networks:
   jao-network:

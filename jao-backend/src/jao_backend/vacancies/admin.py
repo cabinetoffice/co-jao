@@ -1,28 +1,14 @@
-from redis.exceptions import ConnectionError
-from redis.exceptions import TimeoutError
-from redis.exceptions import RedisError
-from kombu.exceptions import OperationalError
-from celery.exceptions import WorkerLostError
-
-from django.contrib import admin, messages
-from django.db.models import Count, Q
-from django.shortcuts import redirect, render
-from django.urls import path
-from django.conf import settings
-from django import forms
-
-from jao_backend.common.admin import ReadOnlyAdminMixin
-from jao_backend.common.celery.monitoring import is_task_running
-from jao_backend.embeddings.models import EmbeddingTag
-from jao_backend.vacancies.models import Vacancy, VacancyGrade, VacancyRoleType
-from jao_backend.vacancies.tasks import embed_vacancies
 import logging
 
+from django.contrib import admin
+from django.db.models import Count, Q
+from django.conf import settings
+
+from jao_backend.common.admin import ReadOnlyAdminMixin
+from jao_backend.embeddings.models import EmbeddingTag
+from jao_backend.vacancies.models import Vacancy, VacancyGrade, VacancyRoleType
+
 logger = logging.getLogger(__name__)
-
-
-class StartEmbeddingsTaskForm(forms.Form):
-    pass
 
 
 class StatusFilter(admin.SimpleListFilter):
@@ -98,127 +84,3 @@ class VacancyAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related()
-
-    def get_urls(self):
-        urls = super().get_urls()
-        custom_urls = [
-            path(
-                "embeddings/",
-                self.admin_site.admin_view(self.embeddings_view),
-                name="vacancies_vacancy_embeddings",
-            )
-        ]
-        return custom_urls + urls
-
-    def embeddings_view(self, request):
-        task_name = "jao_backend.vacancies.tasks.embed_vacancies"
-
-        if request.method == "POST":
-            form = StartEmbeddingsTaskForm(request.POST)
-            if form.is_valid():
-                task_running = False
-                check_failed = False
-                try:
-                    task_running = is_task_running(task_name)
-                except (ConnectionError, TimeoutError, OperationalError, WorkerLostError) as e:
-                    logger.error(f"Task status check failed: {
-                                 type(e).__name__}: {e}")
-                    messages.error(
-                        request,
-                        f"Could not check task status due to Redis/Celery error: {type(e).__name__}: {
-                            e}",
-                    )
-                    check_failed = True
-
-                if not check_failed:
-                    if task_running:
-                        messages.warning(
-                            request, "An embedding task is already running.")
-                    else:
-                        embed_vacancies.delay()
-                        messages.success(
-                            request, "Embedding task has been started.")
-            return redirect(request.path_info)
-
-        try:
-            task_is_running = is_task_running(task_name)
-        except (ConnectionError, TimeoutError, OperationalError, WorkerLostError) as e:
-            logger.error(f"Task status check failed: {type(e).__name__}: {e}")
-            messages.error(
-                request,
-                f"Could not check task status due to Redis/Celery error: {type(e).__name__}: {
-                    e}",
-            )
-            task_is_running = False
-
-        embed_limit = getattr(
-            settings, "JAO_BACKEND_VACANCY_EMBED_LIMIT", None)
-
-        total_vacancies = Vacancy.objects.filter(is_deleted=False).count()
-
-        configured_vacancies_qs = Vacancy.objects.configured_for_embed(
-            limit=embed_limit
-        )
-        progress_max = configured_vacancies_qs.count()
-
-        vacancies_needing_embedding = Vacancy.objects.requires_embedding(
-            limit=embed_limit
-        )
-        remaining_work_count = vacancies_needing_embedding.count()
-
-        embedding_stats = self._get_embedding_statistics(
-            configured_vacancies_qs, progress_max
-        )
-
-        context = {
-            **self.admin_site.each_context(request),
-            "title": "Vacancy Embeddings",
-            "litellm_custom_provider": settings.LITELLM_CUSTOM_PROVIDER,
-            "total_vacancies": total_vacancies,
-            "progress_max": progress_max,
-            "remaining_work_count": remaining_work_count,
-            "embedding_stats": embedding_stats,
-            "embed_limit": embed_limit,
-            "task_is_running": task_is_running,
-            "form": StartEmbeddingsTaskForm(),
-        }
-        return render(request, "admin/vacancies/embedding_status.html", context)
-
-    def _get_embedding_statistics(self, configured_vacancies_qs, progress_max):
-        """
-        Helper method to calculate embedding statistics for each valid tag.
-        Uses the existing valid_tags() queryset method.
-        """
-        if progress_max == 0:
-            return []
-
-        # Use the existing valid_tags queryset method
-        valid_tags = (
-            EmbeddingTag.objects.valid_tags()
-            .annotate(
-                embedded_count=Count(
-                    "vacancyembedding__vacancy",
-                    filter=Q(
-                        vacancyembedding__vacancy__in=configured_vacancies_qs),
-                    distinct=True,
-                )
-            )
-            .select_related("model")
-            .order_by("name")
-        )
-
-        embedding_stats = []
-        for tag in valid_tags:
-            percentage = (
-                (tag.embedded_count / progress_max * 100) if progress_max > 0 else 0
-            )
-
-            embedding_stats.append(
-                {
-                    "tag": tag,
-                    "embedded_count": tag.embedded_count,  # Keep original template variable name
-                    "percentage": f"{percentage:.1f}",
-                }
-            )
-
-        return embedding_stats

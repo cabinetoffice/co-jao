@@ -1,4 +1,17 @@
-# main.tf
+# main.tf - JAO Data Engine Infrastructure (Minimal)
+#
+# This infrastructure supports a batch data processing engine that runs weekly.
+# It does NOT include: API Gateway, Frontend, Celery/Redis, always-on ECS services.
+#
+# Components:
+# - VPC with private/public subnets
+# - Aurora PostgreSQL with pgvector
+# - Single ECS cluster with two task definitions:
+#   - Data Engine (Python 3.12) - main pipeline
+#   - Skills Worker (Python 3.10) - skills extraction
+# - S3 buckets for initialization and data science
+# - Optional: SageMaker notebook, Bastion host
+
 terraform {
   required_providers {
     aws = {
@@ -20,7 +33,6 @@ locals {
     ManagedBy   = "terraform"
   }
 
-
   # Environment-specific configurations
   env_config = {
     prod = {
@@ -33,12 +45,6 @@ locals {
       db_backup_retention    = 30
       db_skip_final_snapshot = false
       db_deletion_protection = true
-      api_rate_limit         = 200
-      api_burst_limit        = 300
-      max_requests_per_min   = "1000"
-      enable_xray_tracing    = true
-      django_debug           = "False"
-      session_cookie_secure  = "true"
       monitoring_interval    = 60
     }
     dev = {
@@ -51,12 +57,6 @@ locals {
       db_backup_retention    = 7
       db_skip_final_snapshot = true
       db_deletion_protection = false
-      api_rate_limit         = 500
-      api_burst_limit        = 1000
-      max_requests_per_min   = "2000"
-      enable_xray_tracing    = false
-      django_debug           = "True"
-      session_cookie_secure  = "false"
       monitoring_interval    = 30
     }
   }
@@ -64,12 +64,16 @@ locals {
   # Current environment config
   current_env = local.env_config[var.environment == "prod" ? "prod" : "dev"]
 
-  # ECR repository URLs
-  backend_ecr_url  = "${aws_ecr_repository.app.repository_url}:${var.image_tag}"
-  frontend_ecr_url = "${aws_ecr_repository.frontend.repository_url}:${var.image_tag}"
+  # ECR image URLs (same repo, different tags)
+  data_engine_ecr_url   = "${aws_ecr_repository.main.repository_url}:${var.data_engine_image_tag}"
+  skills_worker_ecr_url = "${aws_ecr_repository.main.repository_url}:${var.skills_worker_image_tag}"
 }
 
-# Create S3 bucket for initialization scripts
+# =============================================================================
+# S3 BUCKETS
+# =============================================================================
+
+# S3 bucket for initialization scripts
 module "initialization_bucket" {
   source      = "./modules/s3_bucket"
   bucket_name = coalesce(var.initialization_bucket, "${var.app_name}-${var.environment}-initialization")
@@ -91,8 +95,14 @@ module "initialization_bucket" {
   tags = local.common_tags
 }
 
-# ECR Repository for Backend API Docker image
-resource "aws_ecr_repository" "app" {
+# =============================================================================
+# ECR REPOSITORY (Single repo, multiple image tags)
+# =============================================================================
+
+# ECR Repository for all Docker images
+# - data-engine tag: Python 3.12 main pipeline
+# - skills-worker tag: Python 3.10 skills extraction
+resource "aws_ecr_repository" "main" {
   name                 = "${var.app_name}-${var.environment}"
   image_tag_mutability = "MUTABLE"
 
@@ -103,20 +113,44 @@ resource "aws_ecr_repository" "app" {
   tags = local.common_tags
 }
 
-# ECR Repository for Frontend Docker image
-resource "aws_ecr_repository" "frontend" {
-  name                 = "${var.app_name}-frontend-${var.environment}"
-  image_tag_mutability = "MUTABLE"
+resource "aws_ecr_lifecycle_policy" "main" {
+  repository = aws_ecr_repository.main.name
 
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-
-  tags = local.common_tags
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep last 10 images per tag prefix"
+        selection = {
+          tagStatus     = "tagged"
+          tagPrefixList = ["data-engine", "skills-worker"]
+          countType     = "imageCountMoreThan"
+          countNumber   = 10
+        }
+        action = {
+          type = "expire"
+        }
+      },
+      {
+        rulePriority = 2
+        description  = "Keep last 5 untagged images"
+        selection = {
+          tagStatus   = "untagged"
+          countType   = "imageCountMoreThan"
+          countNumber = 5
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
 }
 
+# =============================================================================
+# VPC
+# =============================================================================
 
-# VPC configuration
 module "vpc" {
   source = "./modules/vpc"
 
@@ -144,179 +178,10 @@ module "vpc" {
   tags = local.common_tags
 }
 
-# ECS Cluster and Service
-module "ecs" {
-  source = "./modules/ecs"
+# =============================================================================
+# AURORA POSTGRESQL DATABASE
+# =============================================================================
 
-  name_prefix        = var.app_name
-  environment        = var.environment
-  ecr_repository_url = local.backend_ecr_url
-  container_port     = var.container_port
-  vpc_id             = module.vpc.vpc_id
-  private_subnet_ids = module.vpc.private_subnet_ids
-  public_subnet_ids  = module.vpc.public_subnet_ids
-  cpu                = var.task_cpu
-  memory             = var.task_memory
-  desired_count      = var.desired_count
-  container_name     = var.app_name
-  additional_security_group_ids = [
-    aws_security_group.redis_client.id,
-    aws_security_group.db_access.id,
-    aws_security_group.oleeo.id
-  ]
-
-  # Environment variables for the API service
-  environment_variables = merge(var.environment_variables, {
-    # Database environment variables
-    DB_HOST     = module.vectordb.cluster_endpoint
-    DB_PORT     = "5432"
-    DB_NAME     = module.vectordb.database_name
-    DB_USER     = module.vectordb.master_username
-    DB_PASSWORD = "secrettpassword"
-
-    # Django environment variables
-    ENV                    = "dev"
-    DJANGO_SETTINGS_MODULE = "jao_backend.settings.dev"
-    JAO_BACKEND_SECRET_KEY = "8e5c0e0f457aeec89329be09" # Will be overridden in production
-    DJANGO_DEBUG           = local.current_env.django_debug
-    API_STAGE_NAME         = var.environment
-    DJANGO_ALLOWED_HOSTS   = "*"
-    DEPLOYMENT_TYPE        = "aws"
-
-    # Database URL for Django (required by jao_backend settings)
-    JAO_BACKEND_DATABASE_URL       = "postgresql://${module.vectordb.master_username}:secrettpassword@${module.vectordb.cluster_endpoint}:5432/${module.vectordb.database_name}"
-    JAO_BACKEND_OLEEO_DATABASE_URL = var.oleeo_url
-    JAO_BACKEND_ENABLE_OLEEO       = 1
-    JAO_BACKEND_SUPERUSER_USERNAME = var.jao_backend_superuser_username
-    JAO_BACKEND_SUPERUSER_PASSWORD = var.jao_backend_superuser_password
-    JAO_BACKEND_SUPERUSER_EMAIL    = var.jao_backend_superuser_email
-    REDIS_HOST                     = module.celery_redis.celery_broker_url
-    # Celery configuration
-    CELERY_BROKER_URL                     = module.celery_redis.celery_broker_url
-    CELERY_RESULT_BACKEND                 = module.celery_redis.celery_result_backend
-    JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE = 200
-
-    # LiteLLM integration
-    JAO_BACKEND_VACANCY_EMBED_LIMIT       = 70000
-    #JAO_BACKEND_LITELLM_API_BASE          = "http://127.0.0.1:11434/api/embed" # Default for dev environment
-    #JAO_BACKEND_LITELLM_CUSTOM_PROVIDER   = "ollama"                           # Default for dev environment
-    JAO_EMBEDDER_SUMMARY_RESPONSIBILITIES = "bedrock/amazon.titan-embed-text-v2:0"
-
-    # API rate limiting and monitoring config
-    ENABLE_RATE_LIMITING = "true"
-    MAX_REQUESTS_PER_MIN = local.current_env.max_requests_per_min
-    ENABLE_API_METRICS   = "true"
-
-    # Django admin URL configuration - use standard admin URL
-    DJANGO_ADMIN_URL = "django-admin/"
-  })
-
-  health_check_path        = "/health"
-  internal_lb              = false
-  admin_lb_internet_facing = true
-  logs_retention_in_days   = local.current_env.log_retention_days
-
-  # Enable enhanced monitoring and tracing for the API backend
-  enable_enhanced_monitoring = true
-  enable_xray_tracing        = local.current_env.enable_xray_tracing
-  enable_circuit_breaker     = true
-
-  # Enable Celery services
-  enable_celery_services = var.enable_celery_services
-
-  # Admin IP whitelisting
-  admin_allowed_cidrs = var.admin_allowed_cidrs
-
-  tags = local.common_tags
-}
-
-# Frontend Module
-module "frontend" {
-  source = "./modules/frontend"
-
-  name_prefix        = var.app_name
-  environment        = var.environment
-  ecr_repository_url = local.frontend_ecr_url
-  container_port     = 8000
-  vpc_id             = module.vpc.vpc_id
-  private_subnet_ids = module.vpc.private_subnet_ids
-  public_subnet_ids  = module.vpc.public_subnet_ids
-  cpu                = var.task_cpu
-  memory             = var.task_memory
-  desired_count      = var.desired_count
-  frontend_allowed_cidrs = var.frontend_allowed_cidrs
-
-  # Environment variables for the frontend service
-  environment_variables = {
-    DJANGO_DEBUG             = local.current_env.django_debug
-    DJANGO_SETTINGS_MODULE   = "jao_web.settings.dev"
-    PORT                     = "8000"
-    JAO_BACKEND_URL          = module.ecs.load_balancer_dns_name
-    JAO_BACKEND_TIMEOUT      = "15"
-    JAO_BACKEND_ENABLE_HTTP2 = "true"
-    SESSION_COOKIE_SECURE    = local.current_env.session_cookie_secure
-    ENV                      = var.environment
-    DJANGO_ALLOWED_HOSTS     = "*"
-  }
-  health_check_path      = "/health"
-  internal_lb            = false
-  logs_retention_in_days = local.current_env.log_retention_days
-
-  tags = local.common_tags
-}
-
-# API Gateway with enhanced third-party API features
-module "api_gateway" {
-  source = "./modules/api_gateway"
-
-  name_prefix                = var.app_name
-  environment                = var.environment
-  vpc_id                     = module.vpc.vpc_id
-  load_balancer_arn          = module.ecs.load_balancer_arn
-  load_balancer_dns_name     = module.ecs.load_balancer_dns_name
-  stage_name                 = var.environment
-  logs_retention_in_days     = local.current_env.log_retention_days
-  enable_api_keys            = true
-  enable_detailed_metrics    = true
-  api_throttling_rate_limit  = local.current_env.api_rate_limit
-  api_throttling_burst_limit = local.current_env.api_burst_limit
-
-  # API keys for third-party consumers
-  api_keys = [
-    {
-      name        = "internal-frontend"
-      description = "API key for internal frontend application"
-      enabled     = true
-    },
-    {
-      name        = "partner-api-consumer"
-      description = "API key for partner applications"
-      enabled     = true
-    },
-    {
-      name        = "public-api-consumer"
-      description = "API key for public API consumers"
-      enabled     = true
-    }
-  ]
-  routes = [
-    {
-      route_key = "ANY /{proxy+}"
-      methods   = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
-      path      = "/{proxy+}"
-    },
-    {
-      route_key = "GET /health"
-      methods   = ["GET"]
-      path      = "/health"
-    }
-  ]
-
-  tags = local.common_tags
-}
-
-
-# Database Module - Aurora PostgreSQL with pgvector
 module "vectordb" {
   source = "./modules/aurora_pgvector"
 
@@ -328,7 +193,8 @@ module "vectordb" {
   subnet_ids = module.vpc.private_subnet_ids
 
   allowed_security_groups = [aws_security_group.db_access.id]
-  allowed_cidr_blocks = var.allowed_cidr_blocks
+  allowed_cidr_blocks     = var.allowed_cidr_blocks
+
   # Enable data science read replica if SageMaker is enabled
   create_data_science_replica = var.enable_sagemaker_environment
   data_science_instance_class = var.environment == "prod" ? "db.r6g.xlarge" : "db.serverless"
@@ -336,8 +202,7 @@ module "vectordb" {
   # Database configuration
   database_name   = "${replace(var.app_name, "-", "")}${var.environment}db"
   master_username = "dbadmin"
-  # master_password = var.skip_secret_creation ? "TemporaryPassword123!" : null
-  engine_version = "15.12"
+  engine_version  = "15.12"
 
   use_serverless = false
   instance_count = 1
@@ -356,7 +221,6 @@ module "vectordb" {
   init_script        = "${path.module}/sql/init_pgvector.sql"
   init_script_bucket = module.initialization_bucket.bucket_id
   prevent_destroy    = false
-
 
   additional_parameters = [
     {
@@ -380,18 +244,6 @@ module "vectordb" {
   tags = local.common_tags
 }
 
-resource "aws_security_group_rule" "sagemaker_to_aurora" {
-  count = var.enable_sagemaker_environment ? 1 : 0
-
-  type                     = "ingress"
-  from_port                = 5432
-  to_port                  = 5432
-  protocol                 = "tcp"
-  source_security_group_id = module.sagemaker[0].security_group_id
-  security_group_id        = module.vectordb.security_group_id
-  description              = "Allow SageMaker notebook to connect to Aurora PostgreSQL"
-}
-
 # Security group for database access from ECS tasks
 resource "aws_security_group" "db_access" {
   name        = "${var.app_name}-${var.environment}-db-access"
@@ -406,8 +258,6 @@ resource "aws_security_group" "db_access" {
     security_groups = [module.vectordb.security_group_id]
     description     = "PostgreSQL database access to Aurora"
   }
-
-
 
   # DNS resolution
   egress {
@@ -432,19 +282,114 @@ resource "aws_security_group" "db_access" {
   depends_on = [module.vpc]
 }
 
-# Bastion host for database access
+# Security group for Oleeo MSSQL access
+resource "aws_security_group" "oleeo" {
+  name_prefix = "${var.app_name}-${var.environment}-oleeo-"
+  vpc_id      = module.vpc.vpc_id
+
+  egress {
+    from_port   = 1433
+    to_port     = 1433
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow outbound MSSQL connection to Oleeo database"
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${var.app_name}-${var.environment}-oleeo-sg"
+  })
+}
+
+# =============================================================================
+# ECS SCHEDULED TASKS (Single Cluster, Two Task Definitions)
+# =============================================================================
+
+module "scheduled_tasks" {
+  source = "./modules/scheduled_task"
+
+  name_prefix = var.app_name
+  environment = var.environment
+
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+
+  security_group_ids = [
+    aws_security_group.db_access.id,
+    aws_security_group.oleeo.id
+  ]
+
+  # Data Engine Task (Python 3.12)
+  data_engine_image_url           = local.data_engine_ecr_url
+  data_engine_cpu                 = var.data_engine_cpu
+  data_engine_memory              = var.data_engine_memory
+  data_engine_command             = ["python", "manage.py", "run_weekly_pipeline"]
+  data_engine_schedule_expression = var.data_engine_schedule_expression
+
+  # Data engine environment variables
+  environment_variables = {
+    # Database environment variables
+    DB_HOST     = module.vectordb.cluster_endpoint
+    DB_PORT     = "5432"
+    DB_NAME     = module.vectordb.database_name
+    DB_USER     = module.vectordb.master_username
+    DB_PASSWORD = var.db_password
+
+    # Django environment variables
+    ENV                    = var.environment
+    DJANGO_SETTINGS_MODULE = "jao_backend.settings.${var.environment}"
+    JAO_BACKEND_SECRET_KEY = var.django_secret_key
+    DEPLOYMENT_TYPE        = "aws"
+
+    # Database URL for Django
+    JAO_BACKEND_DATABASE_URL       = "postgresql://${module.vectordb.master_username}:${var.db_password}@${module.vectordb.cluster_endpoint}:5432/${module.vectordb.database_name}"
+    JAO_BACKEND_OLEEO_DATABASE_URL = var.oleeo_url
+    JAO_BACKEND_ENABLE_OLEEO       = "1"
+
+    # Data processing settings
+    JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE = tostring(var.ingest_batch_size)
+    JAO_BACKEND_VACANCY_EMBED_LIMIT       = tostring(var.vacancy_embed_limit)
+    JAO_EMBEDDER_SUMMARY_RESPONSIBILITIES = var.embedder_model
+  }
+
+  # Skills Worker Task (Python 3.10)
+  skills_worker_image_url           = local.skills_worker_ecr_url
+  skills_worker_cpu                 = var.skills_worker_cpu
+  skills_worker_memory              = var.skills_worker_memory
+  skills_worker_command             = ["python", "skills_extraction.py"]
+  enable_skills_worker_schedule     = var.enable_skills_worker_schedule
+  skills_worker_schedule_expression = var.skills_worker_schedule_expression
+
+  # Skills worker environment variables
+  skills_worker_environment_variables = {
+    # Database connection for storing results
+    DB_HOST     = module.vectordb.cluster_endpoint
+    DB_PORT     = "5432"
+    DB_NAME     = module.vectordb.database_name
+    DB_USER     = module.vectordb.master_username
+    DB_PASSWORD = var.db_password
+  }
+
+  schedule_enabled       = var.schedule_enabled
+  logs_retention_in_days = local.current_env.log_retention_days
+
+  tags = local.common_tags
+}
+
+# =============================================================================
+# BASTION HOST (Optional)
+# =============================================================================
+
 module "bastion" {
   count  = var.enable_bastion_host ? 1 : 0
   source = "./modules/bastion"
 
   name_prefix         = var.app_name
-  vpc_cidr_blocks        = [module.vpc.vpc_cidr_block]
-
-  vpc_id             = module.vpc.vpc_id
-  public_subnet_id   = module.vpc.public_subnet_ids[0]
+  vpc_cidr_blocks     = [module.vpc.vpc_cidr_block]
+  vpc_id              = module.vpc.vpc_id
+  public_subnet_id    = module.vpc.public_subnet_ids[0]
   allowed_cidr_blocks = var.allowed_cidr_blocks
-  ssh_public_key     = var.ssh_public_key
-  aurora_endpoint    = module.vectordb.cluster_endpoint
+  ssh_public_key      = var.ssh_public_key
+  aurora_endpoint     = module.vectordb.cluster_endpoint
 
   tags = local.common_tags
 }
@@ -452,7 +397,7 @@ module "bastion" {
 # Allow bastion to connect to Aurora
 resource "aws_security_group_rule" "bastion_to_aurora" {
   count = var.enable_bastion_host ? 1 : 0
-  
+
   type                     = "ingress"
   from_port                = 5432
   to_port                  = 5432
@@ -462,139 +407,9 @@ resource "aws_security_group_rule" "bastion_to_aurora" {
   description              = "Allow bastion host to connect to Aurora PostgreSQL"
 }
 
-
-module "celery_redis" {
-  source                     = "./modules/elasticache"
-  replication_group_id       = "jao-celery-cache"
-  node_type                  = "cache.t3.small"
-  subnet_group_name          = aws_elasticache_subnet_group.main.name
-  security_group_ids         = [aws_security_group.redis.id] # Uses redis security group to receive connections
-  transit_encryption_enabled = var.redis_transit_encryption_enabled
-  auth_token                 = var.redis_auth_token
-  tags = {
-    Environment = "production"
-    Application = "celery"
-  }
-}
-
-resource "aws_security_group" "redis_client" {
-  name_prefix = "${var.app_name}-${var.environment}-redis-client-"
-  vpc_id      = module.vpc.vpc_id
-  description = "Security group for services that need Redis access"
-
-  tags = merge(local.common_tags, {
-    Name = "${var.app_name}-${var.environment}-redis-client-sg"
-  })
-}
-
-# Security group for Redis
-resource "aws_security_group" "redis" {
-  name_prefix = "redis-celery-"
-  vpc_id      = module.vpc.vpc_id
-
-  tags = {
-    Name = "redis-celery-sg"
-  }
-}
-
-# Egress rule for Redis security group
-resource "aws_security_group_rule" "redis_egress_all" {
-  type              = "egress"
-  from_port         = 0
-  to_port           = 0
-  protocol          = "-1"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.redis.id
-  description       = "Allow all outbound traffic from Redis"
-}
-
-
-resource "aws_security_group" "celery_workers" {
-  name_prefix = "celery-workers-"
-  vpc_id      = module.vpc.vpc_id
-
-  tags = {
-    Name = "celery-workers-sg"
-  }
-}
-
-# Security group rules
-resource "aws_security_group_rule" "redis_ingress_6379_redis_client" {
-  type                     = "ingress"
-  from_port                = 6379
-  to_port                  = 6379
-  protocol                 = "tcp"
-  source_security_group_id = aws_security_group.redis_client.id
-  security_group_id        = aws_security_group.redis.id
-  description              = "Allow Redis write connections from redis_client"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_security_group_rule" "redis_ingress_6379_celery" {
-  type                     = "ingress"
-  from_port                = 6379
-  to_port                  = 6379
-  protocol                 = "tcp"
-  source_security_group_id = aws_security_group.celery_workers.id
-  security_group_id        = aws_security_group.redis.id
-  description              = "Allow Redis write connections from celery_workers"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-# Egress rules for redis_client security group - allows connections to Redis
-# Port 6379: Standard Redis port for both primary and replica endpoints
-
-resource "aws_security_group_rule" "redis_client_egress_6379" {
-  type                     = "egress"
-  from_port                = 6379
-  to_port                  = 6379
-  protocol                 = "tcp"
-  source_security_group_id = aws_security_group.redis.id
-  security_group_id        = aws_security_group.redis_client.id
-  description              = "Allow Redis connections to redis"
-}
-
-# Egress rules for celery_workers security group - allows Celery workers to connect to Redis
-
-resource "aws_security_group_rule" "celery_workers_egress_6379" {
-  type                     = "egress"
-  from_port                = 6379
-  to_port                  = 6379
-  protocol                 = "tcp"
-  source_security_group_id = aws_security_group.redis.id
-  security_group_id        = aws_security_group.celery_workers.id
-  description              = "Allow Redis connections to redis"
-}
-
-# Subnet group
-resource "aws_elasticache_subnet_group" "main" {
-  name       = "celery-redis-subnet-group"
-  subnet_ids = module.vpc.private_subnet_ids
-}
-
-resource "aws_security_group" "oleeo" {
-
-  name_prefix = "oleeo-"
-  vpc_id      = module.vpc.vpc_id
-
-  egress {
-    from_port   = 1433
-    to_port     = 1433
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Allow outbound MSSQL connection to database VPC"
-  }
-
-  tags = {
-    Name = "oleeo-sg"
-  }
-}
+# =============================================================================
+# SAGEMAKER (Optional)
+# =============================================================================
 
 # S3 Bucket for Data Science Work
 module "data_science_bucket" {
@@ -665,4 +480,14 @@ module "sagemaker" {
   depends_on = [module.vectordb]
 }
 
+resource "aws_security_group_rule" "sagemaker_to_aurora" {
+  count = var.enable_sagemaker_environment ? 1 : 0
 
+  type                     = "ingress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  source_security_group_id = module.sagemaker[0].security_group_id
+  security_group_id        = module.vectordb.security_group_id
+  description              = "Allow SageMaker notebook to connect to Aurora PostgreSQL"
+}

@@ -1,3 +1,9 @@
+# variables.tf - JAO Data Engine Infrastructure Variables
+
+# =============================================================================
+# CORE SETTINGS
+# =============================================================================
+
 variable "aws_region" {
   description = "The AWS region to deploy resources"
   type        = string
@@ -15,6 +21,22 @@ variable "environment" {
   type        = string
   default     = "dev"
 }
+
+variable "data_engine_image_tag" {
+  description = "Docker image tag for data engine (Python 3.12)"
+  type        = string
+  default     = "data-engine-latest"
+}
+
+variable "skills_worker_image_tag" {
+  description = "Docker image tag for skills worker (Python 3.10)"
+  type        = string
+  default     = "skills-worker-latest"
+}
+
+# =============================================================================
+# VPC CONFIGURATION
+# =============================================================================
 
 variable "vpc_cidr" {
   description = "CIDR block for the VPC"
@@ -40,179 +62,10 @@ variable "public_subnet_cidrs" {
   default     = ["10.0.101.0/24", "10.0.102.0/24"]
 }
 
-variable "container_port" {
-  description = "Port exposed by the docker container"
-  type        = number
-  default     = 8000
-}
+# =============================================================================
+# VPC ENDPOINTS
+# =============================================================================
 
-variable "task_cpu" {
-  description = "CPU units for the ECS task"
-  type        = number
-  default     = 128
-}
-
-variable "task_memory" {
-  description = "Memory for the ECS task"
-  type        = number
-  default     = 4096
-}
-
-variable "desired_count" {
-  description = "Number of ECS tasks to run"
-  type        = number
-  default     = 1
-}
-
-variable "environment_variables" {
-  description = "Environment variables for the container"
-  type        = map(string)
-  default = {
-    LOG_LEVEL = "DEBUG"
-  }
-}
-
-variable "initialization_bucket" {
-  description = "S3 bucket name where initialization scripts will be stored (if empty, a bucket will be created with a default name)"
-  type        = string
-  default     = ""
-}
-
-# skip_ecr_creation variable removed for simplification
-
-variable "performance_insights_enabled" {
-  description = "Whether to enable Performance Insights for the database"
-  type        = bool
-  default     = null
-}
-
-variable "enable_enhanced_monitoring" {
-  description = "Whether to enable enhanced monitoring for the ECS and RDS resources"
-  type        = bool
-  default     = false
-}
-
-variable "create_cloudwatch_alarms" {
-  description = "Whether to create CloudWatch alarms for resources"
-  type        = bool
-  default     = false
-}
-
-variable "enable_xray_tracing" {
-  description = "Whether to enable AWS X-Ray tracing"
-  type        = bool
-  default     = false
-}
-
-variable "enable_api_keys" {
-  description = "Whether to enable API keys for the API Gateway"
-  type        = bool
-  default     = true
-}
-
-variable "enable_detailed_metrics" {
-  description = "Whether to enable detailed metrics for API Gateway"
-  type        = bool
-  default     = true
-}
-
-variable "lb_deletion_protection" {
-  description = "Whether to enable deletion protection for load balancers"
-  type        = bool
-  default     = false
-}
-
-variable "deletion_protection" {
-  description = "Whether to enable deletion protection for database resources"
-  type        = bool
-  default     = false
-}
-
-variable "enable_lb_access_logs" {
-  description = "Whether to enable access logs for load balancers"
-  type        = bool
-  default     = false
-}
-
-variable "internal_lb" {
-  description = "Whether load balancers should be internal only"
-  type        = bool
-  default     = true
-}
-
-variable "init_script" {
-  description = "Path to initialization script for the database (set to null to skip)"
-  type        = string
-  default     = null
-}
-
-variable "aws_account_id" {
-  description = "AWS Account ID for ECR repository URLs when skipping creation"
-  type        = string
-  default     = ""
-}
-
-# skip_* variables removed for simplification
-
-# Enhanced API support variables
-variable "enable_api_monitoring" {
-  description = "Whether to enable enhanced API monitoring"
-  type        = bool
-  default     = true
-}
-
-variable "enable_api_tracing" {
-  description = "Whether to enable AWS X-Ray tracing for the API"
-  type        = bool
-  default     = false
-}
-
-variable "api_rate_limit_default" {
-  description = "Default API rate limit (requests per second)"
-  type        = number
-  default     = 100
-}
-
-variable "api_burst_limit_default" {
-  description = "Default API burst limit"
-  type        = number
-  default     = 200
-}
-
-variable "enable_third_party_access" {
-  description = "Whether to enable API key authentication for third-party access"
-  type        = bool
-  default     = false
-}
-
-variable "api_log_level" {
-  description = "Log level for API (DEBUG, INFO, WARNING, ERROR)"
-  type        = string
-  default     = "DEBUG"
-}
-
-variable "enable_api_dashboard" {
-  description = "Whether to create a CloudWatch dashboard for API metrics"
-  type        = bool
-  default     = true
-}
-
-variable "lb_access_logs_bucket" {
-  description = "S3 bucket for load balancer access logs"
-  type        = string
-  default     = ""
-}
-
-# Skip resource creation variables
-# skip_* and existing_* variables removed for simplification
-
-variable "image_tag" {
-  description = "Docker image tag to use for ECS containers"
-  type        = string
-  default     = "latest"
-}
-
-# VPC Endpoints Configuration
 variable "create_vpc_endpoints" {
   description = "Whether to create VPC endpoints"
   type        = bool
@@ -222,7 +75,7 @@ variable "create_vpc_endpoints" {
 variable "create_ecr_dkr_endpoint" {
   description = "Whether to create ECR Docker Registry VPC endpoint"
   type        = bool
-  default     = false # Set to false to avoid conflict with existing endpoint
+  default     = false
 }
 
 variable "create_ecr_api_endpoint" {
@@ -267,54 +120,86 @@ variable "existing_logs_endpoint_id" {
   default     = ""
 }
 
-variable "jao_backend_superuser_password" {
-  description = "Password for the JAO backend superuser"
+# =============================================================================
+# DATA ENGINE TASK (Python 3.12)
+# =============================================================================
+
+variable "data_engine_cpu" {
+  description = "CPU units for data engine task (256, 512, 1024, 2048, 4096)"
+  type        = number
+  default     = 1024
+}
+
+variable "data_engine_memory" {
+  description = "Memory for data engine task in MB"
+  type        = number
+  default     = 4096
+}
+
+variable "data_engine_schedule_expression" {
+  description = "Schedule expression for the data engine task (cron or rate)"
   type        = string
-  default     = ""
+  default     = "cron(0 2 ? * SUN *)"  # Every Sunday at 2 AM UTC
 }
 
-variable "jao_backend_superuser_username" {
-  description = "Username for the JAO backend superuser"
-  type        = string
-  default     = ""
+# =============================================================================
+# SKILLS WORKER TASK (Python 3.10)
+# =============================================================================
+
+variable "skills_worker_cpu" {
+  description = "CPU units for skills worker task"
+  type        = number
+  default     = 512
 }
 
-variable "jao_backend_superuser_email" {
-  description = "Email for the JAO backend superuser"
-  type        = string
-  default     = ""
+variable "skills_worker_memory" {
+  description = "Memory for skills worker task in MB"
+  type        = number
+  default     = 2048
 }
 
-variable "oleeo_url" {
-  description = "oleeo url"
-  type        = string
-  default     = "mssql://user:password@host:port/dbname"
-}
-
-# Redis/ElastiCache Configuration
-variable "redis_auth_token" {
-  description = "AUTH token for Redis/ElastiCache authentication (required when transit encryption is enabled)"
-  type        = string
-  default     = null
-  sensitive   = true
-}
-
-variable "redis_transit_encryption_enabled" {
-  description = "Whether to enable transit encryption (TLS) for Redis/ElastiCache"
-  type        = bool
-  default     = false # Set to false for development, true for production
-}
-
-variable "enable_celery_services" {
-  description = "Enable Celery worker and beat services"
+variable "enable_skills_worker_schedule" {
+  description = "Whether to create a separate EventBridge schedule for skills worker"
   type        = bool
   default     = false
 }
 
-variable "admin_allowed_cidrs" {
-  description = "List of CIDR blocks allowed to access admin interface"
-  type        = list(string)
+variable "skills_worker_schedule_expression" {
+  description = "Schedule expression for the skills worker task (if enabled)"
+  type        = string
+  default     = "cron(0 3 ? * SUN *)"  # Every Sunday at 3 AM UTC
+}
+
+# =============================================================================
+# SCHEDULE CONTROL
+# =============================================================================
+
+variable "schedule_enabled" {
+  description = "Whether the EventBridge schedules are enabled"
+  type        = bool
+  default     = true
+}
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+
+variable "db_password" {
+  description = "Password for the database"
+  type        = string
+  sensitive   = true
+}
+
+variable "performance_insights_enabled" {
+  description = "Whether to enable Performance Insights for the database"
+  type        = bool
   default     = null
+}
+
+variable "enable_enhanced_monitoring" {
+  description = "Whether to enable enhanced monitoring for RDS resources"
+  type        = bool
+  default     = false
 }
 
 variable "allowed_cidr_blocks" {
@@ -323,22 +208,77 @@ variable "allowed_cidr_blocks" {
   default     = []
 }
 
-variable "allowed_security_groups" {
-  description = "List of security group IDs allowed to access the Aurora database"
-  type        = list(string)
-  default     = []
+# =============================================================================
+# DJANGO / APPLICATION CONFIGURATION
+# =============================================================================
+
+variable "django_secret_key" {
+  description = "Django secret key"
+  type        = string
+  sensitive   = true
 }
 
-# variables_sagemaker.tf - Variables for SageMaker data science environment
+variable "oleeo_url" {
+  description = "Oleeo MSSQL database URL"
+  type        = string
+  default     = "mssql://user:password@host:port/dbname"
+  sensitive   = true
+}
 
-# Feature Flag
+variable "ingest_batch_size" {
+  description = "Batch size for data ingestion"
+  type        = number
+  default     = 200
+}
+
+variable "vacancy_embed_limit" {
+  description = "Maximum number of vacancies to embed"
+  type        = number
+  default     = 70000
+}
+
+variable "embedder_model" {
+  description = "Model to use for embeddings"
+  type        = string
+  default     = "bedrock/amazon.titan-embed-text-v2:0"
+}
+
+# =============================================================================
+# S3 CONFIGURATION
+# =============================================================================
+
+variable "initialization_bucket" {
+  description = "S3 bucket name where initialization scripts will be stored"
+  type        = string
+  default     = ""
+}
+
+# =============================================================================
+# BASTION HOST (Optional)
+# =============================================================================
+
+variable "enable_bastion_host" {
+  description = "Enable bastion host for database access"
+  type        = bool
+  default     = false
+}
+
+variable "ssh_public_key" {
+  description = "SSH public key for bastion host access"
+  type        = string
+  default     = ""
+}
+
+# =============================================================================
+# SAGEMAKER (Optional)
+# =============================================================================
+
 variable "enable_sagemaker_environment" {
   description = "Enable the SageMaker data science environment with Aurora read replica"
   type        = bool
   default     = false
 }
 
-# Database Configuration for SageMaker
 variable "sagemaker_db_username" {
   description = "Database username for SageMaker read-only access"
   type        = string
@@ -350,22 +290,4 @@ variable "sagemaker_db_password" {
   type        = string
   sensitive   = true
   default     = ""
-}
-
-variable "ssh_public_key" {
-  description = "SSH public key for bastion host access"
-  type        = string
-  default     = ""
-}
-
-variable "enable_bastion_host" {
-  description = "Enable bastion host for database access"
-  type        = bool
-  default     = false
-}
-
-variable "frontend_allowed_cidrs" {
-  description = "List of CIDR blocks allowed to access frontend"
-  type        = list(string)
-  default     = ["0.0.0.0/0"]  # Open by default
 }

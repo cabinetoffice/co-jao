@@ -1,46 +1,36 @@
-output "api_gateway_url" {
-  description = "API Gateway URL"
-  value       = module.api_gateway.api_gateway_url
+# outputs.tf - JAO Data Engine Infrastructure Outputs
+
+# =============================================================================
+# ECR REPOSITORY
+# =============================================================================
+
+output "ecr_repository_url" {
+  description = "ECR Repository URL (use with :data-engine-* or :skills-worker-* tags)"
+  value       = aws_ecr_repository.main.repository_url
 }
 
-output "backend_ecr_repository_url" {
-  description = "Backend ECR Repository URL"
-  value       = aws_ecr_repository.app.repository_url
+output "ecr_repository_name" {
+  description = "ECR Repository Name"
+  value       = aws_ecr_repository.main.name
 }
 
-output "frontend_ecr_repository_url" {
-  description = "Frontend ECR Repository URL"
-  value       = aws_ecr_repository.frontend.repository_url
+output "data_engine_image_url" {
+  description = "Full image URL for data engine (Python 3.12)"
+  value       = "${aws_ecr_repository.main.repository_url}:${var.data_engine_image_tag}"
 }
 
-output "backend_load_balancer_dns" {
-  description = "Backend ALB DNS Name"
-  value       = module.ecs.load_balancer_dns_name
+output "skills_worker_image_url" {
+  description = "Full image URL for skills worker (Python 3.10)"
+  value       = "${aws_ecr_repository.main.repository_url}:${var.skills_worker_image_tag}"
 }
 
-output "backend_admin_load_balancer_dns" {
-  description = "Backend Admin ALB DNS Name for Django Admin Access"
-  value       = module.ecs.alb_dns_name
-}
-
-output "frontend_load_balancer_dns" {
-  description = "Frontend ALB DNS Name"
-  value       = module.frontend.load_balancer_dns_name
-}
+# =============================================================================
+# VPC
+# =============================================================================
 
 output "vpc_id" {
   description = "ID of the VPC"
   value       = module.vpc.vpc_id
-}
-
-output "backend_ecs_cluster_name" {
-  description = "Name of the Backend ECS cluster"
-  value       = module.ecs.cluster_name
-}
-
-output "frontend_ecs_cluster_name" {
-  description = "Name of the Frontend ECS cluster"
-  value       = module.frontend.cluster_name
 }
 
 output "private_subnet_ids" {
@@ -53,9 +43,18 @@ output "public_subnet_ids" {
   value       = module.vpc.public_subnet_ids
 }
 
+# =============================================================================
+# DATABASE
+# =============================================================================
+
 output "database_endpoint" {
   description = "The PostgreSQL database endpoint"
   value       = module.vectordb.cluster_endpoint
+}
+
+output "database_reader_endpoint" {
+  description = "The PostgreSQL database reader endpoint"
+  value       = module.vectordb.reader_endpoint
 }
 
 output "database_name" {
@@ -68,13 +67,54 @@ output "database_username" {
   value       = module.vectordb.master_username
 }
 
-# output "database_password_secret" {
-#   description = "ARN of the secret containing the database password"
-#   value       = module.vectordb.password_secret_arn
-#   sensitive   = true
-# }
+output "database_port" {
+  description = "The PostgreSQL database port"
+  value       = module.vectordb.port
+}
 
-# S3 bucket outputs
+# =============================================================================
+# ECS CLUSTER & TASKS
+# =============================================================================
+
+output "ecs_cluster_name" {
+  description = "Name of the ECS cluster"
+  value       = module.scheduled_tasks.cluster_name
+}
+
+output "ecs_cluster_arn" {
+  description = "ARN of the ECS cluster"
+  value       = module.scheduled_tasks.cluster_arn
+}
+
+output "data_engine_task_definition_arn" {
+  description = "ARN of the data engine task definition"
+  value       = module.scheduled_tasks.data_engine_task_definition_arn
+}
+
+output "data_engine_schedule_name" {
+  description = "Name of the data engine EventBridge schedule"
+  value       = module.scheduled_tasks.data_engine_schedule_name
+}
+
+output "skills_worker_task_definition_arn" {
+  description = "ARN of the skills worker task definition"
+  value       = module.scheduled_tasks.skills_worker_task_definition_arn
+}
+
+output "skills_worker_schedule_name" {
+  description = "Name of the skills worker EventBridge schedule (if enabled)"
+  value       = module.scheduled_tasks.skills_worker_schedule_name
+}
+
+output "task_log_group" {
+  description = "CloudWatch log group for scheduled tasks"
+  value       = module.scheduled_tasks.log_group_name
+}
+
+# =============================================================================
+# S3 BUCKETS
+# =============================================================================
+
 output "initialization_bucket_name" {
   description = "Name of the S3 bucket for initialization scripts"
   value       = module.initialization_bucket.bucket_id
@@ -85,12 +125,24 @@ output "initialization_bucket_arn" {
   value       = module.initialization_bucket.bucket_arn
 }
 
-output "initialization_bucket_region" {
-  description = "Region where the initialization bucket is located"
-  value       = module.initialization_bucket.bucket_region
+# =============================================================================
+# BASTION HOST (Optional)
+# =============================================================================
+
+output "bastion_public_ip" {
+  description = "Public IP of the bastion host"
+  value       = var.enable_bastion_host ? module.bastion[0].bastion_public_ip : null
 }
 
-# SageMaker outputs
+output "bastion_ssh_command" {
+  description = "SSH command to connect to the bastion host"
+  value       = var.enable_bastion_host ? "ssh -i <your-key.pem> ec2-user@${module.bastion[0].bastion_public_ip}" : null
+}
+
+# =============================================================================
+# SAGEMAKER (Optional)
+# =============================================================================
+
 output "sagemaker_notebook_name" {
   description = "Name of the SageMaker notebook instance"
   value       = var.enable_sagemaker_environment ? module.sagemaker[0].notebook_instance_name : null
