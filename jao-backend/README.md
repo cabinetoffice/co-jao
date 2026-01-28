@@ -1,190 +1,94 @@
-Job Advert Optimiser Backend
-==
+# JAO Data Engine
 
-Django app to serve the backend using [Django-Ninja](https://django-ninja.dev/).
+Django-based data processing engine for job advert analysis. Runs as scheduled batch jobs.
 
-Internal admin is available at `/admin/` and the API is available at `/api/`.
+## Overview
 
-File layout
----
+This is a minimal data engine that:
+- Ingests job vacancy data from Oleeo
+- Generates embeddings using AWS Bedrock
+- Extracts skills (via separate Python 3.10 worker)
+- Aggregates statistics and regional data
 
-This project uses src layout.
+## File Layout
 
+This project uses src layout with Django apps in `src/jao_backend/`.
 
-Configuration
----
+## Configuration
 
-Settings are in src, with per environment settings extending `common.py`.
-Per-environment settings:
+Settings are in `src/jao_backend/settings/` with per-environment settings extending `common.py`:
 - `dev.py`
 - `production.py`
 - `test.py`
 
-Where applicable dotenv is used to override settings.
+Environment variables are used for configuration. See settings files for the full list.
 
-
-Environment variables:
+Key environment variables:
 
 | Variable | Description |
-| JAO_BACKEND_DATABASE_URL | Database URL for the database to use (in the format dj_database_url accepts) |
-| JAO_BACKEND_INGEST_DATABASE_URL | Database URL for the database to use (in the format dj_database_url accepts) |
+|----------|-------------|
+| `JAO_BACKEND_DATABASE_URL` | PostgreSQL database URL |
+| `JAO_BACKEND_OLEEO_DATABASE_URL` | Oleeo MSSQL database URL |
+| `JAO_BACKEND_SECRET_KEY` | Django secret key |
 
+## Prerequisites
 
-Note:  To see a full list of environment variables, the jao_common.settings* files are the source of truth.
+### Poetry
 
-Prerequisites
----
-
-
-NPM
-Install npm then install dependencies:
+Manages Python dependencies. Install it, then:
 
 ```sh
-$ npm install
+poetry install
 ```
 
-Webpack
+### ODBC Libraries (for Oleeo MSSQL)
 
-Webpack packs up Javascript and SCSS, during dev it can update these:
+On macOS with Homebrew:
 
 ```sh
-$ npm webpack start
-``` 
+brew tap microsoft/mssql-release https://github.com/Microsoft/homebrew-mssql-release
+brew update
+HOMEBREW_ACCEPT_EULA=Y brew install msodbcsql17 mssql-tools
+```
 
-To build resources for production:
+## Commands
+
+### Database migrations
 
 ```sh
-$ npm webpack build
+python src/manage.py migrate
 ```
 
-
-Poetry
-Manages python dependencies and environments, install it, activate your virtualenv then use
-it to install dependencies:
+### Run the weekly pipeline
 
 ```sh
-$ poetry install
+python src/manage.py run_weekly_pipeline
 ```
 
+This orchestrates:
+1. Data ingestion from Oleeo
+2. Embedding generation
+3. Statistics aggregation
+4. Regional aggregation
 
-Commands
----
-
-Collect static resources, for production (if you are running locally with ENV=dev, you can keep an
-empty static directory.)
+### Individual commands
 
 ```sh
-$ python src/manage.py collectstatic
+# Ingest data
+python src/manage.py ingest
+
+# Generate embeddings
+python src/manage.py embed_vacancies
+
+# Aggregate statistics
+python src/manage.py aggregate_statistics
+
+# Aggregate regions
+python src/manage.py aggregate_regions
 ```
 
-Migrate
-```sh
-$ python src/manage.py migrate
-```
+## Deployment
 
-On pulling down a new version of the site from github you will need to run any new migrations.
+The data engine runs as scheduled ECS tasks on AWS, triggered by EventBridge.
 
-
-
-Start the django dev server
-```sh
-$ python src/manage.py runserver
-```
-
-
-Start the django server via hypercorn async server
-```sh
-$ hypercorn asgi:application --reload
-```
-
-(The src directory does not need to be included here).
-
-
-Celery
-------
-
-Celery requires celery-beat to orchestrate the tasks, and one or more celery workers.
-
-Start celery-beat:
-
-```
-$ celery -A jao_backend.common.celery beat
-```
-
-Start a worker with loglevel INFO
-
-```
-$ celery -A jao_backend.common.celery worker --loglevel=INFO
-```
-
-Checking up on tasks:
-
-You can use `celery inspect` or run `celery flower` for a GUI view:
-
-```
-$ celery -A jao_backend.common.celery flower
-```
-
-More info:
-
-Celery is configured via the django settings, so see `jao_backend.settings*` and `jao_backend.common.celery`.
-
-Redis (or a Redis compatible service) is used as the backend - this is compatible with the dependency celery-singleton/
-
-Tasks:
-
-Celery tasks can be found in `tasks.py`
-
-
-Jupyter
--------
-
-A Jupyter shell is available as `django-extensions` is installed.
-
-Run Jupyter with:
-
-```
-$ python shell_plus --lab
-```
-
-This gives you a Jupyter shell with access to models in the Django ORM.
-
-
-Databases and database urls:
-----------------------------
-
-Database connections are configured through environment variables (see the python package dj_database_url for the format)
-
-Default database:
-
-`JAO_BACKEND_DATABASE` is expected to be a postgres database, e.g. running locally it could be `postgres://postgres:postgres@localhost/jao-backend`
-
-
-OLEOO database:
-
-`JAO_BACKEND_OLEEO_DATABASE` is expected to be a SQLServer database, e.g. the format looks like this: `mssqlms://username:password@example.com:1433/database_name`
-
-GRID holds a copy of the OLEEO database in a format the ORM can ingest it,
-the particulars of this are in the oleeo app, while ingest code itself lives in the ingest app.
-
-This is an mssql database, installing from poetry will enable the python libraries for this,
-system libraries are also required:
-
-Installing ODBC libraries using homebrew:
-
-Pre-requisites:
-- Homebrew
-- Xcode command line tools
-
-```sh
-$ brew tap microsoft/mssql-release https://github.com/Microsoft/homebrew-mssql-release
-$ brew update
-$ HOMEBREW_ACCEPT_EULA=Y brew install msodbcsql17 mssql-tools
-```
-
-(This info adapted from https://iamsimi.medium.com/development-on-the-m1-mac-connecting-to-microsoft-sql-server-using-python-14fd5012c8d6)
-
-For more detail, see the README.md in oleoo and ingest apps:
-
-[oleeo](src/jao_backend/oleeo/README.md)
-[ingest](src/jao_backend/ingest/README.md)
+See `iac/` for Terraform infrastructure configuration.
