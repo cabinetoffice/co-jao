@@ -1,4 +1,3 @@
- modules/bastion/main.tf
 data "aws_ami" "amazon_linux" {
   most_recent = true
   owners      = ["amazon"]
@@ -55,7 +54,7 @@ resource "aws_security_group" "bastion" {
   name_prefix = "${var.name_prefix}-bastion-"
   vpc_id      = var.vpc_id
   description = "Security group for bastion host"
-  
+
   ingress {
     from_port   = 22
     to_port     = 22
@@ -71,15 +70,15 @@ resource "aws_security_group" "bastion" {
     cidr_blocks = var.vpc_cidr_blocks
     description = "HTTPS to VPC for SSM endpoints"
   }
-  
+
   egress {
-    from_port   = 5432 
+    from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
     cidr_blocks = var.vpc_cidr_blocks
     description = "Database access within VPC"
   }
-  
+
   tags = merge(var.tags, {
     Name = "${var.name_prefix}-bastion-sg"
   })
@@ -96,9 +95,9 @@ resource "aws_instance" "bastion" {
 
   metadata_options {
     http_endpoint = "enabled"
-    http_tokens = "required"
+    http_tokens   = "required"
   }
-  
+
   user_data = <<-EOF
     #!/bin/bash
     yum update -y
@@ -108,7 +107,7 @@ resource "aws_instance" "bastion" {
     systemctl enable amazon-ssm-agent
     systemctl start amazon-ssm-agent
   EOF
-  
+
   tags = merge(var.tags, {
     Name = "${var.name_prefix}-bastion-host"
   })

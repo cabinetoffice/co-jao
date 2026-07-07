@@ -42,6 +42,9 @@ ENV PYTHONPATH="/app/src"
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+# setuptools provides pkg_resources, required by some packages (e.g. django-polymorphic)
+RUN pip install --no-cache-dir setuptools
+
 # Install Poetry
 RUN curl -sSL https://install.python-poetry.org | python -
 ENV PATH="/root/.local/bin:$PATH"

@@ -228,6 +228,10 @@ resource "aws_vpc_endpoint" "bedrock" {
   }
 }
 
+# Note: a bedrock-runtime interface endpoint (with private DNS) already exists in the VPC,
+# created outside this module. Tasks reach it via the self-referencing 443 ingress below -
+# provided that endpoint's security group allows 443 from the ecs_tasks SG.
+
 
 
 # Security group for ECS tasks
@@ -252,6 +256,16 @@ resource "aws_security_group" "ecs_tasks" {
     description     = "HTTP from admin ALB"
   }
 
+  # HTTPS between SG members so tasks can reach the interface VPC endpoints
+  # (bedrock / bedrock-runtime) which share this security group.
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    self        = true
+    description = "HTTPS to shared interface VPC endpoints"
+  }
+
   # HTTP for health checks and external APIs
   egress {
     from_port   = 80
@@ -269,7 +283,7 @@ resource "aws_security_group" "ecs_tasks" {
     description = "HTTPS to VPC endpoints"
   }
 
-   # DNS resolution
+  # DNS resolution
   egress {
     from_port   = 53
     to_port     = 53
@@ -610,9 +624,9 @@ resource "aws_ecs_service" "api" {
   desired_count          = var.desired_count
   launch_type            = "FARGATE"
   enable_execute_command = true
-  force_new_deployment = true
-  
-    network_configuration {
+  force_new_deployment   = true
+
+  network_configuration {
     security_groups  = concat([aws_security_group.ecs_tasks.id], var.additional_security_group_ids)
     subnets          = var.private_subnet_ids
     assign_public_ip = false
@@ -668,7 +682,7 @@ resource "aws_ecs_service" "worker" {
   desired_count          = var.worker_desired_count
   launch_type            = "FARGATE"
   enable_execute_command = true
-  force_new_deployment = true
+  force_new_deployment   = true
 
   network_configuration {
     security_groups  = concat([aws_security_group.ecs_tasks.id], var.additional_security_group_ids)
@@ -708,7 +722,7 @@ resource "aws_ecs_service" "beat" {
   desired_count          = 1
   launch_type            = "FARGATE"
   enable_execute_command = true
-  force_new_deployment = true
+  force_new_deployment   = true
 
   network_configuration {
     security_groups  = concat([aws_security_group.ecs_tasks.id], var.additional_security_group_ids)

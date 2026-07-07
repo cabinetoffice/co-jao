@@ -9,6 +9,7 @@ from typing import Union
 from django.db.models import Count
 from django.db.models import F
 from django.db.models import Model
+from django.db.models import Q
 from django.db.models import Window
 from django.db.models.functions import Cast
 from django.forms import DecimalField
@@ -84,6 +85,22 @@ class VacanciesQuerySet(UpstreamModelQuerySet):
             salary_minimum_is_valid=True, salary_maximum_optional_is_valid=True
         )
 
+    def valid_descriptions(self) -> Self:
+        # Exclude vacancies that point to an external attachment instead of providing a description,
+        # e.g. "Please refer to the attached Job Profile / PDF / document for the job description".
+        # MSSQL upstream has no regex support, so match broadly with LIKE (icontains): any description
+        # mentioning "attached" together with pdf/profile/document.
+        # ponytail: LIKE proximity is loose, may catch "submit your CV as an attached PDF"; tighten with
+        # explicit phrases if false positives show up.
+        return self.exclude(
+            Q(job_description__icontains="attached")
+            & (
+                Q(job_description__icontains="pdf")
+                | Q(job_description__icontains="profile")
+                | Q(job_description__icontains="document")
+            )
+        )
+
     def valid_for_ingest(self):
         """
         :return records that are valid for ingestion:
@@ -100,4 +117,4 @@ class VacanciesQuerySet(UpstreamModelQuerySet):
         - arbitrary strings
         - very large numbers.
         """
-        return self.valid_salary_ranges().valid_timestamps().annotate_dates()
+        return self.valid_salary_ranges().valid_timestamps().valid_descriptions().annotate_dates()

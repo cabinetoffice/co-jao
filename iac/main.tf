@@ -7,10 +7,38 @@ terraform {
     }
   }
   required_version = ">= 1.0"
+
+  # Remote state: S3 for storage + DynamoDB for locking. The bucket and table must be
+  # created before `terraform init -migrate-state` (they can't be bootstrapped by the
+  # config that depends on them) - see the one-time CLI commands in the deploy notes.
+  backend "s3" {
+    bucket         = "jao-co-tfstate"
+    key            = "jao/dev/terraform.tfstate"
+    region         = "eu-west-2"
+    dynamodb_table = "jao-terraform-locks"
+    encrypt        = true
+  }
 }
 
 provider "aws" {
   region = var.aws_region
+}
+
+# The bedrock-runtime interface VPC endpoint (vpce-0523ed77490afa7f2) and its security
+# group (sg-08480d64f9aa03fea) live in vpc-08a6f73395b81df6e but are NOT managed by this
+# state (created outside it). This rule lets the ECS tasks reach the endpoint on 443 so
+# embeddings can call Bedrock. Import the existing rule after adding (see below), do not
+# let Terraform try to recreate it:
+#   terraform import aws_security_group_rule.bedrock_runtime_endpoint_https \
+#     sg-08480d64f9aa03fea_ingress_tcp_443_443_10.0.0.0/16
+resource "aws_security_group_rule" "bedrock_runtime_endpoint_https" {
+  type              = "ingress"
+  security_group_id = "sg-08480d64f9aa03fea"
+  protocol          = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_blocks       = ["10.0.0.0/16"]
+  description       = "HTTPS from VPC so ECS tasks can reach the bedrock-runtime endpoint"
 }
 
 locals {
@@ -194,10 +222,10 @@ module "ecs" {
     # Celery configuration
     CELERY_BROKER_URL                     = module.celery_redis.celery_broker_url
     CELERY_RESULT_BACKEND                 = module.celery_redis.celery_result_backend
-    JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE = 200
+    JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE = 50000
 
     # LiteLLM integration
-    JAO_BACKEND_VACANCY_EMBED_LIMIT       = 70000
+    JAO_BACKEND_VACANCY_EMBED_LIMIT = 70000
     #JAO_BACKEND_LITELLM_API_BASE          = "http://127.0.0.1:11434/api/embed" # Default for dev environment
     #JAO_BACKEND_LITELLM_CUSTOM_PROVIDER   = "ollama"                           # Default for dev environment
     JAO_EMBEDDER_SUMMARY_RESPONSIBILITIES = "bedrock/amazon.titan-embed-text-v2:0"
@@ -234,16 +262,16 @@ module "ecs" {
 module "frontend" {
   source = "./modules/frontend"
 
-  name_prefix        = var.app_name
-  environment        = var.environment
-  ecr_repository_url = local.frontend_ecr_url
-  container_port     = 8000
-  vpc_id             = module.vpc.vpc_id
-  private_subnet_ids = module.vpc.private_subnet_ids
-  public_subnet_ids  = module.vpc.public_subnet_ids
-  cpu                = var.task_cpu
-  memory             = var.task_memory
-  desired_count      = var.desired_count
+  name_prefix            = var.app_name
+  environment            = var.environment
+  ecr_repository_url     = local.frontend_ecr_url
+  container_port         = 8000
+  vpc_id                 = module.vpc.vpc_id
+  private_subnet_ids     = module.vpc.private_subnet_ids
+  public_subnet_ids      = module.vpc.public_subnet_ids
+  cpu                    = var.task_cpu
+  memory                 = var.task_memory
+  desired_count          = var.desired_count
   frontend_allowed_cidrs = var.frontend_allowed_cidrs
 
   # Environment variables for the frontend service
@@ -328,7 +356,7 @@ module "vectordb" {
   subnet_ids = module.vpc.private_subnet_ids
 
   allowed_security_groups = [aws_security_group.db_access.id]
-  allowed_cidr_blocks = var.allowed_cidr_blocks
+  allowed_cidr_blocks     = var.allowed_cidr_blocks
   # Enable data science read replica if SageMaker is enabled
   create_data_science_replica = var.enable_sagemaker_environment
   data_science_instance_class = var.environment == "prod" ? "db.r6g.xlarge" : "db.serverless"
@@ -337,7 +365,7 @@ module "vectordb" {
   database_name   = "${replace(var.app_name, "-", "")}${var.environment}db"
   master_username = "dbadmin"
   # master_password = var.skip_secret_creation ? "TemporaryPassword123!" : null
-  engine_version = "15.12"
+  engine_version = "15.15" # match the live cluster's auto-upgraded minor version to avoid a spurious downgrade/ModifyDBCluster
 
   use_serverless = false
   instance_count = 1
@@ -437,14 +465,14 @@ module "bastion" {
   count  = var.enable_bastion_host ? 1 : 0
   source = "./modules/bastion"
 
-  name_prefix         = var.app_name
-  vpc_cidr_blocks        = [module.vpc.vpc_cidr_block]
+  name_prefix     = var.app_name
+  vpc_cidr_blocks = [module.vpc.vpc_cidr_block]
 
-  vpc_id             = module.vpc.vpc_id
-  public_subnet_id   = module.vpc.public_subnet_ids[0]
+  vpc_id              = module.vpc.vpc_id
+  public_subnet_id    = module.vpc.public_subnet_ids[0]
   allowed_cidr_blocks = var.allowed_cidr_blocks
-  ssh_public_key     = var.ssh_public_key
-  aurora_endpoint    = module.vectordb.cluster_endpoint
+  ssh_public_key      = var.ssh_public_key
+  aurora_endpoint     = module.vectordb.cluster_endpoint
 
   tags = local.common_tags
 }
@@ -452,7 +480,7 @@ module "bastion" {
 # Allow bastion to connect to Aurora
 resource "aws_security_group_rule" "bastion_to_aurora" {
   count = var.enable_bastion_host ? 1 : 0
-  
+
   type                     = "ingress"
   from_port                = 5432
   to_port                  = 5432
