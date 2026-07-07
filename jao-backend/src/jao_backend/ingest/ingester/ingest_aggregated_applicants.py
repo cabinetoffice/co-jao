@@ -152,22 +152,22 @@ class OleeoApplicantStatisticsAggregator:
         logger.info(f"Relations found for ratio aggregation: {list(relations.keys())}")
 
         # Pre-fetch ContentTypes for deletion filtering
-        stats_content_types_qs = ContentType.objects.none()
+        stats_content_type_pks = []
         valid_relations = {}
         for field_name, rel_model in relations.items():
             try:
                 dest_model = rel_model.get_destination_model()
                 ct = ContentType.objects.get_for_model(dest_model)
-                stats_content_types_qs |= Q(pk=ct.pk)
+                stats_content_type_pks.append(ct.pk)
                 valid_relations[field_name] = rel_model # Keep track of relations with valid ContentTypes
             except (NoDestinationModel, ContentType.DoesNotExist):
                 logger.warning(f"Could not get destination/ContentType for relation '{field_name}'. It will be skipped during deletion and processing.")
-        
+
         if not valid_relations:
              logger.warning("No valid relations with ContentTypes found. Stopping aggregation.")
              return
-             
-        stats_content_types = ContentType.objects.filter(stats_content_types_qs)
+
+        stats_content_types = ContentType.objects.filter(pk__in=stats_content_type_pks)
         logger.info(f"Will process statistics for ContentTypes: {[ct.model for ct in stats_content_types]}")
 
 

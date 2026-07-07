@@ -186,7 +186,9 @@ def ingest_applicant_text(batch_size=settings.JAO_BACKEND_INGEST_DEFAULT_BATCH_S
         raise
 
 update_vacancies = chain(
-    ingest_vacancies.s(), aggregate_applicant_statistics.s(), aggregate_applicant_regions.s(), ingest_applicant_text.s(), embed_vacancies.s()
+    # Immutable signatures (.si) so each task keeps its own defaults instead of receiving
+    # the previous task's return value as its first positional arg (batch_size).
+    ingest_vacancies.si(), aggregate_applicant_statistics.si(), aggregate_applicant_regions.si(), ingest_applicant_text.si(), embed_vacancies.si()
 )
 """
 Ingest vacancies, and then start embedding.
