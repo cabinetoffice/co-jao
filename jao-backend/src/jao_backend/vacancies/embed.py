@@ -12,6 +12,7 @@ Adds:
 
 import logging
 
+import litellm
 import nest_asyncio
 from django.conf import settings
 
@@ -28,6 +29,20 @@ EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID = (
 )
 LITELLM_API_BASE = settings.LITELLM_API_BASE
 LITELLM_CUSTOM_PROVIDER = settings.LITELLM_CUSTOM_PROVIDER
+
+# Titan Text Embeddings V2 rejects input over 8192 tokens. We count with tiktoken (litellm's
+# fallback for bedrock) which can disagree with Titan's own tokenizer, so keep real headroom.
+MAX_EMBED_TOKENS = 7000
+
+
+def _truncate_to_token_limit(text: str, model: str, max_tokens: int = MAX_EMBED_TOKENS) -> str:
+    # ponytail: approximate tokenizer + margin, trims ~10% per pass. Good enough for
+    # embeddings (leading text dominates); swap for the model's real tokenizer if drift matters.
+    if litellm.token_counter(model=model, text=text) <= max_tokens:
+        return text
+    while text and litellm.token_counter(model=model, text=text) > max_tokens:
+        text = text[: int(len(text) * 0.9)]
+    return text
 
 
 def embed_vacancy(vacancy: "Vacancy") -> "TaggedEmbedding":
@@ -47,6 +62,9 @@ def embed_vacancy(vacancy: "Vacancy") -> "TaggedEmbedding":
     job_info_text = strip_oleeo_bbcode(
         f"{vacancy.title}\n{vacancy.person_spec}\n{vacancy.description}"
     )
+
+    # Keep within the embedding model's input token limit (e.g. Titan V2 = 8192).
+    job_info_text = _truncate_to_token_limit(job_info_text, tag.model.name)
 
     # Fix for ollama connection issue, remove if https://github.com/BerriAI/litellm/pull/7625 is merged:
     nest_asyncio.apply()

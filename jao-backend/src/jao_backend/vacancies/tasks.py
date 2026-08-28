@@ -109,8 +109,21 @@ def ingest_applicant_text(batch_size=None, initial_vacancy_id=None):
 
     logger.info(f"Starting applicant text ingestion with max_batch_size={batch_size}")
 
-    ingester = ApplicantTextIngest(
-        batch_size=batch_size, initial_vacancy_id=initial_vacancy_id
-    )
-    ingester.do_ingest()
-    logger.info("Applicant text ingestion finished successfully.")
+    try:
+        ingester = ApplicantTextIngest(
+            batch_size=batch_size, initial_vacancy_id=initial_vacancy_id
+        )
+        ingester.do_ingest()
+        logger.info("Applicant text ingestion finished successfully.")
+    except Exception as e:
+        logger.error(f"Error during applicant text ingestion: {e}", exc_info=True)
+        raise
+
+update_vacancies = chain(
+    # Immutable signatures (.si) so each task keeps its own defaults instead of receiving
+    # the previous task's return value as its first positional arg (batch_size).
+    ingest_vacancies.si(), aggregate_applicant_statistics.si(), aggregate_applicant_regions.si(), ingest_applicant_text.si(), embed_vacancies.si()
+)
+"""
+Ingest vacancies, and then start embedding.
+"""

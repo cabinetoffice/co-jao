@@ -20,10 +20,38 @@ terraform {
     }
   }
   required_version = ">= 1.0"
+
+  # Remote state: S3 for storage + DynamoDB for locking. The bucket and table must be
+  # created before `terraform init -migrate-state` (they can't be bootstrapped by the
+  # config that depends on them) - see the one-time CLI commands in the deploy notes.
+  backend "s3" {
+    bucket         = "jao-co-tfstate"
+    key            = "jao/dev/terraform.tfstate"
+    region         = "eu-west-2"
+    dynamodb_table = "jao-terraform-locks"
+    encrypt        = true
+  }
 }
 
 provider "aws" {
   region = var.aws_region
+}
+
+# The bedrock-runtime interface VPC endpoint (vpce-0523ed77490afa7f2) and its security
+# group (sg-08480d64f9aa03fea) live in vpc-08a6f73395b81df6e but are NOT managed by this
+# state (created outside it). This rule lets the ECS tasks reach the endpoint on 443 so
+# embeddings can call Bedrock. Import the existing rule after adding (see below), do not
+# let Terraform try to recreate it:
+#   terraform import aws_security_group_rule.bedrock_runtime_endpoint_https \
+#     sg-08480d64f9aa03fea_ingress_tcp_443_443_10.0.0.0/16
+resource "aws_security_group_rule" "bedrock_runtime_endpoint_https" {
+  type              = "ingress"
+  security_group_id = "sg-08480d64f9aa03fea"
+  protocol          = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_blocks       = ["10.0.0.0/16"]
+  description       = "HTTPS from VPC so ECS tasks can reach the bedrock-runtime endpoint"
 }
 
 locals {
@@ -182,6 +210,175 @@ module "vpc" {
 # AURORA POSTGRESQL DATABASE
 # =============================================================================
 
+  name_prefix        = var.app_name
+  environment        = var.environment
+  ecr_repository_url = local.backend_ecr_url
+  container_port     = var.container_port
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+  public_subnet_ids  = module.vpc.public_subnet_ids
+  cpu                = var.task_cpu
+  memory             = var.task_memory
+  desired_count      = var.desired_count
+  container_name     = var.app_name
+  additional_security_group_ids = [
+    aws_security_group.redis_client.id,
+    aws_security_group.db_access.id,
+    aws_security_group.oleeo.id
+  ]
+
+  # Environment variables for the API service
+  environment_variables = merge(var.environment_variables, {
+    # Database environment variables
+    DB_HOST     = module.vectordb.cluster_endpoint
+    DB_PORT     = "5432"
+    DB_NAME     = module.vectordb.database_name
+    DB_USER     = module.vectordb.master_username
+    DB_PASSWORD = "secrettpassword"
+
+    # Django environment variables
+    ENV                    = "dev"
+    DJANGO_SETTINGS_MODULE = "jao_backend.settings.dev"
+    JAO_BACKEND_SECRET_KEY = "8e5c0e0f457aeec89329be09" # Will be overridden in production
+    DJANGO_DEBUG           = local.current_env.django_debug
+    API_STAGE_NAME         = var.environment
+    DJANGO_ALLOWED_HOSTS   = "*"
+    DEPLOYMENT_TYPE        = "aws"
+
+    # Database URL for Django (required by jao_backend settings)
+    JAO_BACKEND_DATABASE_URL       = "postgresql://${module.vectordb.master_username}:secrettpassword@${module.vectordb.cluster_endpoint}:5432/${module.vectordb.database_name}"
+    JAO_BACKEND_OLEEO_DATABASE_URL = var.oleeo_url
+    JAO_BACKEND_ENABLE_OLEEO       = 1
+    JAO_BACKEND_SUPERUSER_USERNAME = var.jao_backend_superuser_username
+    JAO_BACKEND_SUPERUSER_PASSWORD = var.jao_backend_superuser_password
+    JAO_BACKEND_SUPERUSER_EMAIL    = var.jao_backend_superuser_email
+    REDIS_HOST                     = module.celery_redis.celery_broker_url
+    # Celery configuration
+    CELERY_BROKER_URL                     = module.celery_redis.celery_broker_url
+    CELERY_RESULT_BACKEND                 = module.celery_redis.celery_result_backend
+    JAO_BACKEND_INGEST_DEFAULT_BATCH_SIZE = 50000
+
+    # LiteLLM integration
+    JAO_BACKEND_VACANCY_EMBED_LIMIT = 70000
+    #JAO_BACKEND_LITELLM_API_BASE          = "http://127.0.0.1:11434/api/embed" # Default for dev environment
+    #JAO_BACKEND_LITELLM_CUSTOM_PROVIDER   = "ollama"                           # Default for dev environment
+    JAO_EMBEDDER_SUMMARY_RESPONSIBILITIES = "bedrock/amazon.titan-embed-text-v2:0"
+
+    # API rate limiting and monitoring config
+    ENABLE_RATE_LIMITING = "true"
+    MAX_REQUESTS_PER_MIN = local.current_env.max_requests_per_min
+    ENABLE_API_METRICS   = "true"
+
+    # Django admin URL configuration - use standard admin URL
+    DJANGO_ADMIN_URL = "django-admin/"
+  })
+
+  health_check_path        = "/health"
+  internal_lb              = false
+  admin_lb_internet_facing = true
+  logs_retention_in_days   = local.current_env.log_retention_days
+
+  # Enable enhanced monitoring and tracing for the API backend
+  enable_enhanced_monitoring = true
+  enable_xray_tracing        = local.current_env.enable_xray_tracing
+  enable_circuit_breaker     = true
+
+  # Enable Celery services
+  enable_celery_services = var.enable_celery_services
+
+  # Admin IP whitelisting
+  admin_allowed_cidrs = var.admin_allowed_cidrs
+
+  tags = local.common_tags
+}
+
+# Frontend Module
+module "frontend" {
+  source = "./modules/frontend"
+
+  name_prefix            = var.app_name
+  environment            = var.environment
+  ecr_repository_url     = local.frontend_ecr_url
+  container_port         = 8000
+  vpc_id                 = module.vpc.vpc_id
+  private_subnet_ids     = module.vpc.private_subnet_ids
+  public_subnet_ids      = module.vpc.public_subnet_ids
+  cpu                    = var.task_cpu
+  memory                 = var.task_memory
+  desired_count          = var.desired_count
+  frontend_allowed_cidrs = var.frontend_allowed_cidrs
+
+  # Environment variables for the frontend service
+  environment_variables = {
+    DJANGO_DEBUG             = local.current_env.django_debug
+    DJANGO_SETTINGS_MODULE   = "jao_web.settings.dev"
+    PORT                     = "8000"
+    JAO_BACKEND_URL          = module.ecs.load_balancer_dns_name
+    JAO_BACKEND_TIMEOUT      = "15"
+    JAO_BACKEND_ENABLE_HTTP2 = "true"
+    SESSION_COOKIE_SECURE    = local.current_env.session_cookie_secure
+    ENV                      = var.environment
+    DJANGO_ALLOWED_HOSTS     = "*"
+  }
+  health_check_path      = "/health"
+  internal_lb            = false
+  logs_retention_in_days = local.current_env.log_retention_days
+
+  tags = local.common_tags
+}
+
+# API Gateway with enhanced third-party API features
+module "api_gateway" {
+  source = "./modules/api_gateway"
+
+  name_prefix                = var.app_name
+  environment                = var.environment
+  vpc_id                     = module.vpc.vpc_id
+  load_balancer_arn          = module.ecs.load_balancer_arn
+  load_balancer_dns_name     = module.ecs.load_balancer_dns_name
+  stage_name                 = var.environment
+  logs_retention_in_days     = local.current_env.log_retention_days
+  enable_api_keys            = true
+  enable_detailed_metrics    = true
+  api_throttling_rate_limit  = local.current_env.api_rate_limit
+  api_throttling_burst_limit = local.current_env.api_burst_limit
+
+  # API keys for third-party consumers
+  api_keys = [
+    {
+      name        = "internal-frontend"
+      description = "API key for internal frontend application"
+      enabled     = true
+    },
+    {
+      name        = "partner-api-consumer"
+      description = "API key for partner applications"
+      enabled     = true
+    },
+    {
+      name        = "public-api-consumer"
+      description = "API key for public API consumers"
+      enabled     = true
+    }
+  ]
+  routes = [
+    {
+      route_key = "ANY /{proxy+}"
+      methods   = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
+      path      = "/{proxy+}"
+    },
+    {
+      route_key = "GET /health"
+      methods   = ["GET"]
+      path      = "/health"
+    }
+  ]
+
+  tags = local.common_tags
+}
+
+
+# Database Module - Aurora PostgreSQL with pgvector
 module "vectordb" {
   source = "./modules/aurora_pgvector"
 
@@ -194,7 +391,6 @@ module "vectordb" {
 
   allowed_security_groups = [aws_security_group.db_access.id]
   allowed_cidr_blocks     = var.allowed_cidr_blocks
-
   # Enable data science read replica if SageMaker is enabled
   create_data_science_replica = var.enable_sagemaker_environment
   data_science_instance_class = var.environment == "prod" ? "db.r6g.xlarge" : "db.serverless"
@@ -202,7 +398,8 @@ module "vectordb" {
   # Database configuration
   database_name   = "${replace(var.app_name, "-", "")}${var.environment}db"
   master_username = "dbadmin"
-  engine_version  = "15.12"
+  # master_password = var.skip_secret_creation ? "TemporaryPassword123!" : null
+  engine_version = "15.15" # match the live cluster's auto-upgraded minor version to avoid a spurious downgrade/ModifyDBCluster
 
   use_serverless = false
   instance_count = 1
@@ -383,8 +580,9 @@ module "bastion" {
   count  = var.enable_bastion_host ? 1 : 0
   source = "./modules/bastion"
 
-  name_prefix         = var.app_name
-  vpc_cidr_blocks     = [module.vpc.vpc_cidr_block]
+  name_prefix     = var.app_name
+  vpc_cidr_blocks = [module.vpc.vpc_cidr_block]
+
   vpc_id              = module.vpc.vpc_id
   public_subnet_id    = module.vpc.public_subnet_ids[0]
   allowed_cidr_blocks = var.allowed_cidr_blocks

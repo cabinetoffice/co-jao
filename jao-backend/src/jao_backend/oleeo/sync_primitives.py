@@ -99,8 +99,8 @@ def _build_pk_range_filter(
         assert isinstance(pk_start, int), "Start of primary key range must be an int"
         pk_filter_kwargs["pk__gte"] = pk_start
 
-    if pk_start is not None:
-        assert isinstance(pk_start, int), "End of primary key range must be an int"
+    if pk_end is not None:
+        assert isinstance(pk_end, int), "End of primary key range must be an int"
         pk_filter_kwargs["pk__lte"] = pk_end
 
     return pk_filter_kwargs
@@ -202,7 +202,7 @@ def destination_pending_create_update_delete(
 
     destination_qs = destination_model.objects.order_by("pk")
     if pk_filter_kwargs:
-        destination_qs.filter(**pk_filter_kwargs)
+        destination_qs = destination_qs.filter(**pk_filter_kwargs)
 
     deleted_pks = []
 
