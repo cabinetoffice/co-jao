@@ -211,7 +211,9 @@ class OleeoVacanciesIngest:
         )
         if update_instances:
             for instance in update_instances:
-                instance.deleted = False
+                # Still present upstream, so not deleted: this also resurrects a row
+                # that was previously marked deleted.  (The field is is_deleted.)
+                instance.is_deleted = False
 
             non_pk_fields = [
                 field.name
@@ -228,7 +230,7 @@ class OleeoVacanciesIngest:
 
         deleted_count = 0
         if not create_only:
-            deleted_count = delete_qs.update(is_deleted=False)
+            deleted_count = delete_qs.update(is_deleted=True)
 
         return created_count, updated_count, deleted_count
 

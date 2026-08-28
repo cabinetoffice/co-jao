@@ -182,6 +182,32 @@ def iter_instances_diff(
         source_pk = next(source_iter, None)
 
 
+def apply_source_values(source_instance, destination_instance):
+    """
+    Copy transformed upstream values onto an existing destination instance.
+
+    `destination_instance` is a row that already exists in the destination database;
+    its primary key identifies the row that bulk_update will write to, so the pk is
+    never overwritten.  Every other value comes from the source, transformed by the
+    registered pydantic schema (see `as_destination_dict`).
+
+    Without this the UPDATE branch hands bulk_update the unmodified row it just read,
+    setting every column to the value it already held.
+    """
+    destination_model = type(destination_instance)
+
+    settable = set()
+    for field in destination_model._meta.concrete_fields:  # noqa
+        if field.primary_key:
+            continue
+        # Relations are set by id: the transform yields values, not model instances.
+        settable.add(field.attname if field.is_relation else field.name)
+
+    for name, value in source_instance.as_destination_dict().items():
+        if name in settable:
+            setattr(destination_instance, name, value)
+
+
 def destination_pending_create_update_delete(
     source_model, destination_model, pk_start=None, pk_end=None, **kwargs
 ):
@@ -218,6 +244,7 @@ def destination_pending_create_update_delete(
         if status == SyncStatus.UPDATE:
             assert source_instance is not None
             assert destination_instance is not None
+            apply_source_values(source_instance, destination_instance)
             updated_instances.append(destination_instance)
         elif status == SyncStatus.CREATE:
             assert source_instance is not None
