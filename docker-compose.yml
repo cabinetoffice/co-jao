@@ -35,7 +35,9 @@ services:
       - jao-network
 
   db:
-    image: postgres:15
+    # pgvector, not plain postgres: common/migrations/0001 runs CREATE EXTENSION vector,
+    # so migrate fails outright on an image without it.
+    image: pgvector/pgvector:pg15
     environment:
       POSTGRES_DB: jao_dev
       POSTGRES_USER: jao_user
