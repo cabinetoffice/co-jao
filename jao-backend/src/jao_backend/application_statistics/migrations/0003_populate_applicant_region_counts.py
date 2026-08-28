@@ -47,6 +47,17 @@ def populate_data(apps, schema_editor):
         region_name_to_object_map[region_name] = region_obj
     print(f"  Ensured {len(unique_region_names)} Region objects exist.")
 
+    # Everything above is derived from postcode_regions.csv and belongs in every
+    # database.  Everything below counts applicants held in OLEEO, so without that
+    # connection there is nothing to count.  Returning here lets a fresh database
+    # (local, CI, test) migrate without access to R2D2, instead of dying with
+    # ConnectionDoesNotExist on the query below.
+    # Checking DATABASES rather than JAO_BACKEND_ENABLE_OLEEO also covers settings
+    # that configure the upstream connection under a different alias.
+    if "oleeo_upstream" not in settings.DATABASES:
+        print("  OLEEO database not configured: skipping applicant region counts.")
+        return
+
         # --- 4. Process all raw applicant data from Oleeo ---
     print("Querying and processing applicant postcodes from Oleeo DB...")
     vacancy_stats = defaultdict(lambda: defaultdict(int))
