@@ -1,8 +1,12 @@
 services:
   jao-backend:
+    platform: linux/amd64
     build:
       context: .
-      dockerfile: ./jao-backend/Dockerfile.dev
+      dockerfile: ./jao-backend/Dockerfile
+    # ponytail: batch engine has no server; exec in to run pipeline commands.
+    # Overrides the image's CMD (run_weekly_pipeline) so `up` cannot start a real ingest.
+    command: sleep infinity
     ports:
       - "8000:8000"
     extra_hosts:
@@ -27,26 +31,6 @@ services:
     depends_on:
       - db
       - skills-worker
-    networks:
-      - jao-network
-
-  jao-web:
-    build:
-      context: .
-      dockerfile: ./jao-web/Dockerfile.dev
-    ports:
-      - "8001:8000"
-    env_file:
-      - .env
-    environment:
-      - ENV=dev
-      - PYTHONPATH=/app/src
-      - PYTHONDONTWRITEBYTECODE=1
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - ./jao-web/src:/app/src
-    depends_on:
-      - jao-backend
     networks:
       - jao-network
 
