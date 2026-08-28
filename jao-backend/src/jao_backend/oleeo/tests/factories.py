@@ -49,6 +49,7 @@ class TestVacanciesFactory(factory.django.DjangoModelFactory):
 
     vacancy_id = factory.Sequence(lambda n: n)
     vacancy_title = factory.Faker("job")
+    job_description = factory.Faker("paragraph")
     salary_minimum = factory.Faker("random_int", min=30000, max=80000)
     salary_maximum_optional = factory.Faker("random_int", min=50000, max=120000)
 
@@ -69,7 +70,7 @@ class TestVacanciesFactory(factory.django.DjangoModelFactory):
     def create_timestamp(obj, create, extracted, **kwargs):
         """Create associated TestVacanciesTimestamps for each vacancy."""
         if create:
-            TestVacanciesTimestamps.objects.get_or_create(
+            TestVacanciesTimestamps.objects_for_ingest.get_or_create(
                 vacancy=obj,
                 defaults={
                     "live_date": fake.date_time_between(

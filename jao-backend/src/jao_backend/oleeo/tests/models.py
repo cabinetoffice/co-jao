@@ -46,6 +46,9 @@ class TestVacancies(OleeoUpstreamModel):
     vacancy_title = models.TextField()
     salary_minimum = models.TextField(blank=True, null=True)
     salary_maximum_optional = models.TextField(blank=True, null=True)
+    # Required by VacanciesQuerySet.valid_descriptions(), which excludes vacancies
+    # that point at an attachment instead of describing the job.
+    job_description = models.TextField(blank=True, null=True)
 
     objects_for_ingest = VacanciesQuerySet.as_manager()
 
