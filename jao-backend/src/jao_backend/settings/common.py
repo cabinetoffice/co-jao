@@ -83,7 +83,10 @@ INSTALLED_APPS = [
     "jao_backend.skills",
 ]
 
-DEBUG = True
+# Off by default: with DEBUG on, Django records every query in connection.queries for
+# the life of the process, which grows without bound over a multi-hour pipeline run.
+# settings.dev turns it back on for local work; set DJANGO_DEBUG=1 to force it here.
+DEBUG = is_truthy(os.environ.get("DJANGO_DEBUG", "false"))
 
 # Use the pytest-django plugin to run tests
 TEST_RUNNER = "jao_backend.settings.tests.runner.PytestTestRunner"
