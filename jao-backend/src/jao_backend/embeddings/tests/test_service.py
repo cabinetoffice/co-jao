@@ -15,7 +15,7 @@ def test_sync_embedding_tags(settings):
             "uuid": settings.EMBEDDING_TAG_JOB_TITLE_RESPONSIBILITIES_ID,
             "name": "job-title-responsibilities",
             "model__name": "sentence-transformers/all-MiniLM-L6-v2",
-            "description": "Description for Vacancy Tag 1",
+            "description": "Job title and responsibilities concatenated",
             "version": 1,
         },
         {
@@ -26,6 +26,11 @@ def test_sync_embedding_tags(settings):
             "version": 1,
         },
     ]
+
+    # get_configured_tags is memoised with @cache, which outlives the per-test
+    # transaction: if an earlier test populated it, the call below would return the
+    # cached tags without writing any rows to this test's database.
+    EmbeddingTag.get_configured_tags.cache_clear()
 
     # On a fresh database there should be no embedding tags yet
     assert EmbeddingTag.objects.exists() is False
