@@ -139,7 +139,7 @@ variable "data_engine_memory" {
 variable "data_engine_schedule_expression" {
   description = "Schedule expression for the data engine task (cron or rate)"
   type        = string
-  default     = "cron(0 2 ? * SUN *)"  # Every Sunday at 2 AM UTC
+  default     = "cron(0 2 ? * SUN *)" # Every Sunday at 2 AM UTC
 }
 
 # =============================================================================
@@ -167,7 +167,7 @@ variable "enable_skills_worker_schedule" {
 variable "skills_worker_schedule_expression" {
   description = "Schedule expression for the skills worker task (if enabled)"
   type        = string
-  default     = "cron(0 3 ? * SUN *)"  # Every Sunday at 3 AM UTC
+  default     = "cron(0 3 ? * SUN *)" # Every Sunday at 3 AM UTC
 }
 
 # =============================================================================

@@ -31,7 +31,7 @@ variable "enable_encryption" {
 
 variable "lifecycle_rules" {
   description = "List of maps containing lifecycle rules configuration"
-  type        = list(object({
+  type = list(object({
     id     = string
     status = string
     expiration = optional(object({

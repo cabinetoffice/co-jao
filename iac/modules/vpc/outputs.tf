@@ -78,10 +78,10 @@ output "vpc_endpoints_security_group_id" {
 output "vpc_endpoints_created" {
   description = "Map of which VPC endpoints were created vs existing"
   value = {
-    ecr_dkr_created = length(aws_vpc_endpoint.ecr_dkr) > 0
-    ecr_api_created = length(aws_vpc_endpoint.ecr_api) > 0
-    s3_created      = length(aws_vpc_endpoint.s3) > 0
-    logs_created    = length(aws_vpc_endpoint.logs) > 0
+    ecr_dkr_created  = length(aws_vpc_endpoint.ecr_dkr) > 0
+    ecr_api_created  = length(aws_vpc_endpoint.ecr_api) > 0
+    s3_created       = length(aws_vpc_endpoint.s3) > 0
+    logs_created     = length(aws_vpc_endpoint.logs) > 0
     ecr_dkr_existing = var.existing_ecr_dkr_endpoint_id != ""
     ecr_api_existing = var.existing_ecr_api_endpoint_id != ""
     s3_existing      = var.existing_s3_endpoint_id != ""

@@ -27,7 +27,7 @@ output "ssh_key_name" {
 
 output "connection_instructions" {
   description = "Instructions for connecting through the bastion"
-  value = <<EOF
+  value       = <<EOF
 To connect to your Aurora database through the bastion:
 
 1. SSH to bastion:
