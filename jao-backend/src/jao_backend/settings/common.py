@@ -117,7 +117,8 @@ INSTALLED_APPS = [
     "jao_backend.oleeo",
     "jao_backend.healthcheck",
     "jao_backend.llm",
-    "jao_backend.applicant_text"
+    "jao_backend.applicant_text",
+    "jao_backend.skills"
 ]
 
 
