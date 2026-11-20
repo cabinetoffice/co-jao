@@ -75,6 +75,8 @@ resource "aws_security_group_rule" "aurora_ingress_sg" {
   description              = "Allow PostgreSQL from security group ${var.allowed_security_groups[count.index]}"
 }
 
+# Security group rule for SageMaker access should be created in main.tf to avoid circular dependency
+
 # subnet group for the Aurora cluster
 resource "aws_db_subnet_group" "aurora" {
   name       = "${local.name_prefix}-subnet-group"
@@ -187,38 +189,31 @@ resource "aws_rds_cluster_instance" "aurora" {
   tags = local.tags
 }
 
-# IAM role for Enhanced Monitoring
-resource "aws_iam_role" "monitoring" {
-  count = var.enhanced_monitoring_interval > 0 ? 1 : 0
+# Create dedicated read replica for data science workloads
+resource "aws_rds_cluster_instance" "data_science_replica" {
+  count = var.create_data_science_replica && !var.use_serverless ? 1 : 0
 
-  name = "${local.name_prefix}-monitoring-role"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = "monitoring.rds.amazonaws.com"
-      }
-    }]
+  identifier           = "${local.name_prefix}-data-science-replica"
+  cluster_identifier   = aws_rds_cluster.aurora.id
+  instance_class       = var.data_science_instance_class != null ? var.data_science_instance_class : "db.serverless"
+  engine               = aws_rds_cluster.aurora.engine
+  engine_version       = aws_rds_cluster.aurora.engine_version
+  db_subnet_group_name = aws_db_subnet_group.aurora.name
+
+  # Enable query performance monitoring for data science workloads
+  performance_insights_enabled          = true
+  performance_insights_retention_period = var.performance_insights_retention_period != null ? var.performance_insights_retention_period : 7
+
+  monitoring_interval = var.enhanced_monitoring_interval
+  monitoring_role_arn = var.enhanced_monitoring_interval > 0 ? aws_iam_role.monitoring[0].arn : null
+
+  apply_immediately = var.apply_immediately
+
+  tags = merge(local.tags, {
+    Purpose = "data-science"
+    Type    = "read-replica"
   })
-
-  tags = local.tags
 }
-
-resource "aws_iam_role_policy_attachment" "monitoring" {
-  count = var.enhanced_monitoring_interval > 0 ? 1 : 0
-
-  role       = aws_iam_role.monitoring[0].name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
-}
-
-# random password if one is not provided
-# resource "random_password" "master" {
-#   for_each = var.master_password == null ? { "main" = true } : {}
-#   length   = 16
-#   special  = false
-# }
 
 # Store password in Secrets Manager if auto-generated
 # resource "aws_secretsmanager_secret" "password" {
