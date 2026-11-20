@@ -395,22 +395,3 @@ resource "aws_scheduler_schedule" "skills_worker" {
 
   state = var.schedule_enabled ? "ENABLED" : "DISABLED"
 }
-
-# =============================================================================
-# BEDROCK VPC ENDPOINT
-# =============================================================================
-
-resource "aws_vpc_endpoint" "bedrock" {
-  vpc_id            = var.vpc_id
-  service_name      = "com.amazonaws.${data.aws_region.current.name}.bedrock-runtime"
-  vpc_endpoint_type = "Interface"
-  subnet_ids        = var.private_subnet_ids
-
-  security_group_ids = [aws_security_group.tasks.id]
-
-  private_dns_enabled = true
-
-  tags = merge(var.tags, {
-    Name = "${local.name}-bedrock-endpoint"
-  })
-}

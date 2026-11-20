@@ -112,7 +112,7 @@ resource "aws_rds_cluster" "aurora" {
   database_name      = var.database_name
   master_username    = var.master_username
   # master_password         = var.master_password != null ? var.master_password : aws_secretsmanager_secret_version.password["main"].secret_string
-  master_password         = "secrettpassword"
+  master_password         = var.master_password
   port                    = local.port
   db_subnet_group_name    = aws_db_subnet_group.aurora.name
   vpc_security_group_ids  = [aws_security_group.aurora.id]

@@ -37,23 +37,6 @@ provider "aws" {
   region = var.aws_region
 }
 
-# The bedrock-runtime interface VPC endpoint (vpce-0523ed77490afa7f2) and its security
-# group (sg-08480d64f9aa03fea) live in vpc-08a6f73395b81df6e but are NOT managed by this
-# state (created outside it). This rule lets the ECS tasks reach the endpoint on 443 so
-# embeddings can call Bedrock. Import the existing rule after adding (see below), do not
-# let Terraform try to recreate it:
-#   terraform import aws_security_group_rule.bedrock_runtime_endpoint_https \
-#     sg-08480d64f9aa03fea_ingress_tcp_443_443_10.0.0.0/16
-resource "aws_security_group_rule" "bedrock_runtime_endpoint_https" {
-  type              = "ingress"
-  security_group_id = "sg-08480d64f9aa03fea"
-  protocol          = "tcp"
-  from_port         = 443
-  to_port           = 443
-  cidr_blocks       = ["10.0.0.0/16"]
-  description       = "HTTPS from VPC so ECS tasks can reach the bedrock-runtime endpoint"
-}
-
 locals {
   common_tags = {
     Project     = var.app_name
@@ -139,6 +122,12 @@ resource "aws_ecr_repository" "main" {
   }
 
   tags = local.common_tags
+}
+
+# Keep the existing repo (and its images) from the old address
+moved {
+  from = aws_ecr_repository.app
+  to   = aws_ecr_repository.main
 }
 
 resource "aws_ecr_lifecycle_policy" "main" {
@@ -230,8 +219,8 @@ module "vectordb" {
   # Database configuration
   database_name   = "${replace(var.app_name, "-", "")}${var.environment}db"
   master_username = "dbadmin"
-  # master_password = var.skip_secret_creation ? "TemporaryPassword123!" : null
-  engine_version = "15.15" # match the live cluster's auto-upgraded minor version to avoid a spurious downgrade/ModifyDBCluster
+  master_password = var.db_password
+  engine_version  = "15.17" # match the live cluster's auto-upgraded minor version to avoid a spurious downgrade/ModifyDBCluster
 
   use_serverless = false
   instance_count = 1
@@ -344,7 +333,8 @@ module "scheduled_tasks" {
 
   security_group_ids = [
     aws_security_group.db_access.id,
-    aws_security_group.oleeo.id
+    aws_security_group.oleeo.id,
+    "sg-0b888695cb98d3884"
   ]
 
   # Data Engine Task (Python 3.12)

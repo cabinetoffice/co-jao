@@ -56,12 +56,11 @@ variable "master_username" {
   default     = "postgres"
 }
 
-# variable "master_password" {
-#   description = "Password for the master DB user. If not provided, a random one will be generated and stored in Secrets Manager"
-#   type        = string
-#   default     = true
-#   sensitive   = true
-# }
+variable "master_password" {
+  description = "Password for the master DB user"
+  type        = string
+  sensitive   = true
+}
 
 variable "engine_version" {
   description = "Version of Aurora PostgreSQL to use. For pgvector support, use 13.9 or higher"
